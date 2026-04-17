@@ -1,0 +1,100 @@
+import { Button, LineEdit } from "std-widgets.slint";
+
+export component LoginScreen inherits Rectangle {
+    in-out property <string> email;
+    in-out property <string> password;
+    in-out property <string> verification-code;
+    in property <string> status-text: "等待登录";
+
+    callback login-requested();
+    callback register-requested();
+    callback verify-code-requested();
+
+    height: 372px;
+    background: #17251e;
+    border-radius: 28px;
+
+    Text {
+        x: 28px;
+        y: 28px;
+        text: "登录 / 注册";
+        color: #fff4dd;
+        font-size: 30px;
+        font-weight: 800;
+    }
+
+    Text {
+        x: 30px;
+        y: 72px;
+        width: parent.width - 60px;
+        text: "邮箱验证码、注册和密码登录共用这块区域，后面接入 sub2api 登录接口即可。";
+        color: #cbd7bd;
+        font-size: 14px;
+        wrap: word-wrap;
+    }
+
+    LineEdit {
+        x: 28px;
+        y: 122px;
+        width: parent.width - 56px;
+        height: 44px;
+        text <=> root.email;
+        placeholder-text: "邮箱";
+    }
+
+    LineEdit {
+        x: 28px;
+        y: 178px;
+        width: parent.width - 56px;
+        height: 44px;
+        text <=> root.password;
+        placeholder-text: "密码";
+        input-type: InputType.password;
+    }
+
+    LineEdit {
+        x: 28px;
+        y: 234px;
+        width: parent.width - 182px;
+        height: 44px;
+        text <=> root.verification-code;
+        placeholder-text: "邮箱验证码";
+    }
+
+    Button {
+        x: parent.width - 142px;
+        y: 234px;
+        width: 114px;
+        height: 44px;
+        text: "发验证码";
+        clicked => { root.verify-code-requested(); }
+    }
+
+    Button {
+        x: 28px;
+        y: 304px;
+        width: 138px;
+        height: 44px;
+        text: "登录";
+        clicked => { root.login-requested(); }
+    }
+
+    Button {
+        x: 182px;
+        y: 304px;
+        width: 138px;
+        height: 44px;
+        text: "注册";
+        clicked => { root.register-requested(); }
+    }
+
+    Text {
+        x: 338px;
+        y: 316px;
+        width: parent.width - 366px;
+        text: root.status-text;
+        color: #d6e1bd;
+        font-size: 13px;
+        wrap: word-wrap;
+    }
+}

@@ -1,6 +1,6 @@
 # Sub2API Desktop Client
 
-`desktop-client` 是面向终端用户的 `Slint + Rust` 桌面客户端骨架。当前阶段只完成可编译启动壳、路由枚举和首屏 UI，用于承接后续登录、CDK、安装探测和 Codex 启动编排。
+`desktop-client` 是面向终端用户的 `Slint + Rust` 桌面客户端骨架。当前阶段已完成可编译启动壳、账号认证契约类型、系统凭据存储接口、登录/注册/忘记密码 UI 壳、账户总览 UI 壳，用于承接后续 CDK、安装探测和 Codex 启动编排。
 
 ## 本地运行
 
@@ -25,7 +25,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\stop-desktop-client.ps1
 ## 验证
 
 ```powershell
-cargo --config 'source.crates-io.replace-with="rsproxy-sparse"' --config 'source.rsproxy-sparse.registry="sparse+https://rsproxy.cn/index/"' test --manifest-path desktop-client/Cargo.toml --lib app_bootstrap_exposes_router_module
+cargo --config 'source.crates-io.replace-with="rsproxy-sparse"' --config 'source.rsproxy-sparse.registry="sparse+https://rsproxy.cn/index/"' test --manifest-path desktop-client/Cargo.toml --lib
 cargo --config 'source.crates-io.replace-with="rsproxy-sparse"' --config 'source.rsproxy-sparse.registry="sparse+https://rsproxy.cn/index/"' check --manifest-path desktop-client/Cargo.toml
 ```
 
@@ -33,6 +33,6 @@ cargo --config 'source.crates-io.replace-with="rsproxy-sparse"' --config 'source
 
 ## 当前边界
 
-- 已有：Slint 主窗口、基础路由枚举、启动/停止脚本。
-- 未接入：登录、注册、忘记密码、CDK、安装探测、桌面会话、Codex 启动。
-- 安全约束：后续 UI 仍不展示 API Key、Base URL 或 runtime token。
+- 已有：Slint 主窗口、基础路由枚举、账号认证 JSON 契约、2FA 登录响应契约、HTTP 请求构造与超时边界、系统凭据存储接口、登录/注册/邮箱验证码/忘记密码 UI 壳、账户总览 UI 壳、启动/停止脚本。
+- 未接入：真实登录请求、CDK 兑换请求、安装探测、桌面会话、Codex 启动。
+- 安全约束：后续 UI 仍不展示连接密钥、服务地址或 runtime 凭证；refresh token 默认走系统凭据存储，文件实现仅作为测试替身。

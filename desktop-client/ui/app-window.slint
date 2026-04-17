@@ -1,11 +1,20 @@
 import { Button } from "std-widgets.slint";
 import { AboutScreen } from "screens/about.slint";
+import { DashboardScreen } from "screens/dashboard.slint";
+import { ForgotPasswordScreen } from "screens/forgot_password.slint";
+import { LoginScreen } from "screens/login.slint";
 
 export component AppWindow inherits Window {
     width: 1180px;
-    height: 760px;
+    height: 820px;
     title: "Token Client";
     background: #f4eddd;
+
+    in-out property <string> email;
+    in-out property <string> password;
+    in-out property <string> verification-code;
+    in-out property <string> reset-token;
+    in-out property <string> new-password;
 
     Rectangle {
         width: parent.width;
@@ -43,75 +52,48 @@ export component AppWindow inherits Window {
 
         Text {
             x: 72px;
-            y: 124px;
-            width: 620px;
-            text: "给 Sub2API 用户准备的 Codex 启动台。隐藏 API 细节，只保留登录、兑换和一键启动。";
+            y: 118px;
+            width: 650px;
+            text: "给 Sub2API 用户准备的 Codex 启动台。隐藏接口细节，只保留登录、兑换和一键启动。";
             color: #5e684f;
             font-size: 18px;
             wrap: word-wrap;
         }
 
-        Rectangle {
+        LoginScreen {
             x: 72px;
-            y: 208px;
-            width: 250px;
-            height: 132px;
-            background: #efe1bd;
-            border-radius: 22px;
-
-            Text { x: 24px; y: 24px; text: "官方模式"; color: #18251f; font-size: 20px; font-weight: 700; }
-            Text { x: 24px; y: 62px; width: 190px; text: "不修改官方 Profile，直接启动本机 Codex。"; color: #687052; font-size: 14px; wrap: word-wrap; }
+            y: 178px;
+            width: 438px;
+            email <=> root.email;
+            password <=> root.password;
+            verification-code <=> root.verification-code;
+            status-text: "未连接。登录成功后再创建临时桌面会话。";
         }
 
-        Rectangle {
-            x: 348px;
-            y: 208px;
-            width: 300px;
-            height: 132px;
-            background: #dce8c8;
-            border-radius: 22px;
-
-            Text { x: 24px; y: 24px; text: "平台模式"; color: #18251f; font-size: 20px; font-weight: 700; }
-            Text { x: 24px; y: 62px; width: 238px; text: "用短期桌面会话连接 Sub2API，保留独立受管历史。"; color: #56634d; font-size: 14px; wrap: word-wrap; }
+        DashboardScreen {
+            x: 534px;
+            y: 178px;
+            width: 290px;
+            user-label: "当前账号：未登录";
+            balance-text: "余额：--";
+            usage-text: "并发额度：--";
+            recharge-notice: "充值页面暂作为公告页。首版先支持 CDK 兑换，不在客户端展示接口地址或密钥。";
         }
 
-        Rectangle {
+        ForgotPasswordScreen {
             x: 72px;
-            y: 388px;
-            width: 576px;
-            height: 170px;
-            background: #fbf2dd;
-            border-radius: 24px;
-            border-color: #d8c9a6;
-            border-width: 1px;
-
-            Text { x: 26px; y: 24px; text: "首版工作台"; color: #17251e; font-size: 22px; font-weight: 700; }
-            Text { x: 26px; y: 66px; text: "注册 / 忘记密码 / 邮箱验证码"; color: #3f4b3d; font-size: 16px; }
-            Text { x: 26px; y: 96px; text: "余额 / 用量 / CDK 兑换 / 充值说明"; color: #3f4b3d; font-size: 16px; }
-            Text { x: 26px; y: 126px; text: "Codex Desktop / Codex CLI 启动检测"; color: #3f4b3d; font-size: 16px; }
-        }
-
-        Button {
-            x: 72px;
-            y: 602px;
-            width: 210px;
-            height: 48px;
-            text: "进入客户端";
-        }
-
-        Button {
-            x: 304px;
-            y: 602px;
-            width: 210px;
-            height: 48px;
-            text: "检测 Codex";
+            y: 582px;
+            width: 752px;
+            email <=> root.email;
+            reset-token <=> root.reset-token;
+            new-password <=> root.new-password;
         }
 
         Text {
             x: parent.width - 322px;
             y: 72px;
             width: 250px;
-            text: "不会出现 API Key";
+            text: "不会暴露连接凭证";
             color: #f6ead1;
             font-size: 28px;
             font-weight: 800;
@@ -126,6 +108,26 @@ export component AppWindow inherits Window {
             color: #c8d2b7;
             font-size: 16px;
             wrap: word-wrap;
+        }
+
+        Rectangle {
+            x: parent.width - 322px;
+            y: 278px;
+            width: 246px;
+            height: 152px;
+            background: #24382f;
+            border-radius: 22px;
+
+            Text { x: 22px; y: 18px; text: "启动策略"; color: #f6ead1; font-size: 20px; font-weight: 800; }
+            Text { x: 22px; y: 54px; width: 202px; text: "官方模式：不改官方配置。平台模式：为本次启动生成独立临时环境。"; color: #c8d2b7; font-size: 14px; wrap: word-wrap; }
+        }
+
+        Button {
+            x: parent.width - 322px;
+            y: 462px;
+            width: 246px;
+            height: 46px;
+            text: "检测 Codex 安装";
         }
 
         AboutScreen {
