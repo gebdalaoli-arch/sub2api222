@@ -11,90 +11,106 @@ export component LoginScreen inherits Rectangle {
     callback verify-code-requested();
 
     height: 372px;
-    background: #17251e;
-    border-radius: 28px;
+    background: #f8fbff;
+    border-radius: 24px;
+    border-color: #d7e4f0;
+    border-width: 1px;
 
     Text {
-        x: 28px;
-        y: 28px;
-        text: "登录 / 注册";
-        color: #fff4dd;
-        font-size: 30px;
+        x: 24px;
+        y: 20px;
+        text: "登录与注册";
+        color: #18324a;
+        font-size: 24px;
         font-weight: 800;
     }
 
     Text {
-        x: 30px;
-        y: 72px;
-        width: parent.width - 60px;
-        text: "邮箱验证码、注册和密码登录共用这块区域，后面接入 sub2api 登录接口即可。";
-        color: #cbd7bd;
-        font-size: 14px;
+        x: 24px;
+        y: 54px;
+        width: parent.width - 48px;
+        text: "使用注册邮箱登录。需要注册时先发送邮箱验证码，再完成注册。";
+        color: #688097;
+        font-size: 13px;
         wrap: word-wrap;
     }
 
+    Text { x: 24px; y: 98px; text: "邮箱"; color: #3a5570; font-size: 12px; font-weight: 700; }
     LineEdit {
-        x: 28px;
-        y: 122px;
-        width: parent.width - 56px;
-        height: 44px;
+        x: 24px;
+        y: 118px;
+        width: parent.width - 48px;
+        height: 40px;
         text <=> root.email;
-        placeholder-text: "邮箱";
+        placeholder-text: "name@example.com";
     }
 
+    Text { x: 24px; y: 172px; text: "密码"; color: #3a5570; font-size: 12px; font-weight: 700; }
     LineEdit {
-        x: 28px;
-        y: 178px;
-        width: parent.width - 56px;
-        height: 44px;
+        x: 24px;
+        y: 192px;
+        width: parent.width - 48px;
+        height: 40px;
         text <=> root.password;
-        placeholder-text: "密码";
+        placeholder-text: "输入密码";
         input-type: InputType.password;
     }
 
+    Text { x: 24px; y: 246px; text: "验证码 / 2FA"; color: #3a5570; font-size: 12px; font-weight: 700; }
     LineEdit {
-        x: 28px;
-        y: 234px;
-        width: parent.width - 182px;
-        height: 44px;
+        x: 24px;
+        y: 266px;
+        width: parent.width - 160px;
+        height: 40px;
         text <=> root.verification-code;
-        placeholder-text: "邮箱验证码";
+        placeholder-text: "注册验证码或 2FA";
     }
 
     Button {
-        x: parent.width - 142px;
-        y: 234px;
-        width: 114px;
-        height: 44px;
+        x: parent.width - 120px;
+        y: 266px;
+        width: 96px;
+        height: 40px;
         text: "发验证码";
         clicked => { root.verify-code-requested(); }
     }
 
     Button {
-        x: 28px;
-        y: 304px;
-        width: 138px;
-        height: 44px;
+        x: 24px;
+        y: 324px;
+        width: 112px;
+        height: 40px;
         text: "登录";
         clicked => { root.login-requested(); }
     }
 
     Button {
-        x: 182px;
-        y: 304px;
-        width: 138px;
-        height: 44px;
+        x: 148px;
+        y: 324px;
+        width: 112px;
+        height: 40px;
         text: "注册";
         clicked => { root.register-requested(); }
     }
 
-    Text {
-        x: 338px;
-        y: 316px;
-        width: parent.width - 366px;
-        text: root.status-text;
-        color: #d6e1bd;
-        font-size: 13px;
-        wrap: word-wrap;
+    Rectangle {
+        x: 280px;
+        y: 320px;
+        width: parent.width - 304px;
+        height: 44px;
+        background: #ffffff;
+        border-radius: 14px;
+        border-color: #d7e4f0;
+        border-width: 1px;
+
+        Text {
+            x: 14px;
+            y: 14px;
+            width: parent.width - 28px;
+            text: root.status-text;
+            color: #5b7490;
+            font-size: 12px;
+            wrap: word-wrap;
+        }
     }
 }

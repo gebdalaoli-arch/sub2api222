@@ -1,24 +1,25 @@
 export component AboutScreen inherits Rectangle {
-    height: 124px;
-    background: #eef3dc;
-    border-radius: 18px;
+    background: #f8fbff;
+    border-radius: 24px;
+    border-color: #d7e4f0;
+    border-width: 1px;
 
     Text {
-        x: 22px;
+        x: 24px;
         y: 18px;
-        text: "V1 边界";
-        color: #233023;
-        font-size: 18px;
-        font-weight: 700;
+        text: "隐私与连接原则";
+        color: #18324a;
+        font-size: 20px;
+        font-weight: 800;
     }
 
     Text {
-        x: 22px;
-        y: 50px;
-        width: parent.width - 44px;
-        text: "只做 CDK 兑换与公告式充值说明；不展示连接密钥、不展示服务地址、不接管官方账号。";
-        color: #516047;
-        font-size: 14px;
+        x: 24px;
+        y: 52px;
+        width: parent.width - 48px;
+        text: "客户端不展示普通连接密钥，不要求你复制服务地址。官方模式保持原样，平台代理模式使用独立受管运行目录。";
+        color: #688097;
+        font-size: 13px;
         wrap: word-wrap;
     }
 }

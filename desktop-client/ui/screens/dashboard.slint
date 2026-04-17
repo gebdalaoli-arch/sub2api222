@@ -5,82 +5,121 @@ export component DashboardScreen inherits Rectangle {
     in property <string> usage-text: "并发额度：--";
     in property <string> recharge-notice: "充值页面暂作为公告页，首版仅支持 CDK 兑换。";
     in property <string> user-label: "未登录";
+    in property <string> account-status-text: "账户状态：待登录";
 
     callback redeem-requested();
     callback launch-requested();
 
-    height: 372px;
-    background: #eef3dc;
-    border-radius: 28px;
+    background: #f8fbff;
+    border-radius: 24px;
+    border-color: #d7e4f0;
+    border-width: 1px;
 
     Text {
-        x: 26px;
-        y: 24px;
+        x: 24px;
+        y: 20px;
         text: "账户总览";
-        color: #17251e;
-        font-size: 28px;
+        color: #18324a;
+        font-size: 24px;
         font-weight: 800;
     }
 
     Text {
-        x: 28px;
-        y: 66px;
+        x: 24px;
+        y: 54px;
+        width: parent.width - 48px;
         text: root.user-label;
-        color: #607052;
-        font-size: 14px;
+        color: #5b7490;
+        font-size: 13px;
     }
 
     Rectangle {
-        x: 26px;
-        y: 106px;
-        width: parent.width - 52px;
-        height: 82px;
-        background: #17251e;
-        border-radius: 22px;
+        x: 24px;
+        y: 92px;
+        width: (parent.width - 64px) / 3;
+        height: 84px;
+        background: #ffffff;
+        border-radius: 18px;
+        border-color: #d7e4f0;
+        border-width: 1px;
 
-        Text {
-            x: 22px;
-            y: 18px;
-            text: root.balance-text;
-            color: #fff4dd;
-            font-size: 24px;
-            font-weight: 800;
-        }
-
-        Text {
-            x: 22px;
-            y: 52px;
-            text: root.usage-text;
-            color: #cbd7bd;
-            font-size: 14px;
-        }
+        Text { x: 16px; y: 14px; text: "余额"; color: #6a8299; font-size: 12px; font-weight: 700; }
+        Text { x: 16px; y: 38px; text: root.balance-text; color: #18324a; font-size: 18px; font-weight: 800; }
     }
 
-    Text {
-        x: 28px;
-        y: 216px;
-        width: parent.width - 56px;
-        text: root.recharge-notice;
-        color: #4b5944;
-        font-size: 14px;
-        wrap: word-wrap;
+    Rectangle {
+        x: 32px + (parent.width - 64px) / 3;
+        y: 92px;
+        width: (parent.width - 64px) / 3;
+        height: 84px;
+        background: #ffffff;
+        border-radius: 18px;
+        border-color: #d7e4f0;
+        border-width: 1px;
+
+        Text { x: 16px; y: 14px; text: "并发"; color: #6a8299; font-size: 12px; font-weight: 700; }
+        Text { x: 16px; y: 38px; text: root.usage-text; color: #18324a; font-size: 18px; font-weight: 800; }
+    }
+
+    Rectangle {
+        x: 40px + ((parent.width - 64px) / 3) * 2;
+        y: 92px;
+        width: (parent.width - 64px) / 3;
+        height: 84px;
+        background: #ffffff;
+        border-radius: 18px;
+        border-color: #d7e4f0;
+        border-width: 1px;
+
+        Text { x: 16px; y: 14px; text: "状态"; color: #6a8299; font-size: 12px; font-weight: 700; }
+        Text { x: 16px; y: 38px; width: parent.width - 32px; text: root.account-status-text; color: #18324a; font-size: 14px; font-weight: 700; wrap: word-wrap; }
+    }
+
+    Rectangle {
+        x: 24px;
+        y: 196px;
+        width: parent.width - 48px;
+        height: max(74px, parent.height - 284px);
+        background: #ffffff;
+        border-radius: 18px;
+        border-color: #d7e4f0;
+        border-width: 1px;
+
+        Text {
+            x: 16px;
+            y: 16px;
+            text: "公告与交付说明";
+            color: #264461;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        Text {
+            x: 16px;
+            y: 42px;
+            width: parent.width - 32px;
+            text: root.recharge-notice;
+            color: #688097;
+            font-size: 12px;
+            wrap: word-wrap;
+        }
     }
 
     Button {
-        x: 28px;
-        y: 292px;
-        width: 128px;
-        height: 44px;
+        x: 24px;
+        y: parent.height - 56px;
+        width: 126px;
+        height: 40px;
         text: "兑换 CDK";
         clicked => { root.redeem-requested(); }
     }
 
     Button {
-        x: 172px;
-        y: 292px;
-        width: 152px;
-        height: 44px;
-        text: "启动 Codex";
+        x: 164px;
+        y: parent.height - 56px;
+        width: 148px;
+        height: 40px;
+        text: "前往启动中心";
         clicked => { root.launch-requested(); }
     }
 }

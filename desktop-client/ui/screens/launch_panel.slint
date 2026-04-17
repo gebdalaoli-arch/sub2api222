@@ -9,55 +9,84 @@ export component LaunchPanel inherits Rectangle {
     callback launch-cli-requested();
     callback refresh-requested();
 
-    height: 206px;
-    background: #24382f;
-    border-radius: 22px;
+    background: #f8fbff;
+    border-radius: 24px;
+    border-color: #d7e4f0;
+    border-width: 1px;
 
     Text {
-        x: 22px;
-        y: 18px;
-        text: "官方模式";
-        color: #f6ead1;
-        font-size: 20px;
+        x: 24px;
+        y: 20px;
+        text: "官方模式启动";
+        color: #18324a;
+        font-size: 24px;
         font-weight: 800;
     }
 
     Text {
-        x: 22px;
-        y: 52px;
-        width: parent.width - 44px;
+        x: 24px;
+        y: 54px;
+        width: parent.width - 48px;
         text: root.status-text;
-        color: #c8d2b7;
-        font-size: 14px;
+        color: #688097;
+        font-size: 13px;
         wrap: word-wrap;
     }
 
+    Rectangle {
+        x: 24px;
+        y: 98px;
+        width: parent.width - 48px;
+        height: 72px;
+        background: #ffffff;
+        border-radius: 18px;
+        border-color: #d7e4f0;
+        border-width: 1px;
+
+        Text { x: 16px; y: 14px; text: "Codex Desktop"; color: #24415c; font-size: 15px; font-weight: 700; }
+        Text { x: 16px; y: 38px; text: root.desktop-available ? "已检测到可启动目标" : "未检测到可用 Desktop"; color: #688097; font-size: 12px; }
+    }
+
+    Rectangle {
+        x: 24px;
+        y: 182px;
+        width: parent.width - 48px;
+        height: 72px;
+        background: #ffffff;
+        border-radius: 18px;
+        border-color: #d7e4f0;
+        border-width: 1px;
+
+        Text { x: 16px; y: 14px; text: "Codex CLI"; color: #24415c; font-size: 15px; font-weight: 700; }
+        Text { x: 16px; y: 38px; text: root.cli-available ? "已检测到可启动目标" : "未检测到可用 CLI"; color: #688097; font-size: 12px; }
+    }
+
     Button {
-        x: 22px;
-        y: 92px;
-        width: parent.width - 44px;
-        height: 38px;
-        text: "启动 Codex Desktop";
+        x: 24px;
+        y: parent.height - 56px;
+        width: 120px;
+        height: 40px;
+        text: "检测安装";
+        clicked => { root.refresh-requested(); }
+    }
+
+    Button {
+        x: 158px;
+        y: parent.height - 56px;
+        width: 130px;
+        height: 40px;
+        text: "启动 Desktop";
         enabled: root.desktop-available;
         clicked => { root.launch-desktop-requested(); }
     }
 
     Button {
-        x: 22px;
-        y: 140px;
-        width: parent.width - 44px;
-        height: 38px;
-        text: "启动 Codex CLI";
+        x: 302px;
+        y: parent.height - 56px;
+        width: 118px;
+        height: 40px;
+        text: "启动 CLI";
         enabled: root.cli-available;
         clicked => { root.launch-cli-requested(); }
-    }
-
-    Button {
-        x: parent.width - 92px;
-        y: 18px;
-        width: 70px;
-        height: 30px;
-        text: "检测";
-        clicked => { root.refresh-requested(); }
     }
 }
