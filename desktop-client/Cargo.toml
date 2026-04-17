@@ -1,0 +1,11 @@
+[package]
+name = "sub2api-desktop"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+slint = "1.16"
+
+[build-dependencies]
+slint-build = "1.16"

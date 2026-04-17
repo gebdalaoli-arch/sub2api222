@@ -135,3 +135,6 @@ frontend/coverage/
 aicodex
 output/
 
+
+# Rust desktop client build artifacts
+desktop-client/target/
