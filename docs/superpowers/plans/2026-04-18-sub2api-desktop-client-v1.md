@@ -10,12 +10,21 @@
 
 ---
 
+## Current Implementation State
+
+- Backend Task 1 and Task 2 have been implemented and committed through `f06b821`.
+- Desktop sessions now bind `group_id` at creation time and preserve group/subscription context during runtime auth.
+- Refresh and revoke endpoints are owner-scoped by `session_id + user_id`.
+- Migration compatibility is handled by keeping `108_add_desktop_sessions.sql` stable and adding `109_add_desktop_session_group_context.sql` for the new `group_id` context.
+- The next implementation entry point is Task 3: bootstrap the `desktop-client/` Rust + Slint project.
+
 ## File Map
 
 ### Backend
 
 - Create: `backend/ent/schema/desktop_session.go`
 - Create: `backend/migrations/108_add_desktop_sessions.sql`
+- Create: `backend/migrations/109_add_desktop_session_group_context.sql`
 - Create: `backend/internal/service/desktop_session.go`
 - Create: `backend/internal/service/desktop_session_test.go`
 - Create: `backend/internal/server/middleware/desktop_runtime_auth.go`
@@ -69,6 +78,7 @@
 **Files:**
 - Create: `backend/ent/schema/desktop_session.go`
 - Create: `backend/migrations/108_add_desktop_sessions.sql`
+- Create: `backend/migrations/109_add_desktop_session_group_context.sql`
 - Create: `backend/internal/service/desktop_session.go`
 - Test: `backend/internal/service/desktop_session_test.go`
 - Modify: `backend/internal/service/wire.go`
