@@ -2,6 +2,10 @@
 name = "sub2api-desktop"
 version = "0.1.0"
 edition = "2021"
+authors = ["Sub2API"]
+description = "Bright Windows desktop client for Sub2API users."
+license-file = "../LICENSE"
+repository = "https://github.com/Wei-Shaw/sub2api"
 
 [dependencies]
 anyhow = "1"
@@ -15,6 +19,7 @@ tokio = { version = "1", features = ["time"] }
 
 [build-dependencies]
 slint-build = "1.16"
+winresource = "0.1"
 
 [dev-dependencies]
 tempfile = "3"

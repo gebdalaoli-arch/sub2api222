@@ -1,6 +1,6 @@
 # Sub2API Desktop Client
 
-`desktop-client` 是面向终端用户的 `Slint + Rust` 桌面客户端骨架。当前阶段已完成可编译启动壳、账号认证契约类型、系统凭据存储接口、登录/注册/忘记密码 UI 壳、账户总览 UI 壳、Codex 安装检测和官方模式启动入口，用于承接后续 CDK、平台会话和平台模式 Codex 启动编排。
+`desktop-client` 是面向终端用户的 `Slint + Rust` 桌面客户端。当前已经具备亮色桌面应用壳、登录/注册/找回密码闭环、官方模式安装检测与启动、平台模式受管 `CODEX_HOME` 基础、Windows 安装包脚本与安装验证链路。
 
 ## 本地运行
 
@@ -29,10 +29,30 @@ cargo --config 'source.crates-io.replace-with="rsproxy-sparse"' --config 'source
 cargo --config 'source.crates-io.replace-with="rsproxy-sparse"' --config 'source.rsproxy-sparse.registry="sparse+https://rsproxy.cn/index/"' check --manifest-path desktop-client/Cargo.toml
 ```
 
+## Windows 安装包
+
+在仓库根目录运行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build-desktop-installer.ps1
+```
+
+如果要在打包时写入固定后端地址：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build-desktop-installer.ps1 -ApiBaseUrl "https://your-sub2api.example.com/api/v1"
+```
+
+脚本会：
+
+- 生成 `desktop-client\target\release\sub2api-desktop.exe`
+- 生成 Inno Setup 安装包 `dist\desktop-client\Sub2API-Desktop-Setup-<version>.exe`
+- 在 Windows 下为 exe 嵌入版本信息和图标
+
 这里临时使用 `rsproxy.cn` 是因为当前机器访问 crates.io 出现 TLS 握手失败；如果你的网络能直连 crates.io，可以去掉两个 `--config` 参数。
 
 ## 当前边界
 
-- 已有：Slint 主窗口、基础路由枚举、账号认证 JSON 契约、2FA 登录响应契约、HTTP 请求构造与超时边界、系统凭据存储接口、登录/注册/邮箱验证码/忘记密码 UI 壳、账户总览 UI 壳、Codex Desktop/CLI 安装检测、官方模式启动、启动/停止脚本。
-- 未接入：真实登录请求、CDK 兑换请求、桌面会话、平台模式 Codex 启动。
+- 已有：亮色桌面应用壳、基础路由枚举、账号认证 JSON 契约、2FA 登录响应契约、`/auth/me`、`/groups/available`、desktop session create/refresh/revoke 调用层、HTTP 错误保真、系统凭据存储接口、登录/注册/邮箱验证码/忘记密码 UI 与主程序接线、Codex Desktop/CLI 安装检测、官方模式启动、平台模式受管 home 基础、Windows 安装包脚本。
+- 未接入：CDK 兑换真实请求、platform session 与 UI 启动中心的最终接线、平台模式自动续期与退出清理、订单/订阅明细、图标签名。
 - 安全约束：后续 UI 仍不展示连接密钥、服务地址或 runtime 凭证；refresh token 默认走系统凭据存储，文件实现仅作为测试替身。

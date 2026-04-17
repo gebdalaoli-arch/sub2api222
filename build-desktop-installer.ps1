@@ -1,0 +1,61 @@
+param(
+    [string]$ApiBaseUrl = "http://127.0.0.1:8080/api/v1"
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+
+$repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$cargoToml = Join-Path $repoRoot "desktop-client\Cargo.toml"
+$cargoText = Get-Content $cargoToml -Raw
+$versionMatch = [regex]::Match($cargoText, 'version\s*=\s*"([^"]+)"')
+if (-not $versionMatch.Success) {
+    throw "无法从 $cargoToml 解析版本号。"
+}
+$appVersion = $versionMatch.Groups[1].Value
+
+$releaseExe = Join-Path $repoRoot "desktop-client\target\release\sub2api-desktop.exe"
+$outputDir = Join-Path $repoRoot "dist\desktop-client"
+$issPath = Join-Path $repoRoot "desktop-client\packaging\windows\desktop-client.iss"
+$iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+$cargoConfigDir = Join-Path $repoRoot ".cargo"
+$cargoConfigPath = Join-Path $cargoConfigDir "config.toml"
+
+if (-not (Test-Path $iscc)) {
+    throw "未找到 Inno Setup 编译器：$iscc"
+}
+
+New-Item -ItemType Directory -Force $outputDir | Out-Null
+New-Item -ItemType Directory -Force $cargoConfigDir | Out-Null
+@'
+[source.crates-io]
+replace-with = "rsproxy-sparse"
+
+[source.rsproxy-sparse]
+registry = "sparse+https://rsproxy.cn/index/"
+'@ | Set-Content -Path $cargoConfigPath -Encoding UTF8
+
+Write-Host "==> 构建 release 二进制"
+$env:SUB2API_DESKTOP_API_BASE_URL = $ApiBaseUrl
+try {
+    & cargo build --release --manifest-path desktop-client/Cargo.toml
+}
+finally {
+    if (Test-Path $cargoConfigPath) {
+        Remove-Item $cargoConfigPath -Force
+    }
+}
+
+if (-not (Test-Path $releaseExe)) {
+    throw "未生成 release 二进制：$releaseExe"
+}
+
+Write-Host "==> 生成 Inno Setup 安装包"
+& $iscc `
+    "/DMyAppVersion=$appVersion" `
+    "/DMySourceExe=$releaseExe" `
+    "/DMyOutputDir=$outputDir" `
+    "/DMyRepoRoot=$repoRoot" `
+    $issPath
+
+Write-Host "==> 安装包输出目录: $outputDir"
