@@ -80,8 +80,11 @@ func (r *desktopSessionRepository) Update(ctx context.Context, session *service.
 	}
 
 	client := clientFromContext(ctx, r.client)
-	builder := client.DesktopSession.Update().
-		Where(dbdesktopsession.SessionIDEQ(session.SessionID)).
+	record, err := resolveDesktopSessionEntity(ctx, client, session.ID, session.SessionID)
+	if err != nil {
+		return err
+	}
+	builder := record.Update().
 		SetUserID(session.UserID).
 		SetDeviceID(session.DeviceID).
 		SetDeviceName(session.DeviceName).
@@ -97,28 +100,41 @@ func (r *desktopSessionRepository) Update(ctx context.Context, session *service.
 		builder.ClearRevokedAt()
 	}
 
-	if _, err := builder.Save(ctx); err != nil {
-		return err
-	}
-
-	refreshed, err := r.GetBySessionID(ctx, session.SessionID)
+	updated, err := builder.Save(ctx)
 	if err != nil {
 		return err
 	}
-	if refreshed != nil {
-		*session = *refreshed
-	}
+	applyDesktopSessionEntity(session, updated)
 	return nil
 }
 
 func (r *desktopSessionRepository) Revoke(ctx context.Context, sessionID string, revokedAt time.Time) error {
 	client := clientFromContext(ctx, r.client)
-	_, err := client.DesktopSession.Update().
-		Where(dbdesktopsession.SessionIDEQ(sessionID)).
+	record, err := resolveDesktopSessionEntity(ctx, client, 0, sessionID)
+	if err != nil {
+		return err
+	}
+	_, err = record.Update().
 		SetStatus("revoked").
 		SetRevokedAt(revokedAt).
 		Save(ctx)
 	return err
+}
+
+func resolveDesktopSessionEntity(ctx context.Context, client *dbent.Client, id int64, sessionID string) (*dbent.DesktopSession, error) {
+	if id > 0 {
+		record, err := client.DesktopSession.Get(ctx, id)
+		if err == nil {
+			return record, nil
+		}
+		if !dbent.IsNotFound(err) || sessionID == "" {
+			return nil, err
+		}
+	}
+
+	return client.DesktopSession.Query().
+		Where(dbdesktopsession.SessionIDEQ(sessionID)).
+		Only(ctx)
 }
 
 func desktopSessionEntityToService(record *dbent.DesktopSession) *service.DesktopSession {

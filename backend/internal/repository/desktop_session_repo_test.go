@@ -109,3 +109,34 @@ func TestDesktopSessionRepository_RuntimeTokenHashMustBeUnique(t *testing.T) {
 	err := repo.Create(ctx, second)
 	require.Error(t, err)
 }
+
+func TestDesktopSessionRepository_UpdateMissingSessionReturnsError(t *testing.T) {
+	repo, _ := newDesktopSessionEntRepo(t)
+	ctx := context.Background()
+	now := time.Date(2026, 4, 18, 9, 0, 0, 0, time.UTC)
+
+	record := &service.DesktopSession{
+		ID:               999,
+		SessionID:        "missing-session",
+		UserID:           42,
+		DeviceID:         "device-001",
+		DeviceName:       "MacBook Pro",
+		Target:           "desktop",
+		Status:           "active",
+		RuntimeTokenHash: "hash-missing",
+		ProfileKey:       "platform-desktop",
+		ExpiresAt:        now.Add(12 * time.Hour),
+		LastSeenAt:       now,
+	}
+
+	err := repo.Update(ctx, record)
+	require.Error(t, err)
+}
+
+func TestDesktopSessionRepository_RevokeMissingSessionReturnsError(t *testing.T) {
+	repo, _ := newDesktopSessionEntRepo(t)
+	ctx := context.Background()
+
+	err := repo.Revoke(ctx, "missing-session", time.Date(2026, 4, 18, 10, 0, 0, 0, time.UTC))
+	require.Error(t, err)
+}
