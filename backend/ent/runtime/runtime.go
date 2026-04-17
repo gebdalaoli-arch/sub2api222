@@ -10,6 +10,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/announcement"
 	"github.com/Wei-Shaw/sub2api/ent/announcementread"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
+	"github.com/Wei-Shaw/sub2api/ent/desktopsession"
 	"github.com/Wei-Shaw/sub2api/ent/errorpassthroughrule"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/idempotencyrecord"
@@ -309,6 +310,29 @@ func init() {
 	announcementreadDescCreatedAt := announcementreadFields[3].Descriptor()
 	// announcementread.DefaultCreatedAt holds the default value on creation for the created_at field.
 	announcementread.DefaultCreatedAt = announcementreadDescCreatedAt.Default.(func() time.Time)
+	desktopsessionMixin := schema.DesktopSession{}.Mixin()
+	desktopsessionMixinFields0 := desktopsessionMixin[0].Fields()
+	_ = desktopsessionMixinFields0
+	desktopsessionFields := schema.DesktopSession{}.Fields()
+	_ = desktopsessionFields
+	// desktopsessionDescCreatedAt is the schema descriptor for created_at field.
+	desktopsessionDescCreatedAt := desktopsessionMixinFields0[0].Descriptor()
+	// desktopsession.DefaultCreatedAt holds the default value on creation for the created_at field.
+	desktopsession.DefaultCreatedAt = desktopsessionDescCreatedAt.Default.(func() time.Time)
+	// desktopsessionDescUpdatedAt is the schema descriptor for updated_at field.
+	desktopsessionDescUpdatedAt := desktopsessionMixinFields0[1].Descriptor()
+	// desktopsession.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	desktopsession.DefaultUpdatedAt = desktopsessionDescUpdatedAt.Default.(func() time.Time)
+	// desktopsession.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	desktopsession.UpdateDefaultUpdatedAt = desktopsessionDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// desktopsessionDescDeviceName is the schema descriptor for device_name field.
+	desktopsessionDescDeviceName := desktopsessionFields[3].Descriptor()
+	// desktopsession.DefaultDeviceName holds the default value on creation for the device_name field.
+	desktopsession.DefaultDeviceName = desktopsessionDescDeviceName.Default.(string)
+	// desktopsessionDescStatus is the schema descriptor for status field.
+	desktopsessionDescStatus := desktopsessionFields[5].Descriptor()
+	// desktopsession.DefaultStatus holds the default value on creation for the status field.
+	desktopsession.DefaultStatus = desktopsessionDescStatus.Default.(string)
 	errorpassthroughruleMixin := schema.ErrorPassthroughRule{}.Mixin()
 	errorpassthroughruleMixinFields0 := errorpassthroughruleMixin[0].Fields()
 	_ = errorpassthroughruleMixinFields0

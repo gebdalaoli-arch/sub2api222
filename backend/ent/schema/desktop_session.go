@@ -38,7 +38,8 @@ func (DesktopSession) Fields() []ent.Field {
 		field.String("target"),
 		field.String("status").
 			Default("active"),
-		field.String("runtime_token_hash"),
+		field.String("runtime_token_hash").
+			Unique(),
 		field.String("profile_key"),
 		field.Time("expires_at"),
 		field.Time("last_seen_at"),

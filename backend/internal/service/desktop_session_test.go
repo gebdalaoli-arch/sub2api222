@@ -37,6 +37,7 @@ func TestDesktopSessionService_CreateRefreshRevoke(t *testing.T) {
 	require.NoError(t, svc.Revoke(context.Background(), created.SessionID))
 	stored := repo.mustGet(created.SessionID)
 	require.NotNil(t, stored.RevokedAt)
+	require.Equal(t, "revoked", stored.Status)
 }
 
 func TestDesktopSessionService_CreateStoresRuntimeTokenHashAndValidateRuntimeToken(t *testing.T) {
@@ -91,6 +92,99 @@ func TestDesktopSessionService_ValidateRuntimeTokenRejectsExpiredSession(t *test
 	require.True(t, infraerrors.IsUnauthorized(err))
 }
 
+func TestDesktopSessionService_ValidateRuntimeTokenRejectsRevokedSession(t *testing.T) {
+	now := time.Date(2026, 4, 18, 9, 0, 0, 0, time.UTC)
+	repo := newDesktopSessionRepoStub(now)
+	svc := NewDesktopSessionService(repo, func() time.Time { return now }, []byte("desktop-test-secret"))
+
+	created, err := svc.Create(context.Background(), DesktopSessionCreateRequest{
+		UserID:        42,
+		DeviceID:      "device-001",
+		DeviceName:    "MacBook Pro",
+		Target:        DesktopSessionTargetDesktop,
+		ClientVersion: "0.1.0",
+	})
+	require.NoError(t, err)
+	require.NoError(t, svc.Revoke(context.Background(), created.SessionID))
+
+	validator, ok := any(svc).(desktopRuntimeTokenValidator)
+	require.True(t, ok, "DesktopSessionService must expose ValidateRuntimeToken")
+
+	validated, err := validator.ValidateRuntimeToken(context.Background(), created.RuntimeToken)
+	require.Nil(t, validated)
+	require.Error(t, err)
+	require.True(t, infraerrors.IsUnauthorized(err))
+}
+
+func TestDesktopSessionService_ValidateRuntimeTokenRejectsUnknownToken(t *testing.T) {
+	now := time.Date(2026, 4, 18, 9, 0, 0, 0, time.UTC)
+	repo := newDesktopSessionRepoStub(now)
+	svc := NewDesktopSessionService(repo, func() time.Time { return now }, []byte("desktop-test-secret"))
+
+	validator, ok := any(svc).(desktopRuntimeTokenValidator)
+	require.True(t, ok, "DesktopSessionService must expose ValidateRuntimeToken")
+
+	validated, err := validator.ValidateRuntimeToken(context.Background(), "missing-token")
+	require.Nil(t, validated)
+	require.Error(t, err)
+	require.True(t, infraerrors.IsUnauthorized(err))
+	require.Equal(t, hashDesktopRuntimeToken("missing-token"), repo.lastRuntimeTokenHashLookup)
+	require.Equal(t, 1, repo.getByRuntimeTokenHashCalls)
+}
+
+func TestDesktopSessionService_RefreshRejectsRevokedSession(t *testing.T) {
+	baseNow := time.Date(2026, 4, 18, 9, 0, 0, 0, time.UTC)
+	currentNow := baseNow
+	repo := newDesktopSessionRepoStub(baseNow)
+	svc := NewDesktopSessionService(repo, func() time.Time { return currentNow }, []byte("desktop-test-secret"))
+
+	created, err := svc.Create(context.Background(), DesktopSessionCreateRequest{
+		UserID:        42,
+		DeviceID:      "device-001",
+		DeviceName:    "MacBook Pro",
+		Target:        DesktopSessionTargetDesktop,
+		ClientVersion: "0.1.0",
+	})
+	require.NoError(t, err)
+	require.NoError(t, svc.Revoke(context.Background(), created.SessionID))
+
+	currentNow = baseNow.Add(30 * time.Minute)
+	refreshed, err := svc.Refresh(context.Background(), created.SessionID)
+	require.Nil(t, refreshed)
+	require.Error(t, err)
+	require.True(t, infraerrors.IsUnauthorized(err))
+
+	stored := repo.mustGet(created.SessionID)
+	require.Equal(t, created.ExpiresAt, stored.ExpiresAt)
+	require.Equal(t, "revoked", stored.Status)
+}
+
+func TestDesktopSessionService_RefreshRejectsExpiredSession(t *testing.T) {
+	baseNow := time.Date(2026, 4, 18, 9, 0, 0, 0, time.UTC)
+	currentNow := baseNow
+	repo := newDesktopSessionRepoStub(baseNow)
+	svc := NewDesktopSessionService(repo, func() time.Time { return currentNow }, []byte("desktop-test-secret"))
+
+	created, err := svc.Create(context.Background(), DesktopSessionCreateRequest{
+		UserID:        42,
+		DeviceID:      "device-001",
+		DeviceName:    "MacBook Pro",
+		Target:        DesktopSessionTargetDesktop,
+		ClientVersion: "0.1.0",
+	})
+	require.NoError(t, err)
+
+	currentNow = created.ExpiresAt
+	refreshed, err := svc.Refresh(context.Background(), created.SessionID)
+	require.Nil(t, refreshed)
+	require.Error(t, err)
+	require.True(t, infraerrors.IsUnauthorized(err))
+
+	stored := repo.mustGet(created.SessionID)
+	require.Equal(t, created.ExpiresAt, stored.ExpiresAt)
+	require.Equal(t, "active", stored.Status)
+}
+
 type desktopRuntimeTokenValidator interface {
 	ValidateRuntimeToken(ctx context.Context, token string) (*DesktopSession, error)
 }
@@ -137,6 +231,7 @@ func (s *desktopSessionRepoStub) Revoke(_ context.Context, sessionID string, rev
 	}
 	revokedAtCopy := revokedAt
 	session.RevokedAt = &revokedAtCopy
+	session.Status = "revoked"
 	s.records[sessionID] = cloneDesktopSession(session)
 	return nil
 }
@@ -149,7 +244,7 @@ func (s *desktopSessionRepoStub) GetByRuntimeTokenHash(_ context.Context, tokenH
 			return cloneDesktopSession(session), nil
 		}
 	}
-	return nil, errors.New("desktop session not found")
+	return nil, nil
 }
 
 func (s *desktopSessionRepoStub) mustGet(sessionID string) *DesktopSession {

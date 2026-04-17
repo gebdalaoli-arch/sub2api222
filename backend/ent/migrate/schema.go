@@ -338,6 +338,46 @@ var (
 			},
 		},
 	}
+	// DesktopSessionsColumns holds the columns for the "desktop_sessions" table.
+	DesktopSessionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "session_id", Type: field.TypeString, Unique: true},
+		{Name: "user_id", Type: field.TypeInt64},
+		{Name: "device_id", Type: field.TypeString},
+		{Name: "device_name", Type: field.TypeString, Default: ""},
+		{Name: "target", Type: field.TypeString},
+		{Name: "status", Type: field.TypeString, Default: "active"},
+		{Name: "runtime_token_hash", Type: field.TypeString, Unique: true},
+		{Name: "profile_key", Type: field.TypeString},
+		{Name: "expires_at", Type: field.TypeTime},
+		{Name: "last_seen_at", Type: field.TypeTime},
+		{Name: "revoked_at", Type: field.TypeTime, Nullable: true},
+	}
+	// DesktopSessionsTable holds the schema information for the "desktop_sessions" table.
+	DesktopSessionsTable = &schema.Table{
+		Name:       "desktop_sessions",
+		Columns:    DesktopSessionsColumns,
+		PrimaryKey: []*schema.Column{DesktopSessionsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "desktopsession_user_id",
+				Unique:  false,
+				Columns: []*schema.Column{DesktopSessionsColumns[4]},
+			},
+			{
+				Name:    "desktopsession_device_id",
+				Unique:  false,
+				Columns: []*schema.Column{DesktopSessionsColumns[5]},
+			},
+			{
+				Name:    "desktopsession_expires_at",
+				Unique:  false,
+				Columns: []*schema.Column{DesktopSessionsColumns[11]},
+			},
+		},
+	}
 	// ErrorPassthroughRulesColumns holds the columns for the "error_passthrough_rules" table.
 	ErrorPassthroughRulesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt64, Increment: true},
@@ -1318,6 +1358,7 @@ var (
 		AccountGroupsTable,
 		AnnouncementsTable,
 		AnnouncementReadsTable,
+		DesktopSessionsTable,
 		ErrorPassthroughRulesTable,
 		GroupsTable,
 		IdempotencyRecordsTable,
@@ -1364,6 +1405,9 @@ func init() {
 	AnnouncementReadsTable.ForeignKeys[1].RefTable = UsersTable
 	AnnouncementReadsTable.Annotation = &entsql.Annotation{
 		Table: "announcement_reads",
+	}
+	DesktopSessionsTable.Annotation = &entsql.Annotation{
+		Table: "desktop_sessions",
 	}
 	ErrorPassthroughRulesTable.Annotation = &entsql.Annotation{
 		Table: "error_passthrough_rules",

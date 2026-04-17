@@ -17,6 +17,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/announcement"
 	"github.com/Wei-Shaw/sub2api/ent/announcementread"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
+	"github.com/Wei-Shaw/sub2api/ent/desktopsession"
 	"github.com/Wei-Shaw/sub2api/ent/errorpassthroughrule"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/idempotencyrecord"
@@ -56,6 +57,7 @@ const (
 	TypeAccountGroup            = "AccountGroup"
 	TypeAnnouncement            = "Announcement"
 	TypeAnnouncementRead        = "AnnouncementRead"
+	TypeDesktopSession          = "DesktopSession"
 	TypeErrorPassthroughRule    = "ErrorPassthroughRule"
 	TypeGroup                   = "Group"
 	TypeIdempotencyRecord       = "IdempotencyRecord"
@@ -6885,6 +6887,1038 @@ func (m *AnnouncementReadMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown AnnouncementRead edge %s", name)
+}
+
+// DesktopSessionMutation represents an operation that mutates the DesktopSession nodes in the graph.
+type DesktopSessionMutation struct {
+	config
+	op                 Op
+	typ                string
+	id                 *int64
+	created_at         *time.Time
+	updated_at         *time.Time
+	session_id         *string
+	user_id            *int64
+	adduser_id         *int64
+	device_id          *string
+	device_name        *string
+	target             *string
+	status             *string
+	runtime_token_hash *string
+	profile_key        *string
+	expires_at         *time.Time
+	last_seen_at       *time.Time
+	revoked_at         *time.Time
+	clearedFields      map[string]struct{}
+	done               bool
+	oldValue           func(context.Context) (*DesktopSession, error)
+	predicates         []predicate.DesktopSession
+}
+
+var _ ent.Mutation = (*DesktopSessionMutation)(nil)
+
+// desktopsessionOption allows management of the mutation configuration using functional options.
+type desktopsessionOption func(*DesktopSessionMutation)
+
+// newDesktopSessionMutation creates new mutation for the DesktopSession entity.
+func newDesktopSessionMutation(c config, op Op, opts ...desktopsessionOption) *DesktopSessionMutation {
+	m := &DesktopSessionMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeDesktopSession,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withDesktopSessionID sets the ID field of the mutation.
+func withDesktopSessionID(id int64) desktopsessionOption {
+	return func(m *DesktopSessionMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *DesktopSession
+		)
+		m.oldValue = func(ctx context.Context) (*DesktopSession, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().DesktopSession.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withDesktopSession sets the old DesktopSession of the mutation.
+func withDesktopSession(node *DesktopSession) desktopsessionOption {
+	return func(m *DesktopSessionMutation) {
+		m.oldValue = func(context.Context) (*DesktopSession, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m DesktopSessionMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m DesktopSessionMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *DesktopSessionMutation) ID() (id int64, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *DesktopSessionMutation) IDs(ctx context.Context) ([]int64, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int64{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().DesktopSession.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *DesktopSessionMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *DesktopSessionMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the DesktopSession entity.
+// If the DesktopSession object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesktopSessionMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *DesktopSessionMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *DesktopSessionMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *DesktopSessionMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the DesktopSession entity.
+// If the DesktopSession object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesktopSessionMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *DesktopSessionMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetSessionID sets the "session_id" field.
+func (m *DesktopSessionMutation) SetSessionID(s string) {
+	m.session_id = &s
+}
+
+// SessionID returns the value of the "session_id" field in the mutation.
+func (m *DesktopSessionMutation) SessionID() (r string, exists bool) {
+	v := m.session_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSessionID returns the old "session_id" field's value of the DesktopSession entity.
+// If the DesktopSession object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesktopSessionMutation) OldSessionID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSessionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSessionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSessionID: %w", err)
+	}
+	return oldValue.SessionID, nil
+}
+
+// ResetSessionID resets all changes to the "session_id" field.
+func (m *DesktopSessionMutation) ResetSessionID() {
+	m.session_id = nil
+}
+
+// SetUserID sets the "user_id" field.
+func (m *DesktopSessionMutation) SetUserID(i int64) {
+	m.user_id = &i
+	m.adduser_id = nil
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *DesktopSessionMutation) UserID() (r int64, exists bool) {
+	v := m.user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the DesktopSession entity.
+// If the DesktopSession object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesktopSessionMutation) OldUserID(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// AddUserID adds i to the "user_id" field.
+func (m *DesktopSessionMutation) AddUserID(i int64) {
+	if m.adduser_id != nil {
+		*m.adduser_id += i
+	} else {
+		m.adduser_id = &i
+	}
+}
+
+// AddedUserID returns the value that was added to the "user_id" field in this mutation.
+func (m *DesktopSessionMutation) AddedUserID() (r int64, exists bool) {
+	v := m.adduser_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *DesktopSessionMutation) ResetUserID() {
+	m.user_id = nil
+	m.adduser_id = nil
+}
+
+// SetDeviceID sets the "device_id" field.
+func (m *DesktopSessionMutation) SetDeviceID(s string) {
+	m.device_id = &s
+}
+
+// DeviceID returns the value of the "device_id" field in the mutation.
+func (m *DesktopSessionMutation) DeviceID() (r string, exists bool) {
+	v := m.device_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeviceID returns the old "device_id" field's value of the DesktopSession entity.
+// If the DesktopSession object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesktopSessionMutation) OldDeviceID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeviceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeviceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeviceID: %w", err)
+	}
+	return oldValue.DeviceID, nil
+}
+
+// ResetDeviceID resets all changes to the "device_id" field.
+func (m *DesktopSessionMutation) ResetDeviceID() {
+	m.device_id = nil
+}
+
+// SetDeviceName sets the "device_name" field.
+func (m *DesktopSessionMutation) SetDeviceName(s string) {
+	m.device_name = &s
+}
+
+// DeviceName returns the value of the "device_name" field in the mutation.
+func (m *DesktopSessionMutation) DeviceName() (r string, exists bool) {
+	v := m.device_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeviceName returns the old "device_name" field's value of the DesktopSession entity.
+// If the DesktopSession object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesktopSessionMutation) OldDeviceName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeviceName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeviceName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeviceName: %w", err)
+	}
+	return oldValue.DeviceName, nil
+}
+
+// ResetDeviceName resets all changes to the "device_name" field.
+func (m *DesktopSessionMutation) ResetDeviceName() {
+	m.device_name = nil
+}
+
+// SetTarget sets the "target" field.
+func (m *DesktopSessionMutation) SetTarget(s string) {
+	m.target = &s
+}
+
+// Target returns the value of the "target" field in the mutation.
+func (m *DesktopSessionMutation) Target() (r string, exists bool) {
+	v := m.target
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTarget returns the old "target" field's value of the DesktopSession entity.
+// If the DesktopSession object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesktopSessionMutation) OldTarget(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTarget is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTarget requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTarget: %w", err)
+	}
+	return oldValue.Target, nil
+}
+
+// ResetTarget resets all changes to the "target" field.
+func (m *DesktopSessionMutation) ResetTarget() {
+	m.target = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *DesktopSessionMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *DesktopSessionMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the DesktopSession entity.
+// If the DesktopSession object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesktopSessionMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *DesktopSessionMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetRuntimeTokenHash sets the "runtime_token_hash" field.
+func (m *DesktopSessionMutation) SetRuntimeTokenHash(s string) {
+	m.runtime_token_hash = &s
+}
+
+// RuntimeTokenHash returns the value of the "runtime_token_hash" field in the mutation.
+func (m *DesktopSessionMutation) RuntimeTokenHash() (r string, exists bool) {
+	v := m.runtime_token_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRuntimeTokenHash returns the old "runtime_token_hash" field's value of the DesktopSession entity.
+// If the DesktopSession object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesktopSessionMutation) OldRuntimeTokenHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRuntimeTokenHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRuntimeTokenHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRuntimeTokenHash: %w", err)
+	}
+	return oldValue.RuntimeTokenHash, nil
+}
+
+// ResetRuntimeTokenHash resets all changes to the "runtime_token_hash" field.
+func (m *DesktopSessionMutation) ResetRuntimeTokenHash() {
+	m.runtime_token_hash = nil
+}
+
+// SetProfileKey sets the "profile_key" field.
+func (m *DesktopSessionMutation) SetProfileKey(s string) {
+	m.profile_key = &s
+}
+
+// ProfileKey returns the value of the "profile_key" field in the mutation.
+func (m *DesktopSessionMutation) ProfileKey() (r string, exists bool) {
+	v := m.profile_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProfileKey returns the old "profile_key" field's value of the DesktopSession entity.
+// If the DesktopSession object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesktopSessionMutation) OldProfileKey(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProfileKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProfileKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProfileKey: %w", err)
+	}
+	return oldValue.ProfileKey, nil
+}
+
+// ResetProfileKey resets all changes to the "profile_key" field.
+func (m *DesktopSessionMutation) ResetProfileKey() {
+	m.profile_key = nil
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (m *DesktopSessionMutation) SetExpiresAt(t time.Time) {
+	m.expires_at = &t
+}
+
+// ExpiresAt returns the value of the "expires_at" field in the mutation.
+func (m *DesktopSessionMutation) ExpiresAt() (r time.Time, exists bool) {
+	v := m.expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpiresAt returns the old "expires_at" field's value of the DesktopSession entity.
+// If the DesktopSession object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesktopSessionMutation) OldExpiresAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpiresAt: %w", err)
+	}
+	return oldValue.ExpiresAt, nil
+}
+
+// ResetExpiresAt resets all changes to the "expires_at" field.
+func (m *DesktopSessionMutation) ResetExpiresAt() {
+	m.expires_at = nil
+}
+
+// SetLastSeenAt sets the "last_seen_at" field.
+func (m *DesktopSessionMutation) SetLastSeenAt(t time.Time) {
+	m.last_seen_at = &t
+}
+
+// LastSeenAt returns the value of the "last_seen_at" field in the mutation.
+func (m *DesktopSessionMutation) LastSeenAt() (r time.Time, exists bool) {
+	v := m.last_seen_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastSeenAt returns the old "last_seen_at" field's value of the DesktopSession entity.
+// If the DesktopSession object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesktopSessionMutation) OldLastSeenAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastSeenAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastSeenAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastSeenAt: %w", err)
+	}
+	return oldValue.LastSeenAt, nil
+}
+
+// ResetLastSeenAt resets all changes to the "last_seen_at" field.
+func (m *DesktopSessionMutation) ResetLastSeenAt() {
+	m.last_seen_at = nil
+}
+
+// SetRevokedAt sets the "revoked_at" field.
+func (m *DesktopSessionMutation) SetRevokedAt(t time.Time) {
+	m.revoked_at = &t
+}
+
+// RevokedAt returns the value of the "revoked_at" field in the mutation.
+func (m *DesktopSessionMutation) RevokedAt() (r time.Time, exists bool) {
+	v := m.revoked_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRevokedAt returns the old "revoked_at" field's value of the DesktopSession entity.
+// If the DesktopSession object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesktopSessionMutation) OldRevokedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRevokedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRevokedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRevokedAt: %w", err)
+	}
+	return oldValue.RevokedAt, nil
+}
+
+// ClearRevokedAt clears the value of the "revoked_at" field.
+func (m *DesktopSessionMutation) ClearRevokedAt() {
+	m.revoked_at = nil
+	m.clearedFields[desktopsession.FieldRevokedAt] = struct{}{}
+}
+
+// RevokedAtCleared returns if the "revoked_at" field was cleared in this mutation.
+func (m *DesktopSessionMutation) RevokedAtCleared() bool {
+	_, ok := m.clearedFields[desktopsession.FieldRevokedAt]
+	return ok
+}
+
+// ResetRevokedAt resets all changes to the "revoked_at" field.
+func (m *DesktopSessionMutation) ResetRevokedAt() {
+	m.revoked_at = nil
+	delete(m.clearedFields, desktopsession.FieldRevokedAt)
+}
+
+// Where appends a list predicates to the DesktopSessionMutation builder.
+func (m *DesktopSessionMutation) Where(ps ...predicate.DesktopSession) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the DesktopSessionMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *DesktopSessionMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.DesktopSession, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *DesktopSessionMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *DesktopSessionMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (DesktopSession).
+func (m *DesktopSessionMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *DesktopSessionMutation) Fields() []string {
+	fields := make([]string, 0, 13)
+	if m.created_at != nil {
+		fields = append(fields, desktopsession.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, desktopsession.FieldUpdatedAt)
+	}
+	if m.session_id != nil {
+		fields = append(fields, desktopsession.FieldSessionID)
+	}
+	if m.user_id != nil {
+		fields = append(fields, desktopsession.FieldUserID)
+	}
+	if m.device_id != nil {
+		fields = append(fields, desktopsession.FieldDeviceID)
+	}
+	if m.device_name != nil {
+		fields = append(fields, desktopsession.FieldDeviceName)
+	}
+	if m.target != nil {
+		fields = append(fields, desktopsession.FieldTarget)
+	}
+	if m.status != nil {
+		fields = append(fields, desktopsession.FieldStatus)
+	}
+	if m.runtime_token_hash != nil {
+		fields = append(fields, desktopsession.FieldRuntimeTokenHash)
+	}
+	if m.profile_key != nil {
+		fields = append(fields, desktopsession.FieldProfileKey)
+	}
+	if m.expires_at != nil {
+		fields = append(fields, desktopsession.FieldExpiresAt)
+	}
+	if m.last_seen_at != nil {
+		fields = append(fields, desktopsession.FieldLastSeenAt)
+	}
+	if m.revoked_at != nil {
+		fields = append(fields, desktopsession.FieldRevokedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *DesktopSessionMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case desktopsession.FieldCreatedAt:
+		return m.CreatedAt()
+	case desktopsession.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case desktopsession.FieldSessionID:
+		return m.SessionID()
+	case desktopsession.FieldUserID:
+		return m.UserID()
+	case desktopsession.FieldDeviceID:
+		return m.DeviceID()
+	case desktopsession.FieldDeviceName:
+		return m.DeviceName()
+	case desktopsession.FieldTarget:
+		return m.Target()
+	case desktopsession.FieldStatus:
+		return m.Status()
+	case desktopsession.FieldRuntimeTokenHash:
+		return m.RuntimeTokenHash()
+	case desktopsession.FieldProfileKey:
+		return m.ProfileKey()
+	case desktopsession.FieldExpiresAt:
+		return m.ExpiresAt()
+	case desktopsession.FieldLastSeenAt:
+		return m.LastSeenAt()
+	case desktopsession.FieldRevokedAt:
+		return m.RevokedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *DesktopSessionMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case desktopsession.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case desktopsession.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case desktopsession.FieldSessionID:
+		return m.OldSessionID(ctx)
+	case desktopsession.FieldUserID:
+		return m.OldUserID(ctx)
+	case desktopsession.FieldDeviceID:
+		return m.OldDeviceID(ctx)
+	case desktopsession.FieldDeviceName:
+		return m.OldDeviceName(ctx)
+	case desktopsession.FieldTarget:
+		return m.OldTarget(ctx)
+	case desktopsession.FieldStatus:
+		return m.OldStatus(ctx)
+	case desktopsession.FieldRuntimeTokenHash:
+		return m.OldRuntimeTokenHash(ctx)
+	case desktopsession.FieldProfileKey:
+		return m.OldProfileKey(ctx)
+	case desktopsession.FieldExpiresAt:
+		return m.OldExpiresAt(ctx)
+	case desktopsession.FieldLastSeenAt:
+		return m.OldLastSeenAt(ctx)
+	case desktopsession.FieldRevokedAt:
+		return m.OldRevokedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown DesktopSession field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DesktopSessionMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case desktopsession.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case desktopsession.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case desktopsession.FieldSessionID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSessionID(v)
+		return nil
+	case desktopsession.FieldUserID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case desktopsession.FieldDeviceID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeviceID(v)
+		return nil
+	case desktopsession.FieldDeviceName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeviceName(v)
+		return nil
+	case desktopsession.FieldTarget:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTarget(v)
+		return nil
+	case desktopsession.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case desktopsession.FieldRuntimeTokenHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRuntimeTokenHash(v)
+		return nil
+	case desktopsession.FieldProfileKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProfileKey(v)
+		return nil
+	case desktopsession.FieldExpiresAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpiresAt(v)
+		return nil
+	case desktopsession.FieldLastSeenAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastSeenAt(v)
+		return nil
+	case desktopsession.FieldRevokedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRevokedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DesktopSession field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *DesktopSessionMutation) AddedFields() []string {
+	var fields []string
+	if m.adduser_id != nil {
+		fields = append(fields, desktopsession.FieldUserID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *DesktopSessionMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case desktopsession.FieldUserID:
+		return m.AddedUserID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DesktopSessionMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case desktopsession.FieldUserID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddUserID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DesktopSession numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *DesktopSessionMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(desktopsession.FieldRevokedAt) {
+		fields = append(fields, desktopsession.FieldRevokedAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *DesktopSessionMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *DesktopSessionMutation) ClearField(name string) error {
+	switch name {
+	case desktopsession.FieldRevokedAt:
+		m.ClearRevokedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown DesktopSession nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *DesktopSessionMutation) ResetField(name string) error {
+	switch name {
+	case desktopsession.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case desktopsession.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case desktopsession.FieldSessionID:
+		m.ResetSessionID()
+		return nil
+	case desktopsession.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case desktopsession.FieldDeviceID:
+		m.ResetDeviceID()
+		return nil
+	case desktopsession.FieldDeviceName:
+		m.ResetDeviceName()
+		return nil
+	case desktopsession.FieldTarget:
+		m.ResetTarget()
+		return nil
+	case desktopsession.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case desktopsession.FieldRuntimeTokenHash:
+		m.ResetRuntimeTokenHash()
+		return nil
+	case desktopsession.FieldProfileKey:
+		m.ResetProfileKey()
+		return nil
+	case desktopsession.FieldExpiresAt:
+		m.ResetExpiresAt()
+		return nil
+	case desktopsession.FieldLastSeenAt:
+		m.ResetLastSeenAt()
+		return nil
+	case desktopsession.FieldRevokedAt:
+		m.ResetRevokedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown DesktopSession field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *DesktopSessionMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *DesktopSessionMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *DesktopSessionMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *DesktopSessionMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *DesktopSessionMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *DesktopSessionMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *DesktopSessionMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown DesktopSession unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *DesktopSessionMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown DesktopSession edge %s", name)
 }
 
 // ErrorPassthroughRuleMutation represents an operation that mutates the ErrorPassthroughRule nodes in the graph.

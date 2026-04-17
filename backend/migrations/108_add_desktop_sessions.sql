@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS desktop_sessions (
     device_name TEXT NOT NULL DEFAULT '',
     target TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'active',
-    runtime_token_hash TEXT NOT NULL,
+    runtime_token_hash TEXT NOT NULL UNIQUE,
     profile_key TEXT NOT NULL,
     expires_at TIMESTAMPTZ NOT NULL,
     last_seen_at TIMESTAMPTZ NOT NULL,

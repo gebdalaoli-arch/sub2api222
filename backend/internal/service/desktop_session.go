@@ -15,6 +15,13 @@ type DesktopSessionTarget string
 const (
 	DesktopSessionTargetDesktop DesktopSessionTarget = "desktop"
 	DesktopSessionTargetCLI     DesktopSessionTarget = "cli"
+
+	desktopSessionStatusActive  = "active"
+	desktopSessionStatusRevoked = "revoked"
+
+	desktopSessionTTL          = 12 * time.Hour
+	desktopSessionRefreshAfter = 30 * time.Minute
+	desktopSessionGatewayPath  = "/api/desktop/v1"
 )
 
 type DesktopSession struct {
@@ -43,6 +50,7 @@ type DesktopSessionRepository interface {
 }
 
 var ErrInvalidDesktopRuntimeToken = infraerrors.Unauthorized("INVALID_RUNTIME_TOKEN", "invalid runtime token")
+var ErrInactiveDesktopSession = infraerrors.Unauthorized("DESKTOP_SESSION_INACTIVE", "desktop session is inactive")
 
 type DesktopSessionCreateRequest struct {
 	UserID        int64
@@ -76,17 +84,16 @@ func (s *DesktopSessionService) Create(ctx context.Context, req DesktopSessionCr
 	now := s.now()
 	sessionID := uuid.NewString()
 	token := uuid.NewString() + "." + uuid.NewString()
-	expiresAt := now.Add(12 * time.Hour)
 	record := &DesktopSession{
 		SessionID:        sessionID,
 		UserID:           req.UserID,
 		DeviceID:         req.DeviceID,
 		DeviceName:       req.DeviceName,
 		Target:           string(req.Target),
-		Status:           "active",
+		Status:           desktopSessionStatusActive,
 		RuntimeTokenHash: hashDesktopRuntimeToken(token),
 		ProfileKey:       "platform-" + string(req.Target),
-		ExpiresAt:        expiresAt,
+		ExpiresAt:        now.Add(desktopSessionTTL),
 		LastSeenAt:       now,
 	}
 	if err := s.repo.Create(ctx, record); err != nil {
@@ -97,9 +104,9 @@ func (s *DesktopSessionService) Create(ctx context.Context, req DesktopSessionCr
 		UserID:         req.UserID,
 		RuntimeToken:   token,
 		ProfileKey:     record.ProfileKey,
-		RefreshAfter:   30 * time.Minute,
-		ExpiresAt:      expiresAt,
-		GatewayBaseURL: "/api/desktop/v1",
+		RefreshAfter:   desktopSessionRefreshAfter,
+		ExpiresAt:      record.ExpiresAt,
+		GatewayBaseURL: desktopSessionGatewayPath,
 	}, nil
 }
 
@@ -109,7 +116,10 @@ func (s *DesktopSessionService) Refresh(ctx context.Context, sessionID string) (
 		return nil, err
 	}
 	now := s.now()
-	record.ExpiresAt = now.Add(12 * time.Hour)
+	if !isDesktopSessionActive(record, now) {
+		return nil, ErrInactiveDesktopSession
+	}
+	record.ExpiresAt = now.Add(desktopSessionTTL)
 	record.LastSeenAt = now
 	if err := s.repo.Update(ctx, record); err != nil {
 		return nil, err
@@ -118,9 +128,9 @@ func (s *DesktopSessionService) Refresh(ctx context.Context, sessionID string) (
 		SessionID:      record.SessionID,
 		UserID:         record.UserID,
 		ProfileKey:     record.ProfileKey,
-		RefreshAfter:   30 * time.Minute,
+		RefreshAfter:   desktopSessionRefreshAfter,
 		ExpiresAt:      record.ExpiresAt,
-		GatewayBaseURL: "/api/desktop/v1",
+		GatewayBaseURL: desktopSessionGatewayPath,
 	}, nil
 }
 
@@ -133,10 +143,23 @@ func (s *DesktopSessionService) ValidateRuntimeToken(ctx context.Context, token 
 	if err != nil {
 		return nil, err
 	}
-	if record.RevokedAt != nil || !record.ExpiresAt.After(s.now()) {
+	if !isDesktopSessionActive(record, s.now()) {
 		return nil, ErrInvalidDesktopRuntimeToken
 	}
 	return record, nil
+}
+
+func isDesktopSessionActive(record *DesktopSession, now time.Time) bool {
+	if record == nil {
+		return false
+	}
+	if record.Status != desktopSessionStatusActive {
+		return false
+	}
+	if record.RevokedAt != nil {
+		return false
+	}
+	return record.ExpiresAt.After(now)
 }
 
 func hashDesktopRuntimeToken(token string) string {

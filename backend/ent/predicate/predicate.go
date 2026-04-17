@@ -21,6 +21,9 @@ type Announcement func(*sql.Selector)
 // AnnouncementRead is the predicate function for announcementread builders.
 type AnnouncementRead func(*sql.Selector)
 
+// DesktopSession is the predicate function for desktopsession builders.
+type DesktopSession func(*sql.Selector)
+
 // ErrorPassthroughRule is the predicate function for errorpassthroughrule builders.
 type ErrorPassthroughRule func(*sql.Selector)
 

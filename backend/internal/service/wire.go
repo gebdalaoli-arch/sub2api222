@@ -65,6 +65,10 @@ func ProvideTokenRefreshService(
 	return svc
 }
 
+func ProvideOAuthRefreshAPI(accountRepo AccountRepository, tokenCache GeminiTokenCache) *OAuthRefreshAPI {
+	return NewOAuthRefreshAPI(accountRepo, tokenCache)
+}
+
 // ProvideClaudeTokenProvider creates ClaudeTokenProvider with OAuthRefreshAPI injection
 func ProvideClaudeTokenProvider(
 	accountRepo AccountRepository,
@@ -381,6 +385,19 @@ func ProvideSettingService(settingRepo SettingRepository, groupRepo GroupReposit
 	return svc
 }
 
+func ProvideDesktopSessionNow() func() time.Time {
+	return func() time.Time {
+		return time.Now().UTC()
+	}
+}
+
+func ProvideDesktopSessionSigningKey(cfg *config.Config) []byte {
+	if cfg == nil {
+		return nil
+	}
+	return []byte(cfg.JWT.Secret)
+}
+
 // ProviderSet is the Wire provider set for all services
 var ProviderSet = wire.NewSet(
 	// Core services
@@ -409,7 +426,7 @@ var ProviderSet = wire.NewSet(
 	NewCompositeTokenCacheInvalidator,
 	wire.Bind(new(TokenCacheInvalidator), new(*CompositeTokenCacheInvalidator)),
 	NewAntigravityOAuthService,
-	NewOAuthRefreshAPI,
+	ProvideOAuthRefreshAPI,
 	ProvideGeminiTokenProvider,
 	NewGeminiMessagesCompatService,
 	ProvideAntigravityTokenProvider,
@@ -454,7 +471,8 @@ var ProviderSet = wire.NewSet(
 	NewTotpService,
 	NewErrorPassthroughService,
 	NewTLSFingerprintProfileService,
-	wire.Value(func() time.Time { return time.Now().UTC() }),
+	ProvideDesktopSessionNow,
+	ProvideDesktopSessionSigningKey,
 	NewDesktopSessionService,
 	NewDigestSessionStore,
 	ProvideIdempotencyCoordinator,

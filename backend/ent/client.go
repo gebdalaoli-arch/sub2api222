@@ -20,6 +20,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/announcement"
 	"github.com/Wei-Shaw/sub2api/ent/announcementread"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
+	"github.com/Wei-Shaw/sub2api/ent/desktopsession"
 	"github.com/Wei-Shaw/sub2api/ent/errorpassthroughrule"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/idempotencyrecord"
@@ -60,6 +61,8 @@ type Client struct {
 	Announcement *AnnouncementClient
 	// AnnouncementRead is the client for interacting with the AnnouncementRead builders.
 	AnnouncementRead *AnnouncementReadClient
+	// DesktopSession is the client for interacting with the DesktopSession builders.
+	DesktopSession *DesktopSessionClient
 	// ErrorPassthroughRule is the client for interacting with the ErrorPassthroughRule builders.
 	ErrorPassthroughRule *ErrorPassthroughRuleClient
 	// Group is the client for interacting with the Group builders.
@@ -118,6 +121,7 @@ func (c *Client) init() {
 	c.AccountGroup = NewAccountGroupClient(c.config)
 	c.Announcement = NewAnnouncementClient(c.config)
 	c.AnnouncementRead = NewAnnouncementReadClient(c.config)
+	c.DesktopSession = NewDesktopSessionClient(c.config)
 	c.ErrorPassthroughRule = NewErrorPassthroughRuleClient(c.config)
 	c.Group = NewGroupClient(c.config)
 	c.IdempotencyRecord = NewIdempotencyRecordClient(c.config)
@@ -236,6 +240,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		AccountGroup:            NewAccountGroupClient(cfg),
 		Announcement:            NewAnnouncementClient(cfg),
 		AnnouncementRead:        NewAnnouncementReadClient(cfg),
+		DesktopSession:          NewDesktopSessionClient(cfg),
 		ErrorPassthroughRule:    NewErrorPassthroughRuleClient(cfg),
 		Group:                   NewGroupClient(cfg),
 		IdempotencyRecord:       NewIdempotencyRecordClient(cfg),
@@ -281,6 +286,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		AccountGroup:            NewAccountGroupClient(cfg),
 		Announcement:            NewAnnouncementClient(cfg),
 		AnnouncementRead:        NewAnnouncementReadClient(cfg),
+		DesktopSession:          NewDesktopSessionClient(cfg),
 		ErrorPassthroughRule:    NewErrorPassthroughRuleClient(cfg),
 		Group:                   NewGroupClient(cfg),
 		IdempotencyRecord:       NewIdempotencyRecordClient(cfg),
@@ -332,11 +338,11 @@ func (c *Client) Close() error {
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.APIKey, c.Account, c.AccountGroup, c.Announcement, c.AnnouncementRead,
-		c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord, c.PaymentAuditLog,
-		c.PaymentOrder, c.PaymentProviderInstance, c.PromoCode, c.PromoCodeUsage,
-		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
-		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
+		c.DesktopSession, c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
+		c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance, c.PromoCode,
+		c.PromoCodeUsage, c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting,
+		c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog,
+		c.User, c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
 		c.UserSubscription,
 	} {
 		n.Use(hooks...)
@@ -348,11 +354,11 @@ func (c *Client) Use(hooks ...Hook) {
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.APIKey, c.Account, c.AccountGroup, c.Announcement, c.AnnouncementRead,
-		c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord, c.PaymentAuditLog,
-		c.PaymentOrder, c.PaymentProviderInstance, c.PromoCode, c.PromoCodeUsage,
-		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
-		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
-		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
+		c.DesktopSession, c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
+		c.PaymentAuditLog, c.PaymentOrder, c.PaymentProviderInstance, c.PromoCode,
+		c.PromoCodeUsage, c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting,
+		c.SubscriptionPlan, c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog,
+		c.User, c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
 		c.UserSubscription,
 	} {
 		n.Intercept(interceptors...)
@@ -372,6 +378,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Announcement.mutate(ctx, m)
 	case *AnnouncementReadMutation:
 		return c.AnnouncementRead.mutate(ctx, m)
+	case *DesktopSessionMutation:
+		return c.DesktopSession.mutate(ctx, m)
 	case *ErrorPassthroughRuleMutation:
 		return c.ErrorPassthroughRule.mutate(ctx, m)
 	case *GroupMutation:
@@ -1228,6 +1236,139 @@ func (c *AnnouncementReadClient) mutate(ctx context.Context, m *AnnouncementRead
 		return (&AnnouncementReadDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown AnnouncementRead mutation op: %q", m.Op())
+	}
+}
+
+// DesktopSessionClient is a client for the DesktopSession schema.
+type DesktopSessionClient struct {
+	config
+}
+
+// NewDesktopSessionClient returns a client for the DesktopSession from the given config.
+func NewDesktopSessionClient(c config) *DesktopSessionClient {
+	return &DesktopSessionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `desktopsession.Hooks(f(g(h())))`.
+func (c *DesktopSessionClient) Use(hooks ...Hook) {
+	c.hooks.DesktopSession = append(c.hooks.DesktopSession, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `desktopsession.Intercept(f(g(h())))`.
+func (c *DesktopSessionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.DesktopSession = append(c.inters.DesktopSession, interceptors...)
+}
+
+// Create returns a builder for creating a DesktopSession entity.
+func (c *DesktopSessionClient) Create() *DesktopSessionCreate {
+	mutation := newDesktopSessionMutation(c.config, OpCreate)
+	return &DesktopSessionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of DesktopSession entities.
+func (c *DesktopSessionClient) CreateBulk(builders ...*DesktopSessionCreate) *DesktopSessionCreateBulk {
+	return &DesktopSessionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *DesktopSessionClient) MapCreateBulk(slice any, setFunc func(*DesktopSessionCreate, int)) *DesktopSessionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &DesktopSessionCreateBulk{err: fmt.Errorf("calling to DesktopSessionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*DesktopSessionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &DesktopSessionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for DesktopSession.
+func (c *DesktopSessionClient) Update() *DesktopSessionUpdate {
+	mutation := newDesktopSessionMutation(c.config, OpUpdate)
+	return &DesktopSessionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *DesktopSessionClient) UpdateOne(_m *DesktopSession) *DesktopSessionUpdateOne {
+	mutation := newDesktopSessionMutation(c.config, OpUpdateOne, withDesktopSession(_m))
+	return &DesktopSessionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *DesktopSessionClient) UpdateOneID(id int64) *DesktopSessionUpdateOne {
+	mutation := newDesktopSessionMutation(c.config, OpUpdateOne, withDesktopSessionID(id))
+	return &DesktopSessionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for DesktopSession.
+func (c *DesktopSessionClient) Delete() *DesktopSessionDelete {
+	mutation := newDesktopSessionMutation(c.config, OpDelete)
+	return &DesktopSessionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *DesktopSessionClient) DeleteOne(_m *DesktopSession) *DesktopSessionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *DesktopSessionClient) DeleteOneID(id int64) *DesktopSessionDeleteOne {
+	builder := c.Delete().Where(desktopsession.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &DesktopSessionDeleteOne{builder}
+}
+
+// Query returns a query builder for DesktopSession.
+func (c *DesktopSessionClient) Query() *DesktopSessionQuery {
+	return &DesktopSessionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeDesktopSession},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a DesktopSession entity by its id.
+func (c *DesktopSessionClient) Get(ctx context.Context, id int64) (*DesktopSession, error) {
+	return c.Query().Where(desktopsession.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *DesktopSessionClient) GetX(ctx context.Context, id int64) *DesktopSession {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *DesktopSessionClient) Hooks() []Hook {
+	return c.hooks.DesktopSession
+}
+
+// Interceptors returns the client interceptors.
+func (c *DesktopSessionClient) Interceptors() []Interceptor {
+	return c.inters.DesktopSession
+}
+
+func (c *DesktopSessionClient) mutate(ctx context.Context, m *DesktopSessionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&DesktopSessionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&DesktopSessionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&DesktopSessionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&DesktopSessionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown DesktopSession mutation op: %q", m.Op())
 	}
 }
 
@@ -4628,7 +4769,7 @@ func (c *UserSubscriptionClient) mutate(ctx context.Context, m *UserSubscription
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		APIKey, Account, AccountGroup, Announcement, AnnouncementRead,
+		APIKey, Account, AccountGroup, Announcement, AnnouncementRead, DesktopSession,
 		ErrorPassthroughRule, Group, IdempotencyRecord, PaymentAuditLog, PaymentOrder,
 		PaymentProviderInstance, PromoCode, PromoCodeUsage, Proxy, RedeemCode,
 		SecuritySecret, Setting, SubscriptionPlan, TLSFingerprintProfile,
@@ -4636,7 +4777,7 @@ type (
 		UserAttributeValue, UserSubscription []ent.Hook
 	}
 	inters struct {
-		APIKey, Account, AccountGroup, Announcement, AnnouncementRead,
+		APIKey, Account, AccountGroup, Announcement, AnnouncementRead, DesktopSession,
 		ErrorPassthroughRule, Group, IdempotencyRecord, PaymentAuditLog, PaymentOrder,
 		PaymentProviderInstance, PromoCode, PromoCodeUsage, Proxy, RedeemCode,
 		SecuritySecret, Setting, SubscriptionPlan, TLSFingerprintProfile,

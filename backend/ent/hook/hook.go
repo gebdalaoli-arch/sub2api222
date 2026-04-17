@@ -69,6 +69,18 @@ func (f AnnouncementReadFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.V
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AnnouncementReadMutation", m)
 }
 
+// The DesktopSessionFunc type is an adapter to allow the use of ordinary
+// function as DesktopSession mutator.
+type DesktopSessionFunc func(context.Context, *ent.DesktopSessionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f DesktopSessionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.DesktopSessionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DesktopSessionMutation", m)
+}
+
 // The ErrorPassthroughRuleFunc type is an adapter to allow the use of ordinary
 // function as ErrorPassthroughRule mutator.
 type ErrorPassthroughRuleFunc func(context.Context, *ent.ErrorPassthroughRuleMutation) (ent.Value, error)
