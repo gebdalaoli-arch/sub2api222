@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"io"
 	"math"
 	"net/http"
@@ -86,6 +87,37 @@ func TestAPIContracts(t *testing.T) {
 					"refresh_after": 1800000000000,
 					"expires_at": "2025-01-02T15:04:05Z",
 					"gateway_base_url": "/api/desktop/v1"
+				}
+			}`,
+		},
+		{
+			name:       "POST /api/v1/desktop/sessions/:id/refresh",
+			method:     http.MethodPost,
+			path:       "/api/v1/desktop/sessions/desktop-session-1/refresh",
+			wantStatus: http.StatusOK,
+			wantJSON: `{
+				"code": 0,
+				"message": "success",
+				"data": {
+					"session_id": "desktop-session-1",
+					"user_id": 1,
+					"profile_key": "platform-desktop",
+					"refresh_after": 1800000000000,
+					"expires_at": "2025-01-02T15:04:05Z",
+					"gateway_base_url": "/api/desktop/v1"
+				}
+			}`,
+		},
+		{
+			name:       "DELETE /api/v1/desktop/sessions/:id",
+			method:     http.MethodDelete,
+			path:       "/api/v1/desktop/sessions/desktop-session-1",
+			wantStatus: http.StatusOK,
+			wantJSON: `{
+				"code": 0,
+				"message": "success",
+				"data": {
+					"message": "desktop session revoked"
 				}
 			}`,
 		},
@@ -791,6 +823,8 @@ func newContractDeps(t *testing.T) *contractDeps {
 	v1Desktop := v1.Group("")
 	v1Desktop.Use(jwtAuth)
 	v1Desktop.POST("/desktop/sessions", desktopHandler.CreateSession)
+	v1Desktop.POST("/desktop/sessions/:id/refresh", desktopHandler.RefreshSession)
+	v1Desktop.DELETE("/desktop/sessions/:id", desktopHandler.DeleteSession)
 
 	v1Usage := v1.Group("")
 	v1Usage.Use(jwtAuth)
@@ -858,11 +892,24 @@ func (s *stubContractDesktopSessionService) Create(ctx context.Context, req serv
 }
 
 func (s *stubContractDesktopSessionService) Refresh(ctx context.Context, sessionID string, userID int64) (*service.DesktopSessionResult, error) {
-	return nil, errors.New("not implemented")
+	if sessionID == "missing" {
+		return nil, infraerrors.NotFound("DESKTOP_SESSION_NOT_FOUND", "desktop session not found")
+	}
+	return &service.DesktopSessionResult{
+		SessionID:      sessionID,
+		UserID:         userID,
+		ProfileKey:     "platform-desktop",
+		RefreshAfter:   30 * time.Minute,
+		ExpiresAt:      s.now.Add(12 * time.Hour),
+		GatewayBaseURL: "/api/desktop/v1",
+	}, nil
 }
 
 func (s *stubContractDesktopSessionService) Revoke(ctx context.Context, sessionID string, userID int64) error {
-	return errors.New("not implemented")
+	if sessionID == "missing" {
+		return infraerrors.NotFound("DESKTOP_SESSION_NOT_FOUND", "desktop session not found")
+	}
+	return nil
 }
 
 type stubUserRepo struct {

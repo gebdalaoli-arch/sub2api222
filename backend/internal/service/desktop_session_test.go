@@ -54,8 +54,8 @@ func TestDesktopSessionService_CreateStoresRuntimeTokenHashAndValidateRuntimeTok
 	repo := newDesktopSessionRepoStub(now)
 	svc := NewDesktopSessionService(
 		repo,
-		&desktopSessionUserReaderStub{user: &User{ID: 42, AllowedGroups: []int64{9}}},
-		&desktopSessionGroupReaderStub{group: newDesktopSessionTestGroup(9)},
+		&desktopSessionUserReaderStub{user: &User{ID: 42}},
+		&desktopSessionGroupReaderStub{group: newDesktopSessionSubscriptionGroup(9)},
 		&desktopSessionSubscriptionReaderStub{sub: &UserSubscription{ID: 100, UserID: 42, GroupID: 9, Status: SubscriptionStatusActive, ExpiresAt: now.Add(time.Hour)}},
 		func() time.Time { return now },
 		[]byte("desktop-test-secret"),
@@ -82,6 +82,31 @@ func TestDesktopSessionService_CreateStoresRuntimeTokenHashAndValidateRuntimeTok
 	require.Equal(t, created.SessionID, validated.SessionID)
 	require.Equal(t, stored.RuntimeTokenHash, repo.lastRuntimeTokenHashLookup)
 	require.Equal(t, 1, repo.getByRuntimeTokenHashCalls)
+}
+
+func TestDesktopSessionService_CreateRejectsSubscriptionGroupWithoutActiveSubscription(t *testing.T) {
+	now := time.Date(2026, 4, 18, 9, 0, 0, 0, time.UTC)
+	repo := newDesktopSessionRepoStub(now)
+	svc := NewDesktopSessionService(
+		repo,
+		&desktopSessionUserReaderStub{user: &User{ID: 42}},
+		&desktopSessionGroupReaderStub{group: newDesktopSessionSubscriptionGroup(9)},
+		&desktopSessionSubscriptionReaderStub{},
+		func() time.Time { return now },
+		[]byte("desktop-test-secret"),
+	)
+
+	created, err := svc.Create(context.Background(), DesktopSessionCreateRequest{
+		UserID:        42,
+		GroupID:       9,
+		DeviceID:      "device-001",
+		DeviceName:    "MacBook Pro",
+		Target:        DesktopSessionTargetDesktop,
+		ClientVersion: "0.1.0",
+	})
+	require.Nil(t, created)
+	require.Error(t, err)
+	require.True(t, infraerrors.IsBadRequest(err))
 }
 
 func TestDesktopSessionService_ValidateRuntimeTokenRejectsExpiredSession(t *testing.T) {
@@ -461,6 +486,13 @@ func (s *desktopSessionSubscriptionReaderStub) GetActiveByUserIDAndGroupID(_ con
 		return &clone, nil
 	}
 	return nil, ErrSubscriptionNotFound
+}
+
+func newDesktopSessionSubscriptionGroup(groupID int64) *Group {
+	group := newDesktopSessionTestGroup(groupID)
+	group.SubscriptionType = SubscriptionTypeSubscription
+	group.IsExclusive = false
+	return group
 }
 
 func newDesktopSessionTestGroup(groupID int64) *Group {
