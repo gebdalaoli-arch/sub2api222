@@ -1,5 +1,9 @@
 use anyhow::Result;
-use std::{ffi::OsString, path::PathBuf, process::Command};
+use std::{
+    ffi::OsString,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 use super::install_detection::InstalledTarget;
 
@@ -55,6 +59,24 @@ pub fn official_launch_command(target: &InstalledTarget) -> LaunchCommandSpec {
 
 pub fn launch_official(target: &InstalledTarget) -> Result<()> {
     let spec = official_launch_command(target);
+    spawn_command(spec)
+}
+
+pub fn platform_launch_command(target: &InstalledTarget, codex_home: &Path) -> LaunchCommandSpec {
+    let mut spec = official_launch_command(target);
+    spec.envs.push((
+        OsString::from("CODEX_HOME"),
+        codex_home.as_os_str().to_os_string(),
+    ));
+    spec
+}
+
+pub fn launch_platform(target: &InstalledTarget, codex_home: &Path) -> Result<()> {
+    let spec = platform_launch_command(target, codex_home);
+    spawn_command(spec)
+}
+
+fn spawn_command(spec: LaunchCommandSpec) -> Result<()> {
     let mut command = Command::new(&spec.program);
     command.args(&spec.args);
     for (key, value) in spec.envs {
@@ -66,7 +88,7 @@ pub fn launch_official(target: &InstalledTarget) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{official_launch_command, LaunchCommandSpec};
+    use super::{official_launch_command, platform_launch_command, LaunchCommandSpec};
     use crate::platform::install_detection::{InstalledTarget, LaunchTarget};
     use std::path::PathBuf;
 
@@ -106,5 +128,32 @@ mod tests {
             target.executable.to_string_lossy()
         );
         assert_eq!(spec, LaunchCommandSpec::direct(target.executable));
+    }
+
+    #[test]
+    fn platform_launch_injects_isolated_codex_home() {
+        let target = InstalledTarget {
+            kind: LaunchTarget::Cli,
+            executable: PathBuf::from(r"C:\Users\tester\AppData\Roaming\npm\codex.cmd"),
+            display_name: "Codex CLI".to_string(),
+        };
+
+        let runtime_home = PathBuf::from(r"D:\TokenClient\runtime\platform-cli");
+        let spec = platform_launch_command(&target, runtime_home.as_path());
+
+        let env_pairs: Vec<(String, String)> = spec
+            .envs
+            .iter()
+            .map(|(key, value)| {
+                (
+                    key.to_string_lossy().into_owned(),
+                    value.to_string_lossy().into_owned(),
+                )
+            })
+            .collect();
+
+        assert!(env_pairs.iter().any(|(key, value)| {
+            key == "CODEX_HOME" && value == r"D:\TokenClient\runtime\platform-cli"
+        }));
     }
 }
