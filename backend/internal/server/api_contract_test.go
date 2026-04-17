@@ -66,6 +66,28 @@ func TestAPIContracts(t *testing.T) {
 					"run_mode": "standard"
 				}
 			}`,
+		}, {
+			name:   "POST /api/v1/desktop/sessions",
+			method: http.MethodPost,
+			path:   "/api/v1/desktop/sessions",
+			body:   `{"target":"desktop","device_id":"desktop-1","device_name":"mbp","client_version":"0.1.0"}`,
+			headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			wantStatus: http.StatusOK,
+			wantJSON: `{
+				"code": 0,
+				"message": "success",
+				"data": {
+					"session_id": "desktop-session-1",
+					"user_id": 1,
+					"runtime_token": "runtime-token-1",
+					"profile_key": "platform-desktop",
+					"refresh_after": 1800000000000,
+					"expires_at": "2025-01-02T15:04:05Z",
+					"gateway_base_url": "/api/desktop/v1"
+				}
+			}`,
 		},
 		{
 			name:   "POST /api/v1/keys",
@@ -720,6 +742,8 @@ func newContractDeps(t *testing.T) *contractDeps {
 	subscriptionService := service.NewSubscriptionService(groupRepo, userSubRepo, nil, nil, cfg)
 	subscriptionHandler := handler.NewSubscriptionHandler(subscriptionService)
 
+	desktopHandler := handler.NewDesktopHandler(&stubContractDesktopSessionService{now: now})
+
 	redeemService := service.NewRedeemService(redeemRepo, userRepo, subscriptionService, nil, nil, nil, nil)
 	redeemHandler := handler.NewRedeemHandler(redeemService)
 
@@ -763,6 +787,10 @@ func newContractDeps(t *testing.T) *contractDeps {
 	v1Keys.GET("/keys", apiKeyHandler.List)
 	v1Keys.POST("/keys", apiKeyHandler.Create)
 	v1Keys.GET("/groups/available", apiKeyHandler.GetAvailableGroups)
+
+	v1Desktop := v1.Group("")
+	v1Desktop.Use(jwtAuth)
+	v1Desktop.POST("/desktop/sessions", desktopHandler.CreateSession)
 
 	v1Usage := v1.Group("")
 	v1Usage.Use(jwtAuth)
@@ -812,6 +840,30 @@ func doRequest(t *testing.T, router http.Handler, method, path, body string, hea
 }
 
 func ptr[T any](v T) *T { return &v }
+
+type stubContractDesktopSessionService struct {
+	now time.Time
+}
+
+func (s *stubContractDesktopSessionService) Create(ctx context.Context, req service.DesktopSessionCreateRequest) (*service.DesktopSessionResult, error) {
+	return &service.DesktopSessionResult{
+		SessionID:      "desktop-session-1",
+		UserID:         req.UserID,
+		RuntimeToken:   "runtime-token-1",
+		ProfileKey:     "platform-desktop",
+		RefreshAfter:   30 * time.Minute,
+		ExpiresAt:      s.now.Add(12 * time.Hour),
+		GatewayBaseURL: "/api/desktop/v1",
+	}, nil
+}
+
+func (s *stubContractDesktopSessionService) Refresh(ctx context.Context, sessionID string) (*service.DesktopSessionResult, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *stubContractDesktopSessionService) Revoke(ctx context.Context, sessionID string) error {
+	return errors.New("not implemented")
+}
 
 type stubUserRepo struct {
 	users map[int64]*service.User
