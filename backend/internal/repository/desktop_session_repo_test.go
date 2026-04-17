@@ -42,6 +42,7 @@ func TestDesktopSessionRepository_CreateLookupAndRevoke(t *testing.T) {
 	record := &service.DesktopSession{
 		SessionID:        "session-001",
 		UserID:           42,
+		GroupID:          88,
 		DeviceID:         "device-001",
 		DeviceName:       "MacBook Pro",
 		Target:           "desktop",
@@ -58,6 +59,16 @@ func TestDesktopSessionRepository_CreateLookupAndRevoke(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, bySessionID)
 	require.Equal(t, record.RuntimeTokenHash, bySessionID.RuntimeTokenHash)
+	require.Equal(t, int64(88), bySessionID.GroupID)
+
+	owned, err := repo.GetBySessionIDAndUserID(ctx, record.SessionID, 42)
+	require.NoError(t, err)
+	require.NotNil(t, owned)
+	require.Equal(t, int64(88), owned.GroupID)
+
+	notOwned, err := repo.GetBySessionIDAndUserID(ctx, record.SessionID, 99)
+	require.NoError(t, err)
+	require.Nil(t, notOwned)
 
 	byTokenHash, err := repo.GetByRuntimeTokenHash(ctx, record.RuntimeTokenHash)
 	require.NoError(t, err)
@@ -65,7 +76,7 @@ func TestDesktopSessionRepository_CreateLookupAndRevoke(t *testing.T) {
 	require.Equal(t, record.SessionID, byTokenHash.SessionID)
 
 	revokedAt := now.Add(time.Hour)
-	require.NoError(t, repo.Revoke(ctx, record.SessionID, revokedAt))
+	require.NoError(t, repo.Revoke(ctx, record.SessionID, 42, revokedAt))
 
 	revoked, err := repo.GetBySessionID(ctx, record.SessionID)
 	require.NoError(t, err)
@@ -83,6 +94,7 @@ func TestDesktopSessionRepository_RuntimeTokenHashMustBeUnique(t *testing.T) {
 	first := &service.DesktopSession{
 		SessionID:        "session-001",
 		UserID:           42,
+		GroupID:          88,
 		DeviceID:         "device-001",
 		DeviceName:       "MacBook Pro",
 		Target:           "desktop",
@@ -95,6 +107,7 @@ func TestDesktopSessionRepository_RuntimeTokenHashMustBeUnique(t *testing.T) {
 	second := &service.DesktopSession{
 		SessionID:        "session-002",
 		UserID:           43,
+		GroupID:          89,
 		DeviceID:         "device-002",
 		DeviceName:       "Mac mini",
 		Target:           "desktop",
@@ -119,6 +132,7 @@ func TestDesktopSessionRepository_UpdateMissingSessionReturnsError(t *testing.T)
 		ID:               999,
 		SessionID:        "missing-session",
 		UserID:           42,
+		GroupID:          88,
 		DeviceID:         "device-001",
 		DeviceName:       "MacBook Pro",
 		Target:           "desktop",
@@ -137,6 +151,35 @@ func TestDesktopSessionRepository_RevokeMissingSessionReturnsError(t *testing.T)
 	repo, _ := newDesktopSessionEntRepo(t)
 	ctx := context.Background()
 
-	err := repo.Revoke(ctx, "missing-session", time.Date(2026, 4, 18, 10, 0, 0, 0, time.UTC))
+	err := repo.Revoke(ctx, "missing-session", 42, time.Date(2026, 4, 18, 10, 0, 0, 0, time.UTC))
 	require.Error(t, err)
+}
+
+func TestDesktopSessionRepository_RevokeRejectsNonOwner(t *testing.T) {
+	repo, _ := newDesktopSessionEntRepo(t)
+	ctx := context.Background()
+	now := time.Date(2026, 4, 18, 9, 0, 0, 0, time.UTC)
+
+	record := &service.DesktopSession{
+		SessionID:        "session-001",
+		UserID:           42,
+		GroupID:          88,
+		DeviceID:         "device-001",
+		DeviceName:       "MacBook Pro",
+		Target:           "desktop",
+		Status:           "active",
+		RuntimeTokenHash: "hash-001",
+		ProfileKey:       "platform-desktop",
+		ExpiresAt:        now.Add(12 * time.Hour),
+		LastSeenAt:       now,
+	}
+	require.NoError(t, repo.Create(ctx, record))
+
+	err := repo.Revoke(ctx, record.SessionID, 99, now.Add(time.Hour))
+	require.Error(t, err)
+
+	stored, getErr := repo.GetBySessionID(ctx, record.SessionID)
+	require.NoError(t, getErr)
+	require.NotNil(t, stored)
+	require.Nil(t, stored.RevokedAt)
 }

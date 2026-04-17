@@ -25,6 +25,8 @@ type DesktopSession struct {
 	SessionID string `json:"session_id,omitempty"`
 	// UserID holds the value of the "user_id" field.
 	UserID int64 `json:"user_id,omitempty"`
+	// GroupID holds the value of the "group_id" field.
+	GroupID int64 `json:"group_id,omitempty"`
 	// DeviceID holds the value of the "device_id" field.
 	DeviceID string `json:"device_id,omitempty"`
 	// DeviceName holds the value of the "device_name" field.
@@ -51,7 +53,7 @@ func (*DesktopSession) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case desktopsession.FieldID, desktopsession.FieldUserID:
+		case desktopsession.FieldID, desktopsession.FieldUserID, desktopsession.FieldGroupID:
 			values[i] = new(sql.NullInt64)
 		case desktopsession.FieldSessionID, desktopsession.FieldDeviceID, desktopsession.FieldDeviceName, desktopsession.FieldTarget, desktopsession.FieldStatus, desktopsession.FieldRuntimeTokenHash, desktopsession.FieldProfileKey:
 			values[i] = new(sql.NullString)
@@ -101,6 +103,12 @@ func (_m *DesktopSession) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field user_id", values[i])
 			} else if value.Valid {
 				_m.UserID = value.Int64
+			}
+		case desktopsession.FieldGroupID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field group_id", values[i])
+			} else if value.Valid {
+				_m.GroupID = value.Int64
 			}
 		case desktopsession.FieldDeviceID:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -204,6 +212,9 @@ func (_m *DesktopSession) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("user_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.UserID))
+	builder.WriteString(", ")
+	builder.WriteString("group_id=")
+	builder.WriteString(fmt.Sprintf("%v", _m.GroupID))
 	builder.WriteString(", ")
 	builder.WriteString("device_id=")
 	builder.WriteString(_m.DeviceID)

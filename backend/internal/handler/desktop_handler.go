@@ -12,8 +12,8 @@ import (
 
 type desktopSessionService interface {
 	Create(ctx context.Context, req service.DesktopSessionCreateRequest) (*service.DesktopSessionResult, error)
-	Refresh(ctx context.Context, sessionID string) (*service.DesktopSessionResult, error)
-	Revoke(ctx context.Context, sessionID string) error
+	Refresh(ctx context.Context, sessionID string, userID int64) (*service.DesktopSessionResult, error)
+	Revoke(ctx context.Context, sessionID string, userID int64) error
 }
 
 type DesktopHandler struct {
@@ -22,6 +22,7 @@ type DesktopHandler struct {
 
 type desktopSessionRequest struct {
 	Target        string `json:"target" binding:"required,oneof=desktop cli"`
+	GroupID       int64  `json:"group_id" binding:"required"`
 	DeviceID      string `json:"device_id" binding:"required"`
 	DeviceName    string `json:"device_name" binding:"required"`
 	ClientVersion string `json:"client_version" binding:"required"`
@@ -56,6 +57,7 @@ func (h *DesktopHandler) CreateSession(c *gin.Context) {
 
 	result, err := h.service.Create(c.Request.Context(), service.DesktopSessionCreateRequest{
 		UserID:        subject.UserID,
+		GroupID:       req.GroupID,
 		DeviceID:      req.DeviceID,
 		DeviceName:    req.DeviceName,
 		Target:        service.DesktopSessionTarget(req.Target),
@@ -70,7 +72,13 @@ func (h *DesktopHandler) CreateSession(c *gin.Context) {
 }
 
 func (h *DesktopHandler) RefreshSession(c *gin.Context) {
-	result, err := h.service.Refresh(c.Request.Context(), c.Param("id"))
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+
+	result, err := h.service.Refresh(c.Request.Context(), c.Param("id"), subject.UserID)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -80,7 +88,13 @@ func (h *DesktopHandler) RefreshSession(c *gin.Context) {
 }
 
 func (h *DesktopHandler) DeleteSession(c *gin.Context) {
-	if err := h.service.Revoke(c.Request.Context(), c.Param("id")); err != nil {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+
+	if err := h.service.Revoke(c.Request.Context(), c.Param("id"), subject.UserID); err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}

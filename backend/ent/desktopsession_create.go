@@ -62,6 +62,12 @@ func (_c *DesktopSessionCreate) SetUserID(v int64) *DesktopSessionCreate {
 	return _c
 }
 
+// SetGroupID sets the "group_id" field.
+func (_c *DesktopSessionCreate) SetGroupID(v int64) *DesktopSessionCreate {
+	_c.mutation.SetGroupID(v)
+	return _c
+}
+
 // SetDeviceID sets the "device_id" field.
 func (_c *DesktopSessionCreate) SetDeviceID(v string) *DesktopSessionCreate {
 	_c.mutation.SetDeviceID(v)
@@ -207,6 +213,9 @@ func (_c *DesktopSessionCreate) check() error {
 	if _, ok := _c.mutation.UserID(); !ok {
 		return &ValidationError{Name: "user_id", err: errors.New(`ent: missing required field "DesktopSession.user_id"`)}
 	}
+	if _, ok := _c.mutation.GroupID(); !ok {
+		return &ValidationError{Name: "group_id", err: errors.New(`ent: missing required field "DesktopSession.group_id"`)}
+	}
 	if _, ok := _c.mutation.DeviceID(); !ok {
 		return &ValidationError{Name: "device_id", err: errors.New(`ent: missing required field "DesktopSession.device_id"`)}
 	}
@@ -273,6 +282,10 @@ func (_c *DesktopSessionCreate) createSpec() (*DesktopSession, *sqlgraph.CreateS
 	if value, ok := _c.mutation.UserID(); ok {
 		_spec.SetField(desktopsession.FieldUserID, field.TypeInt64, value)
 		_node.UserID = value
+	}
+	if value, ok := _c.mutation.GroupID(); ok {
+		_spec.SetField(desktopsession.FieldGroupID, field.TypeInt64, value)
+		_node.GroupID = value
 	}
 	if value, ok := _c.mutation.DeviceID(); ok {
 		_spec.SetField(desktopsession.FieldDeviceID, field.TypeString, value)
@@ -401,6 +414,24 @@ func (u *DesktopSessionUpsert) UpdateUserID() *DesktopSessionUpsert {
 // AddUserID adds v to the "user_id" field.
 func (u *DesktopSessionUpsert) AddUserID(v int64) *DesktopSessionUpsert {
 	u.Add(desktopsession.FieldUserID, v)
+	return u
+}
+
+// SetGroupID sets the "group_id" field.
+func (u *DesktopSessionUpsert) SetGroupID(v int64) *DesktopSessionUpsert {
+	u.Set(desktopsession.FieldGroupID, v)
+	return u
+}
+
+// UpdateGroupID sets the "group_id" field to the value that was provided on create.
+func (u *DesktopSessionUpsert) UpdateGroupID() *DesktopSessionUpsert {
+	u.SetExcluded(desktopsession.FieldGroupID)
+	return u
+}
+
+// AddGroupID adds v to the "group_id" field.
+func (u *DesktopSessionUpsert) AddGroupID(v int64) *DesktopSessionUpsert {
+	u.Add(desktopsession.FieldGroupID, v)
 	return u
 }
 
@@ -609,6 +640,27 @@ func (u *DesktopSessionUpsertOne) AddUserID(v int64) *DesktopSessionUpsertOne {
 func (u *DesktopSessionUpsertOne) UpdateUserID() *DesktopSessionUpsertOne {
 	return u.Update(func(s *DesktopSessionUpsert) {
 		s.UpdateUserID()
+	})
+}
+
+// SetGroupID sets the "group_id" field.
+func (u *DesktopSessionUpsertOne) SetGroupID(v int64) *DesktopSessionUpsertOne {
+	return u.Update(func(s *DesktopSessionUpsert) {
+		s.SetGroupID(v)
+	})
+}
+
+// AddGroupID adds v to the "group_id" field.
+func (u *DesktopSessionUpsertOne) AddGroupID(v int64) *DesktopSessionUpsertOne {
+	return u.Update(func(s *DesktopSessionUpsert) {
+		s.AddGroupID(v)
+	})
+}
+
+// UpdateGroupID sets the "group_id" field to the value that was provided on create.
+func (u *DesktopSessionUpsertOne) UpdateGroupID() *DesktopSessionUpsertOne {
+	return u.Update(func(s *DesktopSessionUpsert) {
+		s.UpdateGroupID()
 	})
 }
 
@@ -1002,6 +1054,27 @@ func (u *DesktopSessionUpsertBulk) AddUserID(v int64) *DesktopSessionUpsertBulk 
 func (u *DesktopSessionUpsertBulk) UpdateUserID() *DesktopSessionUpsertBulk {
 	return u.Update(func(s *DesktopSessionUpsert) {
 		s.UpdateUserID()
+	})
+}
+
+// SetGroupID sets the "group_id" field.
+func (u *DesktopSessionUpsertBulk) SetGroupID(v int64) *DesktopSessionUpsertBulk {
+	return u.Update(func(s *DesktopSessionUpsert) {
+		s.SetGroupID(v)
+	})
+}
+
+// AddGroupID adds v to the "group_id" field.
+func (u *DesktopSessionUpsertBulk) AddGroupID(v int64) *DesktopSessionUpsertBulk {
+	return u.Update(func(s *DesktopSessionUpsert) {
+		s.AddGroupID(v)
+	})
+}
+
+// UpdateGroupID sets the "group_id" field to the value that was provided on create.
+func (u *DesktopSessionUpsertBulk) UpdateGroupID() *DesktopSessionUpsertBulk {
+	return u.Update(func(s *DesktopSessionUpsert) {
+		s.UpdateGroupID()
 	})
 }
 

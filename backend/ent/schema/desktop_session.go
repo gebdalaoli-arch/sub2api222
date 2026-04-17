@@ -32,6 +32,7 @@ func (DesktopSession) Fields() []ent.Field {
 		field.String("session_id").
 			Unique(),
 		field.Int64("user_id"),
+		field.Int64("group_id"),
 		field.String("device_id"),
 		field.String("device_name").
 			Default(""),
@@ -52,6 +53,7 @@ func (DesktopSession) Fields() []ent.Field {
 func (DesktopSession) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("user_id"),
+		index.Fields("group_id"),
 		index.Fields("device_id"),
 		index.Fields("expires_at"),
 	}

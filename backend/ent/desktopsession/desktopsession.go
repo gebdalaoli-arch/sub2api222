@@ -21,6 +21,8 @@ const (
 	FieldSessionID = "session_id"
 	// FieldUserID holds the string denoting the user_id field in the database.
 	FieldUserID = "user_id"
+	// FieldGroupID holds the string denoting the group_id field in the database.
+	FieldGroupID = "group_id"
 	// FieldDeviceID holds the string denoting the device_id field in the database.
 	FieldDeviceID = "device_id"
 	// FieldDeviceName holds the string denoting the device_name field in the database.
@@ -50,6 +52,7 @@ var Columns = []string{
 	FieldUpdatedAt,
 	FieldSessionID,
 	FieldUserID,
+	FieldGroupID,
 	FieldDeviceID,
 	FieldDeviceName,
 	FieldTarget,
@@ -110,6 +113,11 @@ func BySessionID(opts ...sql.OrderTermOption) OrderOption {
 // ByUserID orders the results by the user_id field.
 func ByUserID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUserID, opts...).ToFunc()
+}
+
+// ByGroupID orders the results by the group_id field.
+func ByGroupID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldGroupID, opts...).ToFunc()
 }
 
 // ByDeviceID orders the results by the device_id field.

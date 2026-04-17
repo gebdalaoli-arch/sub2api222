@@ -70,7 +70,7 @@ func TestAPIContracts(t *testing.T) {
 			name:   "POST /api/v1/desktop/sessions",
 			method: http.MethodPost,
 			path:   "/api/v1/desktop/sessions",
-			body:   `{"target":"desktop","device_id":"desktop-1","device_name":"mbp","client_version":"0.1.0"}`,
+			body:   `{"target":"desktop","group_id":9,"device_id":"desktop-1","device_name":"mbp","client_version":"0.1.0"}`,
 			headers: map[string]string{
 				"Content-Type": "application/json",
 			},
@@ -857,11 +857,11 @@ func (s *stubContractDesktopSessionService) Create(ctx context.Context, req serv
 	}, nil
 }
 
-func (s *stubContractDesktopSessionService) Refresh(ctx context.Context, sessionID string) (*service.DesktopSessionResult, error) {
+func (s *stubContractDesktopSessionService) Refresh(ctx context.Context, sessionID string, userID int64) (*service.DesktopSessionResult, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s *stubContractDesktopSessionService) Revoke(ctx context.Context, sessionID string) error {
+func (s *stubContractDesktopSessionService) Revoke(ctx context.Context, sessionID string, userID int64) error {
 	return errors.New("not implemented")
 }
 

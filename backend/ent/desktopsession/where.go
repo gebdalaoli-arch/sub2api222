@@ -74,6 +74,11 @@ func UserID(v int64) predicate.DesktopSession {
 	return predicate.DesktopSession(sql.FieldEQ(FieldUserID, v))
 }
 
+// GroupID applies equality check predicate on the "group_id" field. It's identical to GroupIDEQ.
+func GroupID(v int64) predicate.DesktopSession {
+	return predicate.DesktopSession(sql.FieldEQ(FieldGroupID, v))
+}
+
 // DeviceID applies equality check predicate on the "device_id" field. It's identical to DeviceIDEQ.
 func DeviceID(v string) predicate.DesktopSession {
 	return predicate.DesktopSession(sql.FieldEQ(FieldDeviceID, v))
@@ -302,6 +307,46 @@ func UserIDLT(v int64) predicate.DesktopSession {
 // UserIDLTE applies the LTE predicate on the "user_id" field.
 func UserIDLTE(v int64) predicate.DesktopSession {
 	return predicate.DesktopSession(sql.FieldLTE(FieldUserID, v))
+}
+
+// GroupIDEQ applies the EQ predicate on the "group_id" field.
+func GroupIDEQ(v int64) predicate.DesktopSession {
+	return predicate.DesktopSession(sql.FieldEQ(FieldGroupID, v))
+}
+
+// GroupIDNEQ applies the NEQ predicate on the "group_id" field.
+func GroupIDNEQ(v int64) predicate.DesktopSession {
+	return predicate.DesktopSession(sql.FieldNEQ(FieldGroupID, v))
+}
+
+// GroupIDIn applies the In predicate on the "group_id" field.
+func GroupIDIn(vs ...int64) predicate.DesktopSession {
+	return predicate.DesktopSession(sql.FieldIn(FieldGroupID, vs...))
+}
+
+// GroupIDNotIn applies the NotIn predicate on the "group_id" field.
+func GroupIDNotIn(vs ...int64) predicate.DesktopSession {
+	return predicate.DesktopSession(sql.FieldNotIn(FieldGroupID, vs...))
+}
+
+// GroupIDGT applies the GT predicate on the "group_id" field.
+func GroupIDGT(v int64) predicate.DesktopSession {
+	return predicate.DesktopSession(sql.FieldGT(FieldGroupID, v))
+}
+
+// GroupIDGTE applies the GTE predicate on the "group_id" field.
+func GroupIDGTE(v int64) predicate.DesktopSession {
+	return predicate.DesktopSession(sql.FieldGTE(FieldGroupID, v))
+}
+
+// GroupIDLT applies the LT predicate on the "group_id" field.
+func GroupIDLT(v int64) predicate.DesktopSession {
+	return predicate.DesktopSession(sql.FieldLT(FieldGroupID, v))
+}
+
+// GroupIDLTE applies the LTE predicate on the "group_id" field.
+func GroupIDLTE(v int64) predicate.DesktopSession {
+	return predicate.DesktopSession(sql.FieldLTE(FieldGroupID, v))
 }
 
 // DeviceIDEQ applies the EQ predicate on the "device_id" field.

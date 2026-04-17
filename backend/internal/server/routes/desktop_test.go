@@ -17,6 +17,8 @@ import (
 type desktopRoutesRuntimeAuthStub struct {
 	session *service.DesktopSession
 	user    *service.User
+	group   *service.Group
+	sub     *service.UserSubscription
 }
 
 func (s *desktopRoutesRuntimeAuthStub) ValidateRuntimeToken(_ context.Context, _ string) (*service.DesktopSession, error) {
@@ -26,16 +28,42 @@ func (s *desktopRoutesRuntimeAuthStub) ValidateRuntimeToken(_ context.Context, _
 	return &service.DesktopSession{
 		SessionID: "sess-route-1",
 		UserID:    9,
+		GroupID:   9,
 		Target:    string(service.DesktopSessionTargetDesktop),
 		Status:    service.StatusActive,
 	}, nil
 }
 
-func (s *desktopRoutesRuntimeAuthStub) GetByID(_ context.Context, id int64) (*service.User, error) {
+func (s *desktopRoutesRuntimeAuthStub) GetUserByID(_ context.Context, id int64) (*service.User, error) {
 	if s.user != nil {
 		return s.user, nil
 	}
 	return &service.User{ID: id, Role: service.RoleUser, Status: service.StatusActive, Concurrency: 2}, nil
+}
+
+func (s *desktopRoutesRuntimeAuthStub) GetGroupByID(_ context.Context, id int64) (*service.Group, error) {
+	if s.group != nil {
+		clone := *s.group
+		clone.ID = id
+		return &clone, nil
+	}
+	return &service.Group{
+		ID:               id,
+		Platform:         service.PlatformOpenAI,
+		Status:           service.StatusActive,
+		Hydrated:         true,
+		SubscriptionType: service.SubscriptionTypeStandard,
+	}, nil
+}
+
+func (s *desktopRoutesRuntimeAuthStub) GetActiveSubscription(_ context.Context, userID, groupID int64) (*service.UserSubscription, error) {
+	if s.sub != nil {
+		clone := *s.sub
+		clone.UserID = userID
+		clone.GroupID = groupID
+		return &clone, nil
+	}
+	return nil, service.ErrSubscriptionNotFound
 }
 
 func TestDesktopRoutesRuntimeResponsesRouteDoesNotFailWithMissingAPIKeyContext(t *testing.T) {
@@ -56,6 +84,7 @@ func TestDesktopRoutesRuntimeResponsesRouteDoesNotFailWithMissingAPIKeyContext(t
 			session: &service.DesktopSession{
 				SessionID: "sess-route-1",
 				UserID:    7,
+				GroupID:   9,
 				Target:    string(service.DesktopSessionTargetDesktop),
 				Status:    service.StatusActive,
 			},

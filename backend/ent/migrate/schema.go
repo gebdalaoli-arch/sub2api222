@@ -345,6 +345,7 @@ var (
 		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "session_id", Type: field.TypeString, Unique: true},
 		{Name: "user_id", Type: field.TypeInt64},
+		{Name: "group_id", Type: field.TypeInt64},
 		{Name: "device_id", Type: field.TypeString},
 		{Name: "device_name", Type: field.TypeString, Default: ""},
 		{Name: "target", Type: field.TypeString},
@@ -367,14 +368,19 @@ var (
 				Columns: []*schema.Column{DesktopSessionsColumns[4]},
 			},
 			{
-				Name:    "desktopsession_device_id",
+				Name:    "desktopsession_group_id",
 				Unique:  false,
 				Columns: []*schema.Column{DesktopSessionsColumns[5]},
 			},
 			{
+				Name:    "desktopsession_device_id",
+				Unique:  false,
+				Columns: []*schema.Column{DesktopSessionsColumns[6]},
+			},
+			{
 				Name:    "desktopsession_expires_at",
 				Unique:  false,
-				Columns: []*schema.Column{DesktopSessionsColumns[11]},
+				Columns: []*schema.Column{DesktopSessionsColumns[12]},
 			},
 		},
 	}

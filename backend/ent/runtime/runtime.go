@@ -326,11 +326,11 @@ func init() {
 	// desktopsession.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	desktopsession.UpdateDefaultUpdatedAt = desktopsessionDescUpdatedAt.UpdateDefault.(func() time.Time)
 	// desktopsessionDescDeviceName is the schema descriptor for device_name field.
-	desktopsessionDescDeviceName := desktopsessionFields[3].Descriptor()
+	desktopsessionDescDeviceName := desktopsessionFields[4].Descriptor()
 	// desktopsession.DefaultDeviceName holds the default value on creation for the device_name field.
 	desktopsession.DefaultDeviceName = desktopsessionDescDeviceName.Default.(string)
 	// desktopsessionDescStatus is the schema descriptor for status field.
-	desktopsessionDescStatus := desktopsessionFields[5].Descriptor()
+	desktopsessionDescStatus := desktopsessionFields[6].Descriptor()
 	// desktopsession.DefaultStatus holds the default value on creation for the status field.
 	desktopsession.DefaultStatus = desktopsessionDescStatus.Default.(string)
 	errorpassthroughruleMixin := schema.ErrorPassthroughRule{}.Mixin()

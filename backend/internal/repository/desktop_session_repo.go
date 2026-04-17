@@ -26,6 +26,7 @@ func (r *desktopSessionRepository) Create(ctx context.Context, session *service.
 	builder := client.DesktopSession.Create().
 		SetSessionID(session.SessionID).
 		SetUserID(session.UserID).
+		SetGroupID(session.GroupID).
 		SetDeviceID(session.DeviceID).
 		SetDeviceName(session.DeviceName).
 		SetTarget(session.Target).
@@ -50,6 +51,23 @@ func (r *desktopSessionRepository) GetBySessionID(ctx context.Context, sessionID
 	client := clientFromContext(ctx, r.client)
 	record, err := client.DesktopSession.Query().
 		Where(dbdesktopsession.SessionIDEQ(sessionID)).
+		Only(ctx)
+	if err != nil {
+		if dbent.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return desktopSessionEntityToService(record), nil
+}
+
+func (r *desktopSessionRepository) GetBySessionIDAndUserID(ctx context.Context, sessionID string, userID int64) (*service.DesktopSession, error) {
+	client := clientFromContext(ctx, r.client)
+	record, err := client.DesktopSession.Query().
+		Where(
+			dbdesktopsession.SessionIDEQ(sessionID),
+			dbdesktopsession.UserIDEQ(userID),
+		).
 		Only(ctx)
 	if err != nil {
 		if dbent.IsNotFound(err) {
@@ -86,6 +104,7 @@ func (r *desktopSessionRepository) Update(ctx context.Context, session *service.
 	}
 	builder := record.Update().
 		SetUserID(session.UserID).
+		SetGroupID(session.GroupID).
 		SetDeviceID(session.DeviceID).
 		SetDeviceName(session.DeviceName).
 		SetTarget(session.Target).
@@ -108,10 +127,18 @@ func (r *desktopSessionRepository) Update(ctx context.Context, session *service.
 	return nil
 }
 
-func (r *desktopSessionRepository) Revoke(ctx context.Context, sessionID string, revokedAt time.Time) error {
+func (r *desktopSessionRepository) Revoke(ctx context.Context, sessionID string, userID int64, revokedAt time.Time) error {
 	client := clientFromContext(ctx, r.client)
-	record, err := resolveDesktopSessionEntity(ctx, client, 0, sessionID)
+	record, err := client.DesktopSession.Query().
+		Where(
+			dbdesktopsession.SessionIDEQ(sessionID),
+			dbdesktopsession.UserIDEQ(userID),
+		).
+		Only(ctx)
 	if err != nil {
+		if dbent.IsNotFound(err) {
+			return service.ErrDesktopSessionNotFound
+		}
 		return err
 	}
 	_, err = record.Update().
@@ -153,6 +180,7 @@ func applyDesktopSessionEntity(dst *service.DesktopSession, src *dbent.DesktopSe
 	dst.ID = src.ID
 	dst.SessionID = src.SessionID
 	dst.UserID = src.UserID
+	dst.GroupID = src.GroupID
 	dst.DeviceID = src.DeviceID
 	dst.DeviceName = src.DeviceName
 	dst.Target = src.Target

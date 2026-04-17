@@ -601,6 +601,10 @@ func (s *SubscriptionService) GetActiveSubscription(ctx context.Context, userID,
 }
 
 // ListUserSubscriptions 获取用户的所有订阅
+// GetActiveByUserIDAndGroupID exposes the active-subscription lookup behind the desktop session port.
+func (s *SubscriptionService) GetActiveByUserIDAndGroupID(ctx context.Context, userID, groupID int64) (*UserSubscription, error) {
+	return s.GetActiveSubscription(ctx, userID, groupID)
+}
 func (s *SubscriptionService) ListUserSubscriptions(ctx context.Context, userID int64) ([]UserSubscription, error) {
 	subs, err := s.userSubRepo.ListByUserID(ctx, userID)
 	if err != nil {

@@ -6900,6 +6900,8 @@ type DesktopSessionMutation struct {
 	session_id         *string
 	user_id            *int64
 	adduser_id         *int64
+	group_id           *int64
+	addgroup_id        *int64
 	device_id          *string
 	device_name        *string
 	target             *string
@@ -7175,6 +7177,62 @@ func (m *DesktopSessionMutation) AddedUserID() (r int64, exists bool) {
 func (m *DesktopSessionMutation) ResetUserID() {
 	m.user_id = nil
 	m.adduser_id = nil
+}
+
+// SetGroupID sets the "group_id" field.
+func (m *DesktopSessionMutation) SetGroupID(i int64) {
+	m.group_id = &i
+	m.addgroup_id = nil
+}
+
+// GroupID returns the value of the "group_id" field in the mutation.
+func (m *DesktopSessionMutation) GroupID() (r int64, exists bool) {
+	v := m.group_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGroupID returns the old "group_id" field's value of the DesktopSession entity.
+// If the DesktopSession object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesktopSessionMutation) OldGroupID(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGroupID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGroupID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGroupID: %w", err)
+	}
+	return oldValue.GroupID, nil
+}
+
+// AddGroupID adds i to the "group_id" field.
+func (m *DesktopSessionMutation) AddGroupID(i int64) {
+	if m.addgroup_id != nil {
+		*m.addgroup_id += i
+	} else {
+		m.addgroup_id = &i
+	}
+}
+
+// AddedGroupID returns the value that was added to the "group_id" field in this mutation.
+func (m *DesktopSessionMutation) AddedGroupID() (r int64, exists bool) {
+	v := m.addgroup_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetGroupID resets all changes to the "group_id" field.
+func (m *DesktopSessionMutation) ResetGroupID() {
+	m.group_id = nil
+	m.addgroup_id = nil
 }
 
 // SetDeviceID sets the "device_id" field.
@@ -7548,7 +7606,7 @@ func (m *DesktopSessionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *DesktopSessionMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 14)
 	if m.created_at != nil {
 		fields = append(fields, desktopsession.FieldCreatedAt)
 	}
@@ -7560,6 +7618,9 @@ func (m *DesktopSessionMutation) Fields() []string {
 	}
 	if m.user_id != nil {
 		fields = append(fields, desktopsession.FieldUserID)
+	}
+	if m.group_id != nil {
+		fields = append(fields, desktopsession.FieldGroupID)
 	}
 	if m.device_id != nil {
 		fields = append(fields, desktopsession.FieldDeviceID)
@@ -7604,6 +7665,8 @@ func (m *DesktopSessionMutation) Field(name string) (ent.Value, bool) {
 		return m.SessionID()
 	case desktopsession.FieldUserID:
 		return m.UserID()
+	case desktopsession.FieldGroupID:
+		return m.GroupID()
 	case desktopsession.FieldDeviceID:
 		return m.DeviceID()
 	case desktopsession.FieldDeviceName:
@@ -7639,6 +7702,8 @@ func (m *DesktopSessionMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldSessionID(ctx)
 	case desktopsession.FieldUserID:
 		return m.OldUserID(ctx)
+	case desktopsession.FieldGroupID:
+		return m.OldGroupID(ctx)
 	case desktopsession.FieldDeviceID:
 		return m.OldDeviceID(ctx)
 	case desktopsession.FieldDeviceName:
@@ -7693,6 +7758,13 @@ func (m *DesktopSessionMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUserID(v)
+		return nil
+	case desktopsession.FieldGroupID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGroupID(v)
 		return nil
 	case desktopsession.FieldDeviceID:
 		v, ok := value.(string)
@@ -7768,6 +7840,9 @@ func (m *DesktopSessionMutation) AddedFields() []string {
 	if m.adduser_id != nil {
 		fields = append(fields, desktopsession.FieldUserID)
 	}
+	if m.addgroup_id != nil {
+		fields = append(fields, desktopsession.FieldGroupID)
+	}
 	return fields
 }
 
@@ -7778,6 +7853,8 @@ func (m *DesktopSessionMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case desktopsession.FieldUserID:
 		return m.AddedUserID()
+	case desktopsession.FieldGroupID:
+		return m.AddedGroupID()
 	}
 	return nil, false
 }
@@ -7793,6 +7870,13 @@ func (m *DesktopSessionMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddUserID(v)
+		return nil
+	case desktopsession.FieldGroupID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddGroupID(v)
 		return nil
 	}
 	return fmt.Errorf("unknown DesktopSession numeric field %s", name)
@@ -7841,6 +7925,9 @@ func (m *DesktopSessionMutation) ResetField(name string) error {
 		return nil
 	case desktopsession.FieldUserID:
 		m.ResetUserID()
+		return nil
+	case desktopsession.FieldGroupID:
+		m.ResetGroupID()
 		return nil
 	case desktopsession.FieldDeviceID:
 		m.ResetDeviceID()

@@ -69,6 +69,27 @@ func (_u *DesktopSessionUpdate) AddUserID(v int64) *DesktopSessionUpdate {
 	return _u
 }
 
+// SetGroupID sets the "group_id" field.
+func (_u *DesktopSessionUpdate) SetGroupID(v int64) *DesktopSessionUpdate {
+	_u.mutation.ResetGroupID()
+	_u.mutation.SetGroupID(v)
+	return _u
+}
+
+// SetNillableGroupID sets the "group_id" field if the given value is not nil.
+func (_u *DesktopSessionUpdate) SetNillableGroupID(v *int64) *DesktopSessionUpdate {
+	if v != nil {
+		_u.SetGroupID(*v)
+	}
+	return _u
+}
+
+// AddGroupID adds value to the "group_id" field.
+func (_u *DesktopSessionUpdate) AddGroupID(v int64) *DesktopSessionUpdate {
+	_u.mutation.AddGroupID(v)
+	return _u
+}
+
 // SetDeviceID sets the "device_id" field.
 func (_u *DesktopSessionUpdate) SetDeviceID(v string) *DesktopSessionUpdate {
 	_u.mutation.SetDeviceID(v)
@@ -263,6 +284,12 @@ func (_u *DesktopSessionUpdate) sqlSave(ctx context.Context) (_node int, err err
 	if value, ok := _u.mutation.AddedUserID(); ok {
 		_spec.AddField(desktopsession.FieldUserID, field.TypeInt64, value)
 	}
+	if value, ok := _u.mutation.GroupID(); ok {
+		_spec.SetField(desktopsession.FieldGroupID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedGroupID(); ok {
+		_spec.AddField(desktopsession.FieldGroupID, field.TypeInt64, value)
+	}
 	if value, ok := _u.mutation.DeviceID(); ok {
 		_spec.SetField(desktopsession.FieldDeviceID, field.TypeString, value)
 	}
@@ -351,6 +378,27 @@ func (_u *DesktopSessionUpdateOne) SetNillableUserID(v *int64) *DesktopSessionUp
 // AddUserID adds value to the "user_id" field.
 func (_u *DesktopSessionUpdateOne) AddUserID(v int64) *DesktopSessionUpdateOne {
 	_u.mutation.AddUserID(v)
+	return _u
+}
+
+// SetGroupID sets the "group_id" field.
+func (_u *DesktopSessionUpdateOne) SetGroupID(v int64) *DesktopSessionUpdateOne {
+	_u.mutation.ResetGroupID()
+	_u.mutation.SetGroupID(v)
+	return _u
+}
+
+// SetNillableGroupID sets the "group_id" field if the given value is not nil.
+func (_u *DesktopSessionUpdateOne) SetNillableGroupID(v *int64) *DesktopSessionUpdateOne {
+	if v != nil {
+		_u.SetGroupID(*v)
+	}
+	return _u
+}
+
+// AddGroupID adds value to the "group_id" field.
+func (_u *DesktopSessionUpdateOne) AddGroupID(v int64) *DesktopSessionUpdateOne {
+	_u.mutation.AddGroupID(v)
 	return _u
 }
 
@@ -577,6 +625,12 @@ func (_u *DesktopSessionUpdateOne) sqlSave(ctx context.Context) (_node *DesktopS
 	}
 	if value, ok := _u.mutation.AddedUserID(); ok {
 		_spec.AddField(desktopsession.FieldUserID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.GroupID(); ok {
+		_spec.SetField(desktopsession.FieldGroupID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedGroupID(); ok {
+		_spec.AddField(desktopsession.FieldGroupID, field.TypeInt64, value)
 	}
 	if value, ok := _u.mutation.DeviceID(); ok {
 		_spec.SetField(desktopsession.FieldDeviceID, field.TypeString, value)
