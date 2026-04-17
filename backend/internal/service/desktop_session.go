@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"time"
 
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/google/uuid"
 )
 
@@ -36,9 +37,12 @@ type DesktopSession struct {
 type DesktopSessionRepository interface {
 	Create(ctx context.Context, session *DesktopSession) error
 	GetBySessionID(ctx context.Context, sessionID string) (*DesktopSession, error)
+	GetByRuntimeTokenHash(ctx context.Context, tokenHash string) (*DesktopSession, error)
 	Update(ctx context.Context, session *DesktopSession) error
 	Revoke(ctx context.Context, sessionID string, revokedAt time.Time) error
 }
+
+var ErrInvalidDesktopRuntimeToken = infraerrors.Unauthorized("INVALID_RUNTIME_TOKEN", "invalid runtime token")
 
 type DesktopSessionCreateRequest struct {
 	UserID        int64
@@ -105,11 +109,7 @@ func (s *DesktopSessionService) Refresh(ctx context.Context, sessionID string) (
 		return nil, err
 	}
 	now := s.now()
-	base := now
-	if record.ExpiresAt.After(base) {
-		base = record.ExpiresAt
-	}
-	record.ExpiresAt = base.Add(12 * time.Hour)
+	record.ExpiresAt = now.Add(12 * time.Hour)
 	record.LastSeenAt = now
 	if err := s.repo.Update(ctx, record); err != nil {
 		return nil, err
@@ -126,6 +126,17 @@ func (s *DesktopSessionService) Refresh(ctx context.Context, sessionID string) (
 
 func (s *DesktopSessionService) Revoke(ctx context.Context, sessionID string) error {
 	return s.repo.Revoke(ctx, sessionID, s.now())
+}
+
+func (s *DesktopSessionService) ValidateRuntimeToken(ctx context.Context, token string) (*DesktopSession, error) {
+	record, err := s.repo.GetByRuntimeTokenHash(ctx, hashDesktopRuntimeToken(token))
+	if err != nil {
+		return nil, err
+	}
+	if record.RevokedAt != nil || !record.ExpiresAt.After(s.now()) {
+		return nil, ErrInvalidDesktopRuntimeToken
+	}
+	return record, nil
 }
 
 func hashDesktopRuntimeToken(token string) string {
