@@ -28,10 +28,14 @@ export component AppWindow inherits Window {
     in-out property <string> dashboard-account-status-text: "账户状态：待登录";
     in-out property <string> dashboard-notice-text: "充值页当前作为公告区。首版优先支持 CDK 兑换、订阅状态查看和平台模式启动。";
     in-out property <int> current-section: 0;
+    in-out property <[string]> launch-group-options: ["登录后加载可用分组"];
+    in-out property <int> launch-selected-group-index: 0;
 
     callback refresh-installations-requested();
     callback launch-desktop-requested();
     callback launch-cli-requested();
+    callback launch-platform-desktop-requested();
+    callback launch-platform-cli-requested();
     callback login-requested();
     callback register-requested();
     callback verify-code-requested();
@@ -245,20 +249,24 @@ export component AppWindow inherits Window {
                 x: 0px;
                 y: 0px;
                 width: 460px;
-                height: 320px;
+                height: 420px;
                 desktop-available: root.desktop-available;
                 cli-available: root.cli-available;
                 status-text: root.launch-status-text;
+                group-options: root.launch-group-options;
+                selected-group-index <=> root.launch-selected-group-index;
                 refresh-requested => { root.refresh-installations-requested(); }
                 launch-desktop-requested => { root.launch-desktop-requested(); }
                 launch-cli-requested => { root.launch-cli-requested(); }
+                launch-platform-desktop-requested => { root.launch-platform-desktop-requested(); }
+                launch-platform-cli-requested => { root.launch-platform-cli-requested(); }
             }
 
             Rectangle {
                 x: 484px;
                 y: 0px;
                 width: parent.width - 484px;
-                height: 320px;
+                height: 420px;
                 background: #f8fbff;
                 border-radius: 24px;
                 border-color: #d7e4f0;
@@ -317,7 +325,7 @@ export component AppWindow inherits Window {
                     x: 24px;
                     y: 208px;
                     width: parent.width - 48px;
-                    height: 86px;
+                    height: 180px;
                     background: #ffffff;
                     border-radius: 18px;
                     border-color: #d7e4f0;
@@ -336,7 +344,17 @@ export component AppWindow inherits Window {
                         x: 16px;
                         y: 36px;
                         width: parent.width - 32px;
-                        text: "接下来会绑定 group_id、桌面会话和独立 runtime 目录。当前优先完成安装检测、账户闭环与启动编排。";
+                        text: "登录后会按所选 group_id 创建 desktop session，写入本次启动专属的受管 home，再启动本次 Codex 进程。";
+                        color: #698198;
+                        font-size: 12px;
+                        wrap: word-wrap;
+                    }
+
+                    Text {
+                        x: 16px;
+                        y: 98px;
+                        width: parent.width - 32px;
+                        text: "如果当前分组无权限、订阅失效或会话创建失败，客户端应明确显示原因，并允许你直接退回官方模式。";
                         color: #698198;
                         font-size: 12px;
                         wrap: word-wrap;
@@ -346,7 +364,7 @@ export component AppWindow inherits Window {
 
             AboutScreen {
                 x: 0px;
-                y: 344px;
+                y: 444px;
                 width: parent.width;
                 height: 116px;
             }

@@ -1,6 +1,6 @@
 slint::include_modules!();
 
-use slint::SharedString;
+use slint::{ModelRc, SharedString, VecModel};
 use std::{
     cell::RefCell,
     rc::Rc,
@@ -16,6 +16,9 @@ use sub2api_desktop::{
             register_blocking, reset_password_blocking, send_verify_code_blocking, AuthResponse,
             LoginResponse, RefreshTokenRequest, RegisterRequest, ResetPasswordRequest,
         },
+        desktop_sessions::{
+            create_desktop_session_blocking, DesktopSessionCreateRequest, DesktopSessionTarget,
+        },
         groups::{fetch_available_groups_blocking, GroupSummary},
         http::ApiClient,
     },
@@ -26,7 +29,8 @@ use sub2api_desktop::{
     config::{app_config, AppConfig},
     platform::{
         install_detection::{detect_installed_targets, InstalledTarget, LaunchTarget},
-        launcher::launch_official,
+        launcher::{launch_official, launch_platform},
+        managed_home::{write_platform_home, ManagedHomePaths},
     },
     storage::{
         app_state::AppStateStore,
@@ -56,7 +60,15 @@ fn main() -> anyhow::Result<()> {
     apply_logged_out_state(&app);
     preload_local_state(&app, &app_state);
 
-    wire_launch_callbacks(&app, targets);
+    wire_launch_callbacks(&app, Rc::clone(&targets));
+    wire_platform_launch_callbacks(
+        &app,
+        Rc::clone(&targets),
+        Arc::clone(&config),
+        app_state.clone(),
+        Arc::clone(&auth_session),
+        Arc::clone(&available_groups),
+    );
     wire_auth_callbacks(
         &app,
         Arc::clone(&config),
@@ -109,6 +121,167 @@ fn wire_launch_callbacks(app: &AppWindow, targets: Rc<RefCell<Vec<InstalledTarge
     app.on_launch_cli_requested(move || {
         if let Some(app) = cli_app.upgrade() {
             launch_first_target(&app, &cli_targets.borrow(), LaunchTarget::Cli);
+        }
+    });
+}
+
+fn wire_platform_launch_callbacks(
+    app: &AppWindow,
+    targets: Rc<RefCell<Vec<InstalledTarget>>>,
+    config: Arc<AppConfig>,
+    app_state: AppStateStore,
+    auth_session: Arc<Mutex<Option<AuthSession>>>,
+    available_groups: Arc<Mutex<Vec<GroupSummary>>>,
+) {
+    let platform_desktop_app = app.as_weak();
+    let platform_desktop_targets = Rc::clone(&targets);
+    let platform_desktop_config = Arc::clone(&config);
+    let platform_desktop_session = Arc::clone(&auth_session);
+    let platform_desktop_groups = Arc::clone(&available_groups);
+    let platform_desktop_state = app_state.clone();
+    app.on_launch_platform_desktop_requested(move || {
+        start_platform_launch(
+            &platform_desktop_app,
+            platform_desktop_targets.borrow().clone(),
+            Arc::clone(&platform_desktop_config),
+            platform_desktop_state.clone(),
+            Arc::clone(&platform_desktop_session),
+            Arc::clone(&platform_desktop_groups),
+            LaunchTarget::Desktop,
+        );
+    });
+
+    let platform_cli_app = app.as_weak();
+    let platform_cli_targets = Rc::clone(&targets);
+    let platform_cli_config = Arc::clone(&config);
+    let platform_cli_session = Arc::clone(&auth_session);
+    let platform_cli_groups = Arc::clone(&available_groups);
+    app.on_launch_platform_cli_requested(move || {
+        start_platform_launch(
+            &platform_cli_app,
+            platform_cli_targets.borrow().clone(),
+            Arc::clone(&platform_cli_config),
+            app_state.clone(),
+            Arc::clone(&platform_cli_session),
+            Arc::clone(&platform_cli_groups),
+            LaunchTarget::Cli,
+        );
+    });
+}
+
+fn start_platform_launch(
+    app_handle: &slint::Weak<AppWindow>,
+    installed_targets: Vec<InstalledTarget>,
+    config: Arc<AppConfig>,
+    app_state: AppStateStore,
+    auth_session: Arc<Mutex<Option<AuthSession>>>,
+    available_groups: Arc<Mutex<Vec<GroupSummary>>>,
+    target_kind: LaunchTarget,
+) {
+    let Some(app) = app_handle.upgrade() else {
+        return;
+    };
+    let selected_group_index = app.get_launch_selected_group_index() as usize;
+    app.set_launch_status_text(SharedString::from("正在创建平台代理会话..."));
+
+    let ui_handle = app_handle.clone();
+    thread::spawn(move || {
+        let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) else {
+            let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                app.set_launch_status_text(SharedString::from(
+                    "请先登录并加载可用分组，再启动平台代理模式。",
+                ))
+            });
+            return;
+        };
+
+        let groups = available_groups
+            .lock()
+            .ok()
+            .map(|state| state.clone())
+            .unwrap_or_default();
+        let Some(group) = groups.get(selected_group_index).cloned() else {
+            let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                app.set_launch_status_text(SharedString::from(
+                    "当前没有可用分组，请先登录并确认订阅状态。",
+                ))
+            });
+            return;
+        };
+
+        let Some(target) = installed_targets
+            .iter()
+            .find(|target| target.kind == target_kind)
+            .cloned()
+        else {
+            let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                app.set_launch_status_text(SharedString::from(
+                    "未检测到对应的 Codex 目标，无法创建平台代理模式。",
+                ))
+            });
+            return;
+        };
+
+        let api_client = ApiClient::new(config.api_base_url.clone())
+            .with_access_token(Some(session.access_token.clone()));
+        let session_request = DesktopSessionCreateRequest {
+            target: match target_kind {
+                LaunchTarget::Desktop => DesktopSessionTarget::Desktop,
+                LaunchTarget::Cli => DesktopSessionTarget::Cli,
+            },
+            group_id: group.id,
+            device_id: local_device_id(target_kind),
+            device_name: local_device_name(),
+            client_version: env!("CARGO_PKG_VERSION").to_string(),
+        };
+
+        match create_desktop_session_blocking(&api_client, &session_request) {
+            Ok(platform_session) => {
+                let Some(runtime_token) = platform_session.runtime_token.as_deref() else {
+                    let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                        app.set_launch_status_text(SharedString::from(
+                            "平台会话缺少 runtime token，无法继续启动。",
+                        ))
+                    });
+                    return;
+                };
+
+                let runtime_root = app_state
+                    .root()
+                    .join("runtime")
+                    .join(&platform_session.session_id);
+                let paths = ManagedHomePaths::new(runtime_root, &platform_session.profile_key);
+                let gateway_url = platform_session.gateway_url(&config.api_base_url);
+
+                let result = write_platform_home(&paths, &gateway_url, runtime_token)
+                    .and_then(|_| launch_platform(&target, &paths.codex_home));
+
+                match result {
+                    Ok(()) => {
+                        let message = format!(
+                            "已为分组“{}”创建平台代理会话，并启动 {}。",
+                            group.name, target.display_name
+                        );
+                        let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                            app.set_launch_status_text(SharedString::from(message))
+                        });
+                    }
+                    Err(error) => {
+                        let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                            app.set_launch_status_text(SharedString::from(format!(
+                                "平台代理模式启动失败：{error}"
+                            )))
+                        });
+                    }
+                }
+            }
+            Err(error) => {
+                let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                    app.set_launch_status_text(SharedString::from(format!(
+                        "创建平台代理会话失败：{error}"
+                    )))
+                });
+            }
         }
     });
 }
@@ -188,10 +361,16 @@ fn wire_auth_callbacks(
                         email,
                         auth,
                     );
+                    let groups_snapshot = available_groups
+                        .lock()
+                        .ok()
+                        .map(|groups| groups.clone())
+                        .unwrap_or_default();
                     let _ = ui_handle.upgrade_in_event_loop(move |app| {
                         if let Ok(session_guard) = auth_session.lock() {
                             if let Some(session) = session_guard.as_ref() {
                                 apply_authenticated_state(&app, session, group_count);
+                                apply_available_groups_state(&app, &groups_snapshot);
                             }
                         }
                     });
@@ -265,10 +444,16 @@ fn wire_auth_callbacks(
                         email,
                         auth,
                     );
+                    let groups_snapshot = available_groups
+                        .lock()
+                        .ok()
+                        .map(|groups| groups.clone())
+                        .unwrap_or_default();
                     let _ = ui_handle.upgrade_in_event_loop(move |app| {
                         if let Ok(session_guard) = auth_session.lock() {
                             if let Some(session) = session_guard.as_ref() {
                                 apply_authenticated_state(&app, session, group_count);
+                                apply_available_groups_state(&app, &groups_snapshot);
                                 app.set_auth_status_text(SharedString::from(
                                     "注册成功，已自动登录当前账户。",
                                 ));
@@ -436,8 +621,14 @@ fn restore_saved_session(
                                 }
                                 let group_count =
                                     available_groups.lock().ok().map(|groups| groups.len());
+                                let groups_snapshot = available_groups
+                                    .lock()
+                                    .ok()
+                                    .map(|groups| groups.clone())
+                                    .unwrap_or_default();
                                 let _ = app_handle.upgrade_in_event_loop(move |app| {
                                     apply_authenticated_state(&app, &session, group_count);
+                                    apply_available_groups_state(&app, &groups_snapshot);
                                     app.set_auth_status_text(SharedString::from(
                                         "已恢复上次登录状态。",
                                     ));
@@ -527,6 +718,8 @@ fn apply_logged_out_state(app: &AppWindow) {
     app.set_dashboard_balance_text(SharedString::from("余额：--"));
     app.set_dashboard_usage_text(SharedString::from("并发额度：--"));
     app.set_dashboard_account_status_text(SharedString::from("账户状态：待登录"));
+    app.set_launch_group_options(single_option_model("登录后加载可用分组"));
+    app.set_launch_selected_group_index(0);
 }
 
 fn apply_authenticated_state(app: &AppWindow, session: &AuthSession, group_count: Option<usize>) {
@@ -554,6 +747,21 @@ fn apply_authenticated_state(app: &AppWindow, session: &AuthSession, group_count
         None => "已登录，但暂未拉到可用分组列表；可稍后重试或继续使用官方模式。".to_string(),
     }));
     app.set_auth_status_text(SharedString::from("登录成功，可继续进入启动中心。"));
+}
+
+fn apply_available_groups_state(app: &AppWindow, groups: &[GroupSummary]) {
+    if groups.is_empty() {
+        app.set_launch_group_options(single_option_model("当前没有可用分组"));
+        app.set_launch_selected_group_index(0);
+        return;
+    }
+
+    let labels = groups
+        .iter()
+        .map(|group| SharedString::from(format!("{} · {}", group.name, group.status)))
+        .collect::<Vec<_>>();
+    app.set_launch_group_options(ModelRc::new(VecModel::from(labels)));
+    app.set_launch_selected_group_index(0);
 }
 
 fn launch_first_target(app: &AppWindow, targets: &[InstalledTarget], kind: LaunchTarget) {
@@ -584,4 +792,21 @@ enum AuthFlowOutcome {
         temp_token: Option<String>,
         masked_email: Option<String>,
     },
+}
+
+fn single_option_model(text: &str) -> ModelRc<SharedString> {
+    ModelRc::new(VecModel::from(vec![SharedString::from(text)]))
+}
+
+fn local_device_name() -> String {
+    std::env::var("COMPUTERNAME").unwrap_or_else(|_| "desktop-client".to_string())
+}
+
+fn local_device_id(target_kind: LaunchTarget) -> String {
+    let host = local_device_name();
+    let suffix = match target_kind {
+        LaunchTarget::Desktop => "desktop",
+        LaunchTarget::Cli => "cli",
+    };
+    format!("{host}-{suffix}").to_lowercase()
 }

@@ -3,7 +3,10 @@ fn main() {
         let mut res = winresource::WindowsResource::new();
         res.set_icon("assets/app.ico");
         res.set("ProductName", "Sub2API Desktop Client");
-        res.set("FileDescription", "Bright Windows desktop client for Sub2API users");
+        res.set(
+            "FileDescription",
+            "Bright Windows desktop client for Sub2API users",
+        );
         res.set("CompanyName", "Sub2API");
         res.set("LegalCopyright", "Copyright (C) Sub2API");
         res.compile().expect("failed to compile windows resources");
