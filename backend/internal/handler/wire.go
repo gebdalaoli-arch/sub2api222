@@ -76,6 +76,11 @@ func ProvideSettingHandler(settingService *service.SettingService, buildInfo Bui
 	return NewSettingHandler(settingService, buildInfo.Version)
 }
 
+// ProvideDesktopHandler creates DesktopHandler from the concrete desktop session service.
+func ProvideDesktopHandler(service *service.DesktopSessionService) *DesktopHandler {
+	return NewDesktopHandler(service)
+}
+
 // ProvideHandlers creates the Handlers struct
 func ProvideHandlers(
 	authHandler *AuthHandler,
@@ -127,8 +132,7 @@ var ProviderSet = wire.NewSet(
 	NewAnnouncementHandler,
 	NewGatewayHandler,
 	NewOpenAIGatewayHandler,
-	wire.Bind(new(desktopSessionService), new(*service.DesktopSessionService)),
-	NewDesktopHandler,
+	ProvideDesktopHandler,
 	NewTotpHandler,
 	ProvideSettingHandler,
 	NewPaymentHandler,

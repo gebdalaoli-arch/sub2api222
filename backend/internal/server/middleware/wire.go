@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 )
@@ -20,6 +19,5 @@ var ProviderSet = wire.NewSet(
 	NewJWTAuthMiddleware,
 	NewAdminAuthMiddleware,
 	NewAPIKeyAuthMiddleware,
-	wire.Bind(new(desktopRuntimeTokenValidator), new(*service.DesktopSessionService)),
-	NewDesktopRuntimeAuthMiddleware,
+	ProvideDesktopRuntimeAuthMiddleware,
 )
