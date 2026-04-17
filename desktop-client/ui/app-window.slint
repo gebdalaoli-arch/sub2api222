@@ -2,6 +2,7 @@ import { Button } from "std-widgets.slint";
 import { AboutScreen } from "screens/about.slint";
 import { DashboardScreen } from "screens/dashboard.slint";
 import { ForgotPasswordScreen } from "screens/forgot_password.slint";
+import { LaunchPanel } from "screens/launch_panel.slint";
 import { LoginScreen } from "screens/login.slint";
 
 export component AppWindow inherits Window {
@@ -15,6 +16,13 @@ export component AppWindow inherits Window {
     in-out property <string> verification-code;
     in-out property <string> reset-token;
     in-out property <string> new-password;
+    in-out property <bool> desktop-available: false;
+    in-out property <bool> cli-available: false;
+    in-out property <string> launch-status-text: "尚未检测 Codex 安装";
+
+    callback refresh-installations-requested();
+    callback launch-desktop-requested();
+    callback launch-cli-requested();
 
     Rectangle {
         width: parent.width;
@@ -114,7 +122,7 @@ export component AppWindow inherits Window {
             x: parent.width - 322px;
             y: 278px;
             width: 246px;
-            height: 152px;
+            height: 112px;
             background: #24382f;
             border-radius: 22px;
 
@@ -122,12 +130,16 @@ export component AppWindow inherits Window {
             Text { x: 22px; y: 54px; width: 202px; text: "官方模式：不改官方配置。平台模式：为本次启动生成独立临时环境。"; color: #c8d2b7; font-size: 14px; wrap: word-wrap; }
         }
 
-        Button {
+        LaunchPanel {
             x: parent.width - 322px;
-            y: 462px;
+            y: 420px;
             width: 246px;
-            height: 46px;
-            text: "检测 Codex 安装";
+            desktop-available: root.desktop-available;
+            cli-available: root.cli-available;
+            status-text: root.launch-status-text;
+            refresh-requested => { root.refresh-installations-requested(); }
+            launch-desktop-requested => { root.launch-desktop-requested(); }
+            launch-cli-requested => { root.launch-cli-requested(); }
         }
 
         AboutScreen {

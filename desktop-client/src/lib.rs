@@ -1,5 +1,6 @@
 pub mod api;
 pub mod app;
+pub mod platform;
 pub mod storage;
 
 #[cfg(test)]
@@ -18,6 +19,7 @@ mod tests {
             manifest_dir.join("ui/screens/about.slint"),
             manifest_dir.join("ui/screens/dashboard.slint"),
             manifest_dir.join("ui/screens/forgot_password.slint"),
+            manifest_dir.join("ui/screens/launch_panel.slint"),
             manifest_dir.join("ui/screens/login.slint"),
         ];
         let forbidden_terms = ["API Key", "Base URL", "runtime token", "重置 token"];

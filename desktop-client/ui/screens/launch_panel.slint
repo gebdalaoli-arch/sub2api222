@@ -1,0 +1,63 @@
+import { Button } from "std-widgets.slint";
+
+export component LaunchPanel inherits Rectangle {
+    in property <bool> desktop-available: false;
+    in property <bool> cli-available: false;
+    in property <string> status-text: "尚未检测 Codex 安装";
+
+    callback launch-desktop-requested();
+    callback launch-cli-requested();
+    callback refresh-requested();
+
+    height: 206px;
+    background: #24382f;
+    border-radius: 22px;
+
+    Text {
+        x: 22px;
+        y: 18px;
+        text: "官方模式";
+        color: #f6ead1;
+        font-size: 20px;
+        font-weight: 800;
+    }
+
+    Text {
+        x: 22px;
+        y: 52px;
+        width: parent.width - 44px;
+        text: root.status-text;
+        color: #c8d2b7;
+        font-size: 14px;
+        wrap: word-wrap;
+    }
+
+    Button {
+        x: 22px;
+        y: 92px;
+        width: parent.width - 44px;
+        height: 38px;
+        text: "启动 Codex Desktop";
+        enabled: root.desktop-available;
+        clicked => { root.launch-desktop-requested(); }
+    }
+
+    Button {
+        x: 22px;
+        y: 140px;
+        width: parent.width - 44px;
+        height: 38px;
+        text: "启动 Codex CLI";
+        enabled: root.cli-available;
+        clicked => { root.launch-cli-requested(); }
+    }
+
+    Button {
+        x: parent.width - 92px;
+        y: 18px;
+        width: 70px;
+        height: 30px;
+        text: "检测";
+        clicked => { root.refresh-requested(); }
+    }
+}
