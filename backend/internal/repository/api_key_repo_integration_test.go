@@ -326,6 +326,43 @@ func (s *APIKeyRepoSuite) TestSearchAPIKeys_NoUserID() {
 	s.Require().Len(found, 1)
 }
 
+func (s *APIKeyRepoSuite) TestVisibleQueries_ExcludeDesktopRuntimeSyntheticKeys() {
+	user := s.mustCreateUser("runtime-hidden@test.com")
+	group := s.mustCreateGroup("g-runtime-hidden")
+
+	s.mustCreateApiKey(user.ID, "sk-visible-1", "Visible Key", &group.ID)
+	s.mustCreateApiKey(
+		user.ID,
+		service.BuildDesktopRuntimeSyntheticAPIKey(user.ID, group.ID, "platform-desktop"),
+		"platform-desktop",
+		&group.ID,
+	)
+
+	keys, page, err := s.repo.ListByUserID(s.ctx, user.ID, pagination.PaginationParams{Page: 1, PageSize: 10}, service.APIKeyListFilters{})
+	s.Require().NoError(err)
+	s.Require().Len(keys, 1)
+	s.Require().Equal(int64(1), page.Total)
+	s.Require().Equal("Visible Key", keys[0].Name)
+
+	count, err := s.repo.CountByUserID(s.ctx, user.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(int64(1), count)
+
+	groupKeys, groupPage, err := s.repo.ListByGroupID(s.ctx, group.ID, pagination.PaginationParams{Page: 1, PageSize: 10})
+	s.Require().NoError(err)
+	s.Require().Len(groupKeys, 1)
+	s.Require().Equal(int64(1), groupPage.Total)
+
+	groupCount, err := s.repo.CountByGroupID(s.ctx, group.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(int64(1), groupCount)
+
+	listedKeys, err := s.repo.ListKeysByUserID(s.ctx, user.ID)
+	s.Require().NoError(err)
+	s.Require().Len(listedKeys, 1)
+	s.Require().Equal("sk-visible-1", listedKeys[0])
+}
+
 // --- ClearGroupIDByGroupID ---
 
 func (s *APIKeyRepoSuite) TestClearGroupIDByGroupID() {

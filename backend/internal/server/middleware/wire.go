@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 )
@@ -16,8 +17,13 @@ type APIKeyAuthMiddleware gin.HandlerFunc
 
 // ProviderSet 中间件层的依赖注入
 var ProviderSet = wire.NewSet(
+	ProvideDesktopRuntimeAuthAPIKeyStore,
 	NewJWTAuthMiddleware,
 	NewAdminAuthMiddleware,
 	NewAPIKeyAuthMiddleware,
 	ProvideDesktopRuntimeAuthMiddleware,
 )
+
+func ProvideDesktopRuntimeAuthAPIKeyStore(repo service.APIKeyRepository) desktopRuntimeAuthAPIKeyStore {
+	return repo
+}

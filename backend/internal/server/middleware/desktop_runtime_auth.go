@@ -14,6 +14,15 @@ const (
 	desktopRuntimeSyntheticAPIKeyName = "desktop-runtime"
 )
 
+type desktopRuntimeAuthAPIKeyStore interface {
+	Create(ctx context.Context, key *service.APIKey) error
+	GetByKey(ctx context.Context, key string) (*service.APIKey, error)
+}
+
+type desktopRuntimeAuthAPIKeyResolver interface {
+	ResolveRuntimeAPIKey(ctx context.Context, session *service.DesktopSession, user *service.User, group *service.Group) (*service.APIKey, error)
+}
+
 type desktopRuntimeAuthUserReader interface {
 	GetByID(ctx context.Context, id int64) (*service.User, error)
 }
@@ -42,6 +51,7 @@ type desktopRuntimeAuthDeps struct {
 	users         desktopRuntimeAuthUserReader
 	groups        desktopRuntimeAuthGroupReader
 	subscriptions desktopRuntimeAuthSubscriptionReader
+	apiKeys       desktopRuntimeAuthAPIKeyStore
 }
 
 func (d desktopRuntimeAuthDeps) ValidateRuntimeToken(ctx context.Context, token string) (*service.DesktopSession, error) {
@@ -64,6 +74,10 @@ func (d desktopRuntimeAuthDeps) GetActiveSubscription(ctx context.Context, userI
 		return nil, service.ErrSubscriptionNotFound
 	}
 	return d.subscriptions.GetActiveSubscription(ctx, userID, groupID)
+}
+
+func (d desktopRuntimeAuthDeps) ResolveRuntimeAPIKey(ctx context.Context, session *service.DesktopSession, user *service.User, group *service.Group) (*service.APIKey, error) {
+	return resolveDesktopRuntimeAPIKey(ctx, d.apiKeys, session, user, group)
 }
 
 type DesktopRuntimeAuthMiddleware gin.HandlerFunc
@@ -111,6 +125,17 @@ func NewDesktopRuntimeAuthMiddleware(deps desktopRuntimeAuthDependencies) Deskto
 		}
 
 		apiKey := buildDesktopRuntimeAPIKey(session, user, group)
+		if resolver, ok := deps.(desktopRuntimeAuthAPIKeyResolver); ok {
+			apiKey, err = resolver.ResolveRuntimeAPIKey(c.Request.Context(), session, user, group)
+			if err != nil || apiKey == nil {
+				AbortWithError(c, 500, "INTERNAL_ERROR", "Failed to load runtime API key")
+				return
+			}
+			if apiKey.ID <= 0 {
+				AbortWithError(c, 500, "INTERNAL_ERROR", "Runtime API key is not ready")
+				return
+			}
+		}
 
 		if group.IsSubscriptionType() {
 			subscription, subErr := deps.GetActiveSubscription(c.Request.Context(), user.ID, group.ID)
@@ -143,20 +168,31 @@ func ProvideDesktopRuntimeAuthMiddleware(
 	userService *service.UserService,
 	groupService *service.GroupService,
 	subscriptionService *service.SubscriptionService,
+	apiKeys desktopRuntimeAuthAPIKeyStore,
 ) DesktopRuntimeAuthMiddleware {
 	return NewDesktopRuntimeAuthMiddleware(desktopRuntimeAuthDeps{
 		sessions:      sessionService,
 		users:         userService,
 		groups:        groupService,
 		subscriptions: subscriptionService,
+		apiKeys:       apiKeys,
 	})
 }
 
 func buildDesktopRuntimeAPIKey(session *service.DesktopSession, user *service.User, group *service.Group) *service.APIKey {
+	profileKey := desktopRuntimeSyntheticAPIKeyName
+	groupID := int64(0)
+	if group != nil {
+		groupID = group.ID
+	}
+	if session != nil && session.ProfileKey != "" {
+		profileKey = session.ProfileKey
+	}
+
 	apiKey := &service.APIKey{
 		UserID: user.ID,
-		Key:    desktopRuntimeSyntheticAPIKeyName + ":" + session.SessionID,
-		Name:   desktopRuntimeSyntheticAPIKeyName,
+		Key:    service.BuildDesktopRuntimeSyntheticAPIKey(user.ID, groupID, profileKey),
+		Name:   profileKey,
 		Status: service.StatusActive,
 		User:   user,
 		Group:  group,
@@ -168,9 +204,74 @@ func buildDesktopRuntimeAPIKey(session *service.DesktopSession, user *service.Us
 	if session != nil {
 		apiKey.CreatedAt = session.CreatedAt
 		apiKey.UpdatedAt = session.UpdatedAt
-		if session.ProfileKey != "" {
-			apiKey.Name = session.ProfileKey
+	}
+	return apiKey
+}
+
+func resolveDesktopRuntimeAPIKey(
+	ctx context.Context,
+	store desktopRuntimeAuthAPIKeyStore,
+	session *service.DesktopSession,
+	user *service.User,
+	group *service.Group,
+) (*service.APIKey, error) {
+	fallback := buildDesktopRuntimeAPIKey(session, user, group)
+	if store == nil {
+		return fallback, nil
+	}
+
+	existing, err := store.GetByKey(ctx, fallback.Key)
+	if err == nil {
+		return hydrateDesktopRuntimeAPIKey(existing, fallback, user, group), nil
+	}
+	if !errors.Is(err, service.ErrAPIKeyNotFound) {
+		return nil, err
+	}
+
+	if err := store.Create(ctx, fallback); err != nil {
+		if !errors.Is(err, service.ErrAPIKeyExists) {
+			return nil, err
 		}
+		existing, getErr := store.GetByKey(ctx, fallback.Key)
+		if getErr != nil {
+			return nil, getErr
+		}
+		return hydrateDesktopRuntimeAPIKey(existing, fallback, user, group), nil
+	}
+
+	return hydrateDesktopRuntimeAPIKey(fallback, fallback, user, group), nil
+}
+
+func hydrateDesktopRuntimeAPIKey(
+	apiKey *service.APIKey,
+	fallback *service.APIKey,
+	user *service.User,
+	group *service.Group,
+) *service.APIKey {
+	if apiKey == nil {
+		return fallback
+	}
+	if apiKey.User == nil {
+		apiKey.User = user
+	}
+	if apiKey.Group == nil {
+		apiKey.Group = group
+	}
+	if apiKey.UserID == 0 && user != nil {
+		apiKey.UserID = user.ID
+	}
+	if apiKey.GroupID == nil && group != nil {
+		groupID := group.ID
+		apiKey.GroupID = &groupID
+	}
+	if strings.TrimSpace(apiKey.Name) == "" && fallback != nil {
+		apiKey.Name = fallback.Name
+	}
+	if strings.TrimSpace(apiKey.Key) == "" && fallback != nil {
+		apiKey.Key = fallback.Key
+	}
+	if strings.TrimSpace(apiKey.Status) == "" {
+		apiKey.Status = service.StatusActive
 	}
 	return apiKey
 }

@@ -19,6 +19,7 @@ type desktopRuntimeAuthServiceStub struct {
 	user      *service.User
 	group     *service.Group
 	sub       *service.UserSubscription
+	apiKey    *service.APIKey
 	err       error
 }
 
@@ -59,6 +60,39 @@ func (s *desktopRuntimeAuthServiceStub) GetActiveSubscription(_ context.Context,
 	return nil, service.ErrSubscriptionNotFound
 }
 
+func (s *desktopRuntimeAuthServiceStub) ResolveRuntimeAPIKey(_ context.Context, session *service.DesktopSession, user *service.User, group *service.Group) (*service.APIKey, error) {
+	if s.apiKey == nil {
+		return buildDesktopRuntimeAPIKey(session, user, group), nil
+	}
+	clone := *s.apiKey
+	if clone.User == nil {
+		clone.User = user
+	}
+	if clone.Group == nil {
+		clone.Group = group
+	}
+	if clone.UserID == 0 && user != nil {
+		clone.UserID = user.ID
+	}
+	if clone.GroupID == nil && group != nil {
+		groupID := group.ID
+		clone.GroupID = &groupID
+	}
+	if clone.Status == "" {
+		clone.Status = service.StatusActive
+	}
+	if clone.Key == "" || clone.Name == "" {
+		fallback := buildDesktopRuntimeAPIKey(session, user, group)
+		if clone.Key == "" {
+			clone.Key = fallback.Key
+		}
+		if clone.Name == "" {
+			clone.Name = fallback.Name
+		}
+	}
+	return &clone, nil
+}
+
 func TestDesktopRuntimeAuthMiddleware_AcceptsRuntimeToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -85,6 +119,11 @@ func TestDesktopRuntimeAuthMiddleware_AcceptsRuntimeToken(t *testing.T) {
 			Status:    service.SubscriptionStatusActive,
 			ExpiresAt: time.Date(2026, 4, 19, 9, 0, 0, 0, time.UTC),
 		},
+		apiKey: &service.APIKey{
+			ID:     701,
+			UserID: 42,
+			Status: service.StatusActive,
+		},
 	}
 	mw := NewDesktopRuntimeAuthMiddleware(svc)
 
@@ -97,6 +136,7 @@ func TestDesktopRuntimeAuthMiddleware_AcceptsRuntimeToken(t *testing.T) {
 
 		apiKey, ok := GetAPIKeyFromContext(c)
 		require.True(t, ok)
+		require.NotZero(t, apiKey.ID)
 		require.Equal(t, int64(42), apiKey.UserID)
 		require.Equal(t, service.StatusActive, apiKey.Status)
 		require.NotNil(t, apiKey.GroupID)
