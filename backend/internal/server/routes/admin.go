@@ -32,6 +32,9 @@ func RegisterAdminRoutes(
 		// 公告管理
 		registerAnnouncementRoutes(admin, h)
 
+		// 桌面更新管理
+		registerDesktopUpdateRoutes(admin, h)
+
 		// OpenAI OAuth
 		registerOpenAIOAuthRoutes(admin, h)
 
@@ -293,6 +296,25 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		accounts.POST("/exchange-setup-token-code", h.Admin.OAuth.ExchangeSetupTokenCode)
 		accounts.POST("/cookie-auth", h.Admin.OAuth.CookieAuth)
 		accounts.POST("/setup-token-cookie-auth", h.Admin.OAuth.SetupTokenCookieAuth)
+	}
+}
+
+func registerDesktopUpdateRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	if h.Admin == nil || h.Admin.DesktopUpdates == nil {
+		return
+	}
+
+	desktopUpdates := admin.Group("/desktop-updates")
+	{
+		desktopUpdates.GET("/releases", h.Admin.DesktopUpdates.ListReleases)
+		desktopUpdates.POST("/releases", h.Admin.DesktopUpdates.CreateRelease)
+		desktopUpdates.GET("/releases/:id", h.Admin.DesktopUpdates.GetRelease)
+		desktopUpdates.PUT("/releases/:id", h.Admin.DesktopUpdates.UpdateRelease)
+		desktopUpdates.DELETE("/releases/:id", h.Admin.DesktopUpdates.DeleteRelease)
+		desktopUpdates.GET("/announcements", h.Admin.DesktopUpdates.ListStandaloneAnnouncements)
+		desktopUpdates.POST("/announcements", h.Admin.DesktopUpdates.CreateStandaloneAnnouncement)
+		desktopUpdates.PUT("/announcements/:id", h.Admin.DesktopUpdates.UpdateStandaloneAnnouncement)
+		desktopUpdates.DELETE("/announcements/:id", h.Admin.DesktopUpdates.DeleteStandaloneAnnouncement)
 	}
 }
 

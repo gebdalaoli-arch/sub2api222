@@ -51,6 +51,17 @@ type CreateDesktopReleaseInput struct {
 	PackageUploadPath       string
 }
 
+type UpdateDesktopReleaseInput struct {
+	Version                 *string
+	Title                   *string
+	Summary                 *string
+	ReleaseNotesMarkdown    *string
+	AnnouncementItems       *[]DesktopAnnouncementItem
+	Published               *bool
+	ForceUpdate             *bool
+	MinimumSupportedVersion *string
+}
+
 type DesktopUpdateCheckInput struct {
 	Platform       string
 	Arch           string

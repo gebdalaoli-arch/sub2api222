@@ -122,6 +122,47 @@ func (s *DesktopUpdateService) CreateRelease(ctx context.Context, input CreateDe
 	return &record, nil
 }
 
+func (s *DesktopUpdateService) ListReleases(ctx context.Context, page, pageSize int) ([]DesktopReleaseRecord, int64, error) {
+	feed, err := s.loadFeed(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	records := append([]DesktopReleaseRecord(nil), feed.Releases...)
+	sortDesktopReleases(records)
+	total := int64(len(records))
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+
+	start := (page - 1) * pageSize
+	if start >= len(records) {
+		return []DesktopReleaseRecord{}, total, nil
+	}
+	end := start + pageSize
+	if end > len(records) {
+		end = len(records)
+	}
+	return records[start:end], total, nil
+}
+
+func (s *DesktopUpdateService) GetReleaseByID(ctx context.Context, releaseID int64) (*DesktopReleaseRecord, error) {
+	feed, err := s.loadFeed(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	index := desktopReleaseIndexByID(feed.Releases, releaseID)
+	if index < 0 {
+		return nil, ErrDesktopReleaseNotFound
+	}
+	release := feed.Releases[index]
+	return &release, nil
+}
+
 func (s *DesktopUpdateService) CheckForClient(ctx context.Context, input DesktopUpdateCheckInput) (*DesktopUpdateCheckResult, error) {
 	feed, err := s.loadFeed(ctx)
 	if err != nil {
@@ -156,18 +197,88 @@ func (s *DesktopUpdateService) CheckForClient(ctx context.Context, input Desktop
 }
 
 func (s *DesktopUpdateService) GetPublishedRelease(ctx context.Context, releaseID int64) (*DesktopReleaseRecord, error) {
+	release, err := s.GetReleaseByID(ctx, releaseID)
+	if err != nil {
+		return nil, err
+	}
+	if !release.Published {
+		return nil, ErrDesktopReleaseNotFound
+	}
+	return release, nil
+}
+
+func (s *DesktopUpdateService) UpdateRelease(ctx context.Context, releaseID int64, input UpdateDesktopReleaseInput) (*DesktopReleaseRecord, error) {
 	feed, err := s.loadFeed(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	for i := range feed.Releases {
-		release := feed.Releases[i]
-		if release.ID == releaseID && release.Published {
-			return &release, nil
+	index := desktopReleaseIndexByID(feed.Releases, releaseID)
+	if index < 0 {
+		return nil, ErrDesktopReleaseNotFound
+	}
+
+	record := &feed.Releases[index]
+	if input.Version != nil {
+		record.Version = strings.TrimSpace(*input.Version)
+	}
+	if input.Title != nil {
+		record.Title = strings.TrimSpace(*input.Title)
+	}
+	if input.Summary != nil {
+		record.Summary = strings.TrimSpace(*input.Summary)
+	}
+	if input.ReleaseNotesMarkdown != nil {
+		record.ReleaseNotesMarkdown = *input.ReleaseNotesMarkdown
+	}
+	if input.AnnouncementItems != nil {
+		record.AnnouncementItems = append([]DesktopAnnouncementItem(nil), (*input.AnnouncementItems)...)
+	}
+	if input.ForceUpdate != nil {
+		record.ForceUpdate = *input.ForceUpdate
+	}
+	if input.MinimumSupportedVersion != nil {
+		record.MinimumSupportedVersion = strings.TrimSpace(*input.MinimumSupportedVersion)
+	}
+	if input.Published != nil {
+		record.Published = *input.Published
+		if record.Published {
+			now := time.Now().UTC()
+			record.PublishedAt = &now
+		} else {
+			record.PublishedAt = nil
 		}
 	}
-	return nil, ErrDesktopReleaseNotFound
+	record.UpdatedAt = time.Now().UTC()
+
+	if err := s.saveFeed(ctx, feed); err != nil {
+		return nil, err
+	}
+	release := *record
+	return &release, nil
+}
+
+func (s *DesktopUpdateService) DeleteRelease(ctx context.Context, releaseID int64) error {
+	feed, err := s.loadFeed(ctx)
+	if err != nil {
+		return err
+	}
+
+	index := desktopReleaseIndexByID(feed.Releases, releaseID)
+	if index < 0 {
+		return ErrDesktopReleaseNotFound
+	}
+	release := feed.Releases[index]
+	feed.Releases = append(feed.Releases[:index], feed.Releases[index+1:]...)
+	if err := s.saveFeed(ctx, feed); err != nil {
+		return err
+	}
+	if release.ReleaseSlug != "" {
+		if err := os.RemoveAll(filepath.Join(s.releasesRoot(), release.ReleaseSlug)); err != nil {
+			return fmt.Errorf("remove desktop release dir: %w", err)
+		}
+	}
+	return nil
 }
 
 func (s *DesktopUpdateService) ListAnnouncements(ctx context.Context, platform, arch string) ([]DesktopAnnouncementItem, error) {
@@ -222,6 +333,25 @@ func latestPublishedDesktopRelease(releases []DesktopReleaseRecord, platform, ar
 		}
 	}
 	return best
+}
+
+func desktopReleaseIndexByID(releases []DesktopReleaseRecord, releaseID int64) int {
+	for i := range releases {
+		if releases[i].ID == releaseID {
+			return i
+		}
+	}
+	return -1
+}
+
+func sortDesktopReleases(releases []DesktopReleaseRecord) {
+	for i := 0; i < len(releases); i++ {
+		for j := i + 1; j < len(releases); j++ {
+			if compareVersions(releases[i].Version, releases[j].Version) < 0 {
+				releases[i], releases[j] = releases[j], releases[i]
+			}
+		}
+	}
 }
 
 func buildDesktopReleaseSlug(id int64, version, platform, arch string) string {

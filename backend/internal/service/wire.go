@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"database/sql"
+	"path/filepath"
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
@@ -398,6 +399,10 @@ func ProvideDesktopSessionSigningKey(cfg *config.Config) []byte {
 	return []byte(cfg.JWT.Secret)
 }
 
+func ProvideDesktopUpdateService(settingRepo SettingRepository) *DesktopUpdateService {
+	return NewDesktopUpdateService(settingRepo, filepath.Join("data", "desktop-updates"))
+}
+
 // ProviderSet is the Wire provider set for all services
 var ProviderSet = wire.NewSet(
 	// Core services
@@ -477,6 +482,7 @@ var ProviderSet = wire.NewSet(
 	wire.Bind(new(desktopSessionGroupReader), new(*GroupService)),
 	wire.Bind(new(desktopSessionSubscriptionReader), new(*SubscriptionService)),
 	NewDesktopSessionService,
+	ProvideDesktopUpdateService,
 	NewDigestSessionStore,
 	ProvideIdempotencyCoordinator,
 	ProvideSystemOperationLockService,
