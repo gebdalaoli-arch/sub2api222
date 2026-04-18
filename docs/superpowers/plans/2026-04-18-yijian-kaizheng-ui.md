@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 将 `desktop-client` 从当前的亮色平铺式桌面壳升级为品牌名为 `一键开整` 的下钻式桌面产品，落地全新的登录入口、记住密码/免登录偏好、电子牛马状态文案、Remotion 品牌动态图标和 Stitch 驱动的界面重构。
+**Goal:** 将 `desktop-client` 从当前的亮色平铺式桌面壳升级为品牌名为 `一键开整` 的下钻式桌面产品，落地全新的登录入口、记住密码/免登录偏好、电子牛马状态文案、Remotion 品牌动态图标、全局更新弹窗壳和 Stitch 驱动的界面重构。
 
-**Architecture:** 先在 Rust 侧补齐品牌常量、状态文案池、认证偏好持久化和结果态/下钻路由模型，再在 Slint 侧落共享品牌组件、登录壳、总览页、详情页和结果态覆盖层。动态图标单独放到 `desktop-client/motion/` 的 Remotion 工作区中渲染为静态帧和序列帧，再由一个小型 `motion` 模块按状态轮播接入到开屏、登录成功过渡和关键状态位。
+**Architecture:** 先在 Rust 侧补齐品牌常量、状态文案池、认证偏好持久化和结果态/下钻路由模型，再在 Slint 侧落共享品牌组件、登录壳、总览页、详情页、全局更新弹窗壳和结果态覆盖层。动态图标单独放到 `desktop-client/motion/` 的 Remotion 工作区中渲染为静态帧和序列帧，再由一个小型 `motion` 模块按状态轮播接入到开屏、登录成功过渡和关键状态位；完整的 Windows 更新检查、下载、校验和安装逻辑由独立子项目 `docs/superpowers/specs/2026-04-18-windows-desktop-update-design.md` 负责。
 
 **Tech Stack:** Rust, Slint 1.16, reqwest, serde, directories, keyring, anyhow, npm, Remotion, Stitch
 
@@ -13,8 +13,10 @@
 ## Current Implementation State
 
 - 已确认并提交的设计文档位于 `docs/superpowers/specs/2026-04-18-yijian-kaizheng-ui-design.md`。
+- Windows 桌面更新系统的独立设计文档位于 `docs/superpowers/specs/2026-04-18-windows-desktop-update-design.md`。
 - 当前窗口入口在 `desktop-client/ui/app-window.slint`，登录页在 `desktop-client/ui/screens/login.slint`，账户/启动/计费/帮助均以平铺大卡形式挂在同一个窗口里。
 - 认证、安装检测、平台会话续期和计费数据拉取全部集中在 `desktop-client/src/main.rs` 中；目前没有“记住密码/免登录”偏好模型，也没有结果态覆盖层或品牌动效状态机。
+- 本计划需要同步加入“系统级更新弹窗壳”和“手动检查更新入口”的 UI 接点，但不在本计划中实现完整的下载、校验、静默安装和重启逻辑。
 - 现有测试主要是纯 Rust 单元测试和 UI 文案守卫测试，适合继续用“先写失败测试，再落 UI 状态模型，再跑 `cargo check` + 手工冒烟”的节奏推进。
 
 ## File Map
@@ -23,12 +25,14 @@
 
 - `desktop-client/src/app/brand.rs`
 - `desktop-client/src/app/motion.rs`
+- `desktop-client/src/app/view_models/update_vm.rs`
 - `desktop-client/ui/components/brand_panel.slint`
 - `desktop-client/ui/components/result_overlay.slint`
 - `desktop-client/ui/screens/overview.slint`
 - `desktop-client/ui/screens/launch_detail.slint`
 - `desktop-client/ui/screens/billing_detail.slint`
 - `desktop-client/ui/screens/help_detail.slint`
+- `desktop-client/ui/screens/update_dialog.slint`
 - `desktop-client/motion/package.json`
 - `desktop-client/motion/tsconfig.json`
 - `desktop-client/motion/remotion.config.ts`
@@ -51,6 +55,7 @@
 - `desktop-client/src/app/view_models/dashboard_vm.rs`
 - `desktop-client/src/app/view_models/launch_vm.rs`
 - `desktop-client/src/app/view_models/billing_vm.rs`
+- `desktop-client/src/app/view_models/mod.rs`
 - `desktop-client/src/storage/app_state.rs`
 - `desktop-client/ui/app-window.slint`
 - `desktop-client/ui/screens/login.slint`
@@ -59,6 +64,8 @@
 - `desktop-client/ui/screens/launch_panel.slint`
 - `desktop-client/ui/screens/redeem.slint`
 - `desktop-client/ui/screens/about.slint`
+- `desktop-client/ui/screens/help_detail.slint`
+- `desktop-client/ui/screens/update_dialog.slint`
 - `desktop-client/README.md`
 
 ### Test
@@ -69,6 +76,7 @@
 - `desktop-client/src/app/view_models/auth_vm.rs`
 - `desktop-client/src/app/view_models/launch_vm.rs`
 - `desktop-client/src/app/view_models/billing_vm.rs`
+- `desktop-client/src/app/view_models/update_vm.rs`
 - `desktop-client/src/storage/app_state.rs`
 - `desktop-client/src/lib.rs`
 
@@ -1261,4 +1269,289 @@ Expected:
 ```bash
 git add desktop-client/build.rs desktop-client/src/app/motion.rs desktop-client/src/main.rs desktop-client/ui/components/brand_panel.slint desktop-client/ui/app-window.slint desktop-client/README.md
 git commit -m "feat: wire yijian kaizheng motion into desktop client"
+```
+
+## Task 8: Add Global Update Dialog Shell And Manual Check Entry
+
+**Files:**
+- Create: `desktop-client/src/app/view_models/update_vm.rs`
+- Create: `desktop-client/ui/screens/update_dialog.slint`
+- Modify: `desktop-client/src/app/view_models/mod.rs`
+- Modify: `desktop-client/src/lib.rs`
+- Modify: `desktop-client/src/main.rs`
+- Modify: `desktop-client/ui/app-window.slint`
+- Modify: `desktop-client/ui/screens/help_detail.slint`
+- Test: `desktop-client/src/app/view_models/update_vm.rs`
+- Test: `desktop-client/src/lib.rs`
+
+- [ ] **Step 1: Write the failing tests for the updater UI shell**
+
+```rust
+// desktop-client/src/app/view_models/update_vm.rs
+#[cfg(test)]
+mod tests {
+    use super::{UpdateDialogState, UpdateViewModel};
+
+    #[test]
+    fn update_view_model_matches_optional_and_required_copy() {
+        let optional = UpdateViewModel::optional(
+            "0.1.0".to_string(),
+            "0.2.0".to_string(),
+            "发现新版本".to_string(),
+            "修复若干问题".to_string(),
+        );
+        assert!(!optional.force_update);
+        assert_eq!(optional.primary_action_text, "立即更新");
+        assert_eq!(optional.secondary_action_text.as_deref(), Some("稍后"));
+
+        let required = UpdateViewModel::required(
+            "0.1.0".to_string(),
+            "0.2.0".to_string(),
+            "发现新版本".to_string(),
+            "当前版本已停止支持".to_string(),
+        );
+        assert!(required.force_update);
+        assert_eq!(required.primary_action_text, "立即更新");
+        assert_eq!(required.secondary_action_text, None);
+        assert_eq!(required.state, UpdateDialogState::AvailableRequired);
+    }
+}
+```
+
+```rust
+// desktop-client/src/lib.rs
+#[test]
+fn update_dialog_shell_uses_approved_copy_and_help_entry() {
+    let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let dialog =
+        std::fs::read_to_string(manifest_dir.join("ui/screens/update_dialog.slint")).unwrap();
+    let help =
+        std::fs::read_to_string(manifest_dir.join("ui/screens/help_detail.slint")).unwrap();
+
+    assert!(dialog.contains("发现新版本"));
+    assert!(dialog.contains("立即更新"));
+    assert!(dialog.contains("稍后"));
+    assert!(help.contains("检查更新"));
+}
+```
+
+- [ ] **Step 2: Run the focused tests to verify they fail**
+
+Run:
+
+```powershell
+cargo --config 'source.crates-io.replace-with="rsproxy-sparse"' --config 'source.rsproxy-sparse.registry="sparse+https://rsproxy.cn/index/"' test --manifest-path desktop-client/Cargo.toml --lib update_view_model_matches_optional_and_required_copy
+```
+
+Expected: FAIL because `update_vm.rs` and `update_dialog.slint` do not exist yet.
+
+- [ ] **Step 3: Implement the update view model, global dialog shell, and manual entry**
+
+```rust
+// desktop-client/src/app/view_models/update_vm.rs
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UpdateDialogState {
+    Idle,
+    Checking,
+    AvailableOptional,
+    AvailableRequired,
+    Downloading,
+    ReadyToInstall,
+    Failed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UpdateViewModel {
+    pub state: UpdateDialogState,
+    pub current_version: String,
+    pub latest_version: String,
+    pub title: String,
+    pub summary: String,
+    pub force_update: bool,
+    pub primary_action_text: String,
+    pub secondary_action_text: Option<String>,
+}
+
+impl UpdateViewModel {
+    pub fn optional(
+        current_version: String,
+        latest_version: String,
+        title: String,
+        summary: String,
+    ) -> Self {
+        Self {
+            state: UpdateDialogState::AvailableOptional,
+            current_version,
+            latest_version,
+            title,
+            summary,
+            force_update: false,
+            primary_action_text: "立即更新".to_string(),
+            secondary_action_text: Some("稍后".to_string()),
+        }
+    }
+
+    pub fn required(
+        current_version: String,
+        latest_version: String,
+        title: String,
+        summary: String,
+    ) -> Self {
+        Self {
+            state: UpdateDialogState::AvailableRequired,
+            current_version,
+            latest_version,
+            title,
+            summary,
+            force_update: true,
+            primary_action_text: "立即更新".to_string(),
+            secondary_action_text: None,
+        }
+    }
+}
+```
+
+```rust
+// desktop-client/src/app/view_models/mod.rs
+pub mod auth_vm;
+pub mod billing_vm;
+pub mod dashboard_vm;
+pub mod launch_vm;
+pub mod update_vm;
+```
+
+```slint
+// desktop-client/ui/screens/update_dialog.slint
+import { Button } from "std-widgets.slint";
+
+export component UpdateDialog inherits Rectangle {
+    in property <bool> visible: false;
+    in property <bool> force-update: false;
+    in property <string> latest-version: "v0.0.0";
+    in property <string> current-version: "v0.0.0";
+    in property <string> summary: "当前版本已是最新。";
+    in property <string> primary-text: "立即更新";
+    in property <string> secondary-text: "稍后";
+
+    callback primary-requested();
+    callback secondary-requested();
+    callback close-requested();
+
+    if root.visible: Rectangle {
+        x: 48px;
+        y: 48px;
+        width: parent.width - 96px;
+        height: parent.height - 96px;
+        background: #ffffff;
+        border-radius: 28px;
+        border-color: #d8e3ee;
+        border-width: 1px;
+
+        Text { x: 28px; y: 24px; text: "发现新版本"; color: #17324a; font-size: 28px; font-weight: 800; }
+        Text { x: 28px; y: 86px; text: root.latest-version; color: #2b59d0; font-size: 20px; font-weight: 700; }
+        Text { x: 28px; y: 122px; text: "当前版本 " + root.current-version + "，新版本已可用。"; color: #5f7892; font-size: 14px; }
+        Text { x: 28px; y: 170px; width: parent.width - 56px; text: root.summary; color: #17324a; font-size: 14px; wrap: word-wrap; }
+
+        if !root.force-update: Button {
+            x: parent.width - 236px;
+            y: parent.height - 74px;
+            width: 88px;
+            height: 42px;
+            text: root.secondary-text;
+            clicked => { root.secondary-requested(); }
+        }
+
+        Button {
+            x: parent.width - 136px;
+            y: parent.height - 74px;
+            width: 108px;
+            height: 42px;
+            text: root.primary-text;
+            clicked => { root.primary-requested(); }
+        }
+    }
+}
+```
+
+```slint
+// desktop-client/ui/screens/help_detail.slint
+import { Button } from "std-widgets.slint";
+
+export component HelpDetailScreen inherits Rectangle {
+    callback manual-update-check-requested();
+
+    Text { x: 24px; y: 20px; text: "帮助与安全"; color: #17324a; font-size: 26px; font-weight: 800; }
+    Button {
+        x: 24px;
+        y: 76px;
+        width: 132px;
+        height: 40px;
+        text: "检查更新";
+        clicked => { root.manual-update-check-requested(); }
+    }
+}
+```
+
+```slint
+// desktop-client/ui/app-window.slint
+import { UpdateDialog } from "screens/update_dialog.slint";
+
+in-out property <bool> update-dialog-visible: false;
+in-out property <bool> update-force: false;
+in-out property <string> update-current-version: "v0.1.0";
+in-out property <string> update-latest-version: "v0.1.0";
+in-out property <string> update-summary: "当前版本已是最新。";
+
+callback manual-update-check-requested();
+callback update-primary-requested();
+callback update-secondary-requested();
+
+UpdateDialog {
+    visible: root.update-dialog-visible;
+    force-update: root.update-force;
+    current-version: root.update-current-version;
+    latest-version: root.update-latest-version;
+    summary: root.update-summary;
+    primary-requested => { root.update-primary-requested(); }
+    secondary-requested => { root.update-secondary-requested(); }
+}
+```
+
+```rust
+// desktop-client/src/main.rs
+let manual_update_app = app.as_weak();
+app.on_manual_update_check_requested(move || {
+    if let Some(app) = manual_update_app.upgrade() {
+        app.set_update_dialog_visible(true);
+        app.set_update_force(false);
+        app.set_update_current_version("v0.1.0".into());
+        app.set_update_latest_version("v0.2.0".into());
+        app.set_update_summary("修复若干问题，并提供更稳定的一键开整体验。".into());
+    }
+});
+```
+
+- [ ] **Step 4: Run the tests, compile, and manually confirm the update shell**
+
+Run:
+
+```powershell
+cargo --config 'source.crates-io.replace-with="rsproxy-sparse"' --config 'source.rsproxy-sparse.registry="sparse+https://rsproxy.cn/index/"' test --manifest-path desktop-client/Cargo.toml --lib update_view_model_matches_optional_and_required_copy
+cargo --config 'source.crates-io.replace-with="rsproxy-sparse"' --config 'source.rsproxy-sparse.registry="sparse+https://rsproxy.cn/index/"' test --manifest-path desktop-client/Cargo.toml --lib update_dialog_shell_uses_approved_copy_and_help_entry
+cargo --config 'source.crates-io.replace-with="rsproxy-sparse"' --config 'source.rsproxy-sparse.registry="sparse+https://rsproxy.cn/index/"' check --manifest-path desktop-client/Cargo.toml
+powershell -NoProfile -ExecutionPolicy Bypass -File .\start-desktop-client.ps1
+```
+
+Expected:
+
+- The new update view model tests pass.
+- The copy guard confirms `发现新版本` and `检查更新` exist in the UI.
+- `cargo check` succeeds.
+- Clicking `检查更新` from the help detail surface opens the global update dialog shell.
+
+- [ ] **Step 5: Commit the update-shell UI hooks**
+
+```bash
+git add desktop-client/src/app/view_models/update_vm.rs desktop-client/src/app/view_models/mod.rs desktop-client/src/lib.rs desktop-client/src/main.rs desktop-client/ui/app-window.slint desktop-client/ui/screens/help_detail.slint desktop-client/ui/screens/update_dialog.slint
+git commit -m "feat: add global desktop update dialog shell"
 ```
