@@ -16,6 +16,13 @@ import (
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
 
+func builtinGeminiCLIOAuthClientSecret() string {
+	if v, ok := os.LookupEnv(GeminiCLIOAuthClientSecretEnv); ok {
+		return strings.TrimSpace(v)
+	}
+	return ""
+}
+
 type OAuthConfig struct {
 	ClientID     string
 	ClientSecret string
@@ -170,12 +177,7 @@ func EffectiveOAuthConfig(cfg OAuthConfig, oauthType string) (OAuthConfig, error
 	// Fall back to built-in Gemini CLI OAuth client when not configured.
 	// SECURITY: This repo does not embed the built-in client secret; it must be provided via env.
 	if effective.ClientID == "" && effective.ClientSecret == "" {
-		secret := strings.TrimSpace(GeminiCLIOAuthClientSecret)
-		if secret == "" {
-			if v, ok := os.LookupEnv(GeminiCLIOAuthClientSecretEnv); ok {
-				secret = strings.TrimSpace(v)
-			}
-		}
+		secret := builtinGeminiCLIOAuthClientSecret()
 		if secret == "" {
 			return OAuthConfig{}, infraerrors.Newf(http.StatusBadRequest, "GEMINI_CLI_OAUTH_CLIENT_SECRET_MISSING", "built-in Gemini CLI OAuth client_secret is not configured; set %s or provide a custom OAuth client", GeminiCLIOAuthClientSecretEnv)
 		}
