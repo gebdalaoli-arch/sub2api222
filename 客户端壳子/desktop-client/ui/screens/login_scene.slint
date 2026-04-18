@@ -19,6 +19,11 @@ export component LoginScene inherits Rectangle {
     in property <string> auth-status-text: "请先登录以启用平台模式与账户同步。";
     in property <string> reset-status-text: "可先发送重置邮件，再填写邮件中的重置码。";
     in property <string> brand-status-copy: "你的电子牛马已就位。";
+    in property <string> announcement-hero-version: "最新动态";
+    in property <string> announcement-hero-title: "公告中心已准备就绪";
+    in property <string> announcement-hero-summary: "这里会展示系统更新、维护通知和使用提醒。";
+    in property <[string]> announcement-version-lines: ["暂无版本动态"];
+    in property <[string]> announcement-feed-lines: ["暂无系统公告"];
 
     callback login-requested();
     callback register-requested();
@@ -175,6 +180,11 @@ export component LoginScene inherits Rectangle {
         x: 40px; y: 96px;
         width: parent.width - 80px;
         height: parent.height - 128px;
+        hero-version: root.announcement-hero-version;
+        hero-title: root.announcement-hero-title;
+        hero-summary: root.announcement-hero-summary;
+        version-lines: root.announcement-version-lines;
+        announcement-feed-lines: root.announcement-feed-lines;
     }
 
     if root.showing-announcements: Button {

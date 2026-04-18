@@ -54,7 +54,13 @@ export component AppWindow inherits Window {
     in-out property <bool> update-force: false;
     in-out property <string> update-current-version: "v0.1.0";
     in-out property <string> update-latest-version: "v0.2.0";
+    in-out property <string> update-download-url: "";
     in-out property <string> update-summary: "修复若干问题，并带来更稳定的一键开整体验。";
+    in-out property <string> announcement-hero-version: "最新动态";
+    in-out property <string> announcement-hero-title: "公告中心已准备就绪";
+    in-out property <string> announcement-hero-summary: "这里会展示系统更新、维护通知和使用提醒。";
+    in-out property <[string]> announcement-version-lines: ["暂无版本动态"];
+    in-out property <[string]> announcement-feed-lines: ["暂无系统公告"];
 
     callback refresh-installations-requested();
     callback launch-desktop-requested();
@@ -359,6 +365,11 @@ export component AppWindow inherits Window {
                 x: 0px; y: 0px;
                 width: parent.width;
                 height: parent.height;
+                hero-version: root.announcement-hero-version;
+                hero-title: root.announcement-hero-title;
+                hero-summary: root.announcement-hero-summary;
+                version-lines: root.announcement-version-lines;
+                announcement-feed-lines: root.announcement-feed-lines;
             }
         }
 
@@ -380,6 +391,11 @@ export component AppWindow inherits Window {
             auth-status-text: root.auth-status-text;
             reset-status-text: root.reset-status-text;
             brand-status-copy: root.brand-status-copy;
+            announcement-hero-version: root.announcement-hero-version;
+            announcement-hero-title: root.announcement-hero-title;
+            announcement-hero-summary: root.announcement-hero-summary;
+            announcement-version-lines: root.announcement-version-lines;
+            announcement-feed-lines: root.announcement-feed-lines;
             login-requested => { root.login-requested(); }
             register-requested => { root.register-requested(); }
             verify-code-requested => { root.verify-code-requested(); }

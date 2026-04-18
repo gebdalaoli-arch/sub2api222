@@ -121,6 +121,28 @@ mod tests {
     }
 
     #[test]
+    fn announcement_center_reads_runtime_announcement_state() {
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let announcements =
+            std::fs::read_to_string(manifest_dir.join("ui/screens/announcements.slint")).unwrap();
+
+        assert!(announcements.contains("in property <string> hero-title"));
+        assert!(announcements.contains("in property <string> hero-summary"));
+        assert!(announcements.contains("in property <[string]> announcement-feed-lines"));
+        assert!(announcements.contains("for line[index] in root.announcement-feed-lines"));
+    }
+
+    #[test]
+    fn main_window_wires_update_download_and_announcement_refresh() {
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let main_rs = std::fs::read_to_string(manifest_dir.join("src/main.rs")).unwrap();
+
+        assert!(main_rs.contains("list_desktop_announcements_blocking"));
+        assert!(main_rs.contains("resolve_desktop_download_url"));
+        assert!(main_rs.contains("start_desktop_announcement_refresh"));
+    }
+
+    #[test]
     fn main_window_does_not_ship_with_dev_preview_shortcuts() {
         let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
         let main_rs = std::fs::read_to_string(manifest_dir.join("src/main.rs")).unwrap();

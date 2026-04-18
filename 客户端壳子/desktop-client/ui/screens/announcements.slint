@@ -1,6 +1,12 @@
 import { Button } from "std-widgets.slint";
 
 export component AnnouncementCenterScreen inherits Rectangle {
+    in property <string> hero-version: "最新动态";
+    in property <string> hero-title: "公告中心已准备就绪";
+    in property <string> hero-summary: "这里会展示系统更新、维护通知和使用提醒。";
+    in property <[string]> version-lines: ["暂无版本动态"];
+    in property <[string]> announcement-feed-lines: ["暂无系统公告"];
+
     background: #ffffff;
     border-radius: 12px;
     border-color: #d7e4f0;
@@ -65,14 +71,14 @@ export component AnnouncementCenterScreen inherits Rectangle {
         border-color: #d7e4f0;
         border-width: 0px;
         Text { x: 20px; y: 18px; text: "置顶公告"; color: #006499; font-size: 12px; font-weight: 700; }
-        Text { x: 20px; y: 42px; text: "V2.4.1 版本已发布"; color: #2c3437; font-size: 22px; font-weight: 800; }
-        Text { x: 20px; y: 74px; width: parent.width - 160px; text: "现在支持更稳定的启动链路和新的亮色客户端骨架。"; color: #596064; font-size: 12px; wrap: word-wrap; }
+        Text { x: 20px; y: 42px; text: root.hero-title; color: #2c3437; font-size: 22px; font-weight: 800; }
+        Text { x: 20px; y: 74px; width: parent.width - 160px; text: root.hero-summary; color: #596064; font-size: 12px; wrap: word-wrap; }
         Button {
             x: parent.width - 118px;
             y: 42px;
             width: 94px;
             height: 40px;
-            text: "查看详情";
+            text: root.hero-version;
         }
     }
 
@@ -86,10 +92,23 @@ export component AnnouncementCenterScreen inherits Rectangle {
         border-color: #d7e4f0;
         border-width: 0px;
         Text { x: 18px; y: 18px; text: "版本动态"; color: #2c3437; font-size: 18px; font-weight: 800; }
-        Text { x: 18px; y: 52px; text: "v2.4.1"; color: #006499; font-size: 14px; font-weight: 700; }
-        Text { x: 18px; y: 72px; width: parent.width - 36px; text: "亮色客户端骨架已上线"; color: #596064; font-size: 12px; wrap: word-wrap; }
-        Text { x: 18px; y: 128px; text: "v2.4.0"; color: #006499; font-size: 14px; font-weight: 700; }
-        Text { x: 18px; y: 148px; width: parent.width - 36px; text: "启动 Codex 主链路优化"; color: #596064; font-size: 12px; wrap: word-wrap; }
+        for line[index] in root.version-lines : Rectangle {
+            x: 18px;
+            y: 52px + index * 56px;
+            width: parent.width - 36px;
+            height: 44px;
+            background: #ffffff;
+            border-radius: 10px;
+            Text {
+                x: 12px;
+                y: 12px;
+                width: parent.width - 24px;
+                text: line;
+                color: #596064;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
+        }
     }
 
     Rectangle {
@@ -102,32 +121,24 @@ export component AnnouncementCenterScreen inherits Rectangle {
         border-color: #d7e4f0;
         border-width: 0px;
 
-        Rectangle {
+        for line[index] in root.announcement-feed-lines : Rectangle {
             x: 16px;
-            y: 16px;
+            y: 16px + index * 96px;
             width: parent.width - 32px;
             height: 84px;
             background: #ffffff;
             border-radius: 12px;
             border-color: #d7e4f0;
             border-width: 0px;
-            Text { x: 16px; y: 16px; text: "关于 11 月 5 日凌晨系统维护的通知"; color: #2c3437; font-size: 16px; font-weight: 700; }
-            Text { x: 16px; y: 40px; text: "2026-04-19"; color: #596064; font-size: 11px; }
-            Text { x: 16px; y: 56px; width: parent.width - 124px; text: "届时将进行短时维护，客户端更新与启动功能会有间歇性影响。"; color: #596064; font-size: 12px; wrap: word-wrap; }
-        }
-
-        Rectangle {
-            x: 16px;
-            y: 112px;
-            width: parent.width - 32px;
-            height: 84px;
-            background: #ffffff;
-            border-radius: 12px;
-            border-color: #d7e4f0;
-            border-width: 0px;
-            Text { x: 16px; y: 16px; text: "使用提醒：推荐默认使用桌面版启动"; color: #2c3437; font-size: 16px; font-weight: 700; }
-            Text { x: 16px; y: 40px; text: "2026-04-18"; color: #596064; font-size: 11px; }
-            Text { x: 16px; y: 56px; width: parent.width - 124px; text: "CLI 模式适合高级场景，普通用户建议直接从桌面版进入。"; color: #596064; font-size: 12px; wrap: word-wrap; }
+            Text {
+                x: 16px;
+                y: 14px;
+                width: parent.width - 32px;
+                text: line;
+                color: #596064;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
         }
     }
 }

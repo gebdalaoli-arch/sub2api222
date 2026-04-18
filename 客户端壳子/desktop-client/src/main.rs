@@ -30,7 +30,10 @@ use sub2api_desktop::{
             RedeemHistoryItem,
         },
         subscriptions::{fetch_subscription_summary_blocking, SubscriptionSummary},
-        update::check_desktop_update_blocking,
+        update::{
+            check_desktop_update_blocking, list_desktop_announcements_blocking,
+            resolve_desktop_download_url, DesktopAnnouncementItem, DesktopUpdateCheckResponse,
+        },
     },
     app::{
         auth_flow::{build_login_submission, should_restore_session, LoginSubmission},
@@ -1264,6 +1267,7 @@ fn apply_authenticated_state(app: &AppWindow, session: &AuthSession, group_count
 
 fn wire_update_callbacks(app: &AppWindow, config: Arc<AppConfig>) {
     start_desktop_update_check(app.as_weak(), Arc::clone(&config), false);
+    start_desktop_announcement_refresh(app.as_weak(), Arc::clone(&config));
 
     let manual_update_app = app.as_weak();
     let manual_update_config = Arc::clone(&config);
@@ -1283,9 +1287,30 @@ fn wire_update_callbacks(app: &AppWindow, config: Arc<AppConfig>) {
     });
 
     let primary_update_app = app.as_weak();
+    let primary_update_config = Arc::clone(&config);
     app.on_update_primary_requested(move || {
         if let Some(app) = primary_update_app.upgrade() {
-            app.set_update_dialog_visible(false);
+            let download_url = app.get_update_download_url().to_string();
+            match resolve_desktop_download_url(&primary_update_config.api_base_url, &download_url)
+                .and_then(|resolved| {
+                    open_update_download_url(&resolved)?;
+                    Ok(resolved)
+                }) {
+                Ok(resolved) => {
+                    app.set_update_summary(SharedString::from(format!(
+                        "已打开更新下载链接，请完成安装后重启客户端：{resolved}"
+                    )));
+                    if !app.get_update_force() {
+                        app.set_update_dialog_visible(false);
+                    }
+                }
+                Err(error) => {
+                    app.set_update_dialog_visible(true);
+                    app.set_update_summary(SharedString::from(format!(
+                        "打开更新下载失败：{error}"
+                    )));
+                }
+            }
         }
     });
 }
@@ -1301,29 +1326,29 @@ fn start_desktop_update_check(
 
         match check_desktop_update_blocking(&client, &current_version) {
             Ok(check) if check.has_update => {
-                let summary = if check.release_notes.trim().is_empty() {
-                    check.summary.clone()
-                } else {
-                    check.release_notes.clone()
-                };
-                let vm = UpdateViewModel::available(
-                    check.current_version.clone(),
-                    check.latest_version.clone(),
-                    check.force_update,
-                    check.title.clone(),
-                    summary,
-                );
+                let vm = build_update_view_model(&check);
                 let _ = app_handle.upgrade_in_event_loop(move |app| {
-                    apply_update_view_model(&app, &vm);
+                    apply_update_check_state(&app, &check, &vm);
                 });
             }
-            Ok(_) if show_dialog_on_no_update => {
+            Ok(check) if show_dialog_on_no_update => {
                 let _ = app_handle.upgrade_in_event_loop(move |app| {
                     app.set_update_dialog_visible(true);
                     app.set_update_force(false);
                     app.set_update_current_version(SharedString::from(current_version.clone()));
-                    app.set_update_latest_version(SharedString::from(current_version.clone()));
+                    app.set_update_latest_version(SharedString::from(check.latest_version.clone()));
+                    app.set_update_download_url(SharedString::from(check.download_url.clone()));
                     app.set_update_summary(SharedString::from("当前版本已是最新，可稍后再检查。"));
+                    apply_announcement_highlight(
+                        &app,
+                        &check.latest_version,
+                        &check.title,
+                        if check.release_notes.trim().is_empty() {
+                            &check.summary
+                        } else {
+                            &check.release_notes
+                        },
+                    );
                 });
             }
             Ok(_) => {}
@@ -1342,12 +1367,131 @@ fn start_desktop_update_check(
     });
 }
 
+fn start_desktop_announcement_refresh(app_handle: slint::Weak<AppWindow>, config: Arc<AppConfig>) {
+    thread::spawn(move || {
+        let client = ApiClient::new(config.api_base_url.clone());
+        if let Ok(items) = list_desktop_announcements_blocking(&client) {
+            let _ = app_handle.upgrade_in_event_loop(move |app| {
+                apply_desktop_announcements(&app, &items);
+            });
+        }
+    });
+}
+
+fn build_update_view_model(check: &DesktopUpdateCheckResponse) -> UpdateViewModel {
+    let summary = if check.release_notes.trim().is_empty() {
+        check.summary.clone()
+    } else {
+        check.release_notes.clone()
+    };
+    UpdateViewModel::available(
+        check.current_version.clone(),
+        check.latest_version.clone(),
+        check.force_update,
+        check.title.clone(),
+        summary,
+    )
+}
+
+fn apply_update_check_state(
+    app: &AppWindow,
+    check: &DesktopUpdateCheckResponse,
+    vm: &UpdateViewModel,
+) {
+    apply_update_view_model(app, vm);
+    app.set_update_download_url(SharedString::from(check.download_url.clone()));
+    apply_announcement_highlight(
+        app,
+        &check.latest_version,
+        &check.title,
+        if check.release_notes.trim().is_empty() {
+            &check.summary
+        } else {
+            &check.release_notes
+        },
+    );
+}
+
 fn apply_update_view_model(app: &AppWindow, vm: &UpdateViewModel) {
     app.set_update_dialog_visible(!matches!(vm.state, UpdateDialogState::Hidden));
     app.set_update_force(vm.force_update);
     app.set_update_current_version(SharedString::from(vm.current_version.clone()));
     app.set_update_latest_version(SharedString::from(vm.latest_version.clone()));
     app.set_update_summary(SharedString::from(vm.summary.clone()));
+}
+
+fn apply_announcement_highlight(
+    app: &AppWindow,
+    latest_version: &str,
+    title: &str,
+    summary: &str,
+) {
+    app.set_announcement_hero_version(SharedString::from(latest_version.to_string()));
+    app.set_announcement_hero_title(SharedString::from(title.to_string()));
+    app.set_announcement_hero_summary(SharedString::from(summary.to_string()));
+}
+
+fn apply_desktop_announcements(app: &AppWindow, items: &[DesktopAnnouncementItem]) {
+    if items.is_empty() {
+        app.set_announcement_version_lines(single_option_model("暂无版本动态"));
+        app.set_announcement_feed_lines(single_option_model("暂无系统公告"));
+        return;
+    }
+
+    if let Some(first) = items.first() {
+        app.set_announcement_hero_title(SharedString::from(first.title.clone()));
+        app.set_announcement_hero_summary(SharedString::from(first.content.clone()));
+    }
+
+    let version_lines = items
+        .iter()
+        .take(4)
+        .map(|item| {
+            SharedString::from(format!(
+                "{} · {}",
+                announcement_kind_label(&item.kind),
+                item.title
+            ))
+        })
+        .collect::<Vec<_>>();
+    app.set_announcement_version_lines(string_model(version_lines));
+
+    let feed_lines = items
+        .iter()
+        .take(6)
+        .map(|item| {
+            SharedString::from(format!(
+                "{}\n{}",
+                item.title,
+                item.content.trim()
+            ))
+        })
+        .collect::<Vec<_>>();
+    app.set_announcement_feed_lines(string_model(feed_lines));
+}
+
+fn announcement_kind_label(kind: &str) -> &'static str {
+    let normalized = kind.trim().to_ascii_lowercase();
+    match normalized.as_str() {
+        "release" => "版本更新",
+        "maintenance" => "维护通知",
+        "notice" => "使用提醒",
+        _ => "系统公告",
+    }
+}
+
+fn open_update_download_url(url: &str) -> anyhow::Result<()> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer.exe").arg(url).spawn()?;
+        return Ok(());
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = url;
+        Err(anyhow::anyhow!("当前平台暂未实现更新下载跳转"))
+    }
 }
 
 fn apply_available_groups_state(app: &AppWindow, groups: &[GroupSummary]) {
