@@ -1,4 +1,5 @@
 import { Button } from "std-widgets.slint";
+import { BrandPanel } from "components/brand_panel.slint";
 import { AboutScreen } from "screens/about.slint";
 import { DashboardScreen } from "screens/dashboard.slint";
 import { ForgotPasswordScreen } from "screens/forgot_password.slint";
@@ -9,7 +10,7 @@ import { LoginScreen } from "screens/login.slint";
 export component AppWindow inherits Window {
     width: 1280px;
     height: 860px;
-    title: "Sub2API Desktop Client";
+    title: "一键开整";
     background: #edf3f8;
 
     in-out property <string> email;
@@ -28,6 +29,10 @@ export component AppWindow inherits Window {
     in-out property <string> dashboard-usage-text: "并发额度：--";
     in-out property <string> dashboard-account-status-text: "账户状态：待登录";
     in-out property <string> dashboard-notice-text: "充值页当前作为公告区。首版优先支持 CDK 兑换、订阅状态查看和平台模式启动。";
+    in-out property <bool> remember-password: true;
+    in-out property <bool> auto-login: false;
+    in-out property <bool> show-login-totp: false;
+    in-out property <string> brand-status-copy: "你的电子牛马已就位。";
     in-out property <string> redeem-code;
     in-out property <string> redeem-status-text: "输入 CDK 后点击兑换。";
     in-out property <string> subscription-summary-text: "暂无订阅摘要";
@@ -88,7 +93,7 @@ export component AppWindow inherits Window {
         Text {
             x: 116px;
             y: 52px;
-            text: "Sub2API";
+            text: "一键开整";
             color: #18324a;
             font-size: 30px;
             font-weight: 800;
@@ -98,7 +103,7 @@ export component AppWindow inherits Window {
             x: 118px;
             y: 94px;
             width: 160px;
-            text: "Desktop Client · Bright Edition";
+            text: "Windows 客户端";
             color: #587189;
             font-size: 13px;
         }
@@ -126,7 +131,7 @@ export component AppWindow inherits Window {
                 x: 18px;
                 y: 38px;
                 width: 160px;
-                text: "亮色原生桌面壳。账户、启动、计费三块分区，官方模式优先保底。";
+                text: "一键进入工作台，少折腾配置。账户、启动、计费仍然逐步下钻。";
                 color: #64809a;
                 font-size: 11px;
                 wrap: word-wrap;
@@ -273,42 +278,29 @@ export component AppWindow inherits Window {
             height: parent.height - 196px;
             background: transparent;
 
-            LoginScreen {
+            BrandPanel {
                 x: 0px;
                 y: 0px;
-                width: 460px;
+                width: 352px;
+                height: parent.height;
+                product-name: "一键开整";
+                status-copy: root.brand-status-copy;
+            }
+
+            LoginScreen {
+                x: 376px;
+                y: 0px;
+                width: parent.width - 376px;
                 email <=> root.email;
                 password <=> root.password;
                 verification-code <=> root.verification-code;
+                remember-password <=> root.remember-password;
+                auto-login <=> root.auto-login;
+                show-totp-field: root.show-login-totp;
                 status-text: root.auth-status-text;
                 login-requested => { root.login-requested(); }
                 register-requested => { root.register-requested(); }
                 verify-code-requested => { root.verify-code-requested(); }
-            }
-
-            DashboardScreen {
-                x: 484px;
-                y: 0px;
-                width: parent.width - 484px;
-                user-label: root.dashboard-user-label;
-                balance-text: root.dashboard-balance-text;
-                usage-text: root.dashboard-usage-text;
-                account-status-text: root.dashboard-account-status-text;
-                recharge-notice: root.dashboard-notice-text;
-                redeem-requested => { root.current-section = 2; }
-                launch-requested => { root.current-section = 1; }
-            }
-
-            ForgotPasswordScreen {
-                x: 0px;
-                y: 396px;
-                width: parent.width;
-                email <=> root.email;
-                reset-token <=> root.reset-token;
-                new-password <=> root.new-password;
-                status-text: root.reset-status-text;
-                forgot-password-requested => { root.forgot-password-requested(); }
-                reset-password-requested => { root.reset-password-requested(); }
             }
         }
 

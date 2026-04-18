@@ -4,109 +4,181 @@ export component LoginScreen inherits Rectangle {
     in-out property <string> email;
     in-out property <string> password;
     in-out property <string> verification-code;
-    in property <string> status-text: "等待登录";
+    in-out property <bool> remember-password: true;
+    in-out property <bool> auto-login: false;
+    in property <bool> show-totp-field: false;
+    in property <string> status-text: "请输入邮箱和密码。";
 
     callback login-requested();
     callback register-requested();
     callback verify-code-requested();
+    callback forgot-password-requested();
 
-    height: 372px;
+    height: 664px;
     background: #f8fbff;
-    border-radius: 24px;
+    border-radius: 28px;
     border-color: #d7e4f0;
     border-width: 1px;
 
-    Text {
+    Rectangle {
         x: 24px;
-        y: 20px;
-        text: "登录与注册";
-        color: #18324a;
-        font-size: 24px;
+        y: 24px;
+        width: parent.width - 48px;
+        height: parent.height - 48px;
+        background: #ffffff;
+        border-radius: 24px;
+        border-color: #d6e3f1;
+        border-width: 1px;
+    }
+
+    Text {
+        x: 48px;
+        y: 54px;
+        text: "欢迎王者归来";
+        color: #17324a;
+        font-size: 30px;
         font-weight: 800;
     }
 
     Text {
-        x: 24px;
-        y: 54px;
-        width: parent.width - 48px;
-        text: "使用注册邮箱登录。需要注册时先发送邮箱验证码，再完成注册。";
-        color: #688097;
-        font-size: 13px;
+        x: 48px;
+        y: 96px;
+        width: parent.width - 96px;
+        text: "登录后一键开整。注册与密码恢复放在次路径，不和主动作抢注意力。";
+        color: #627d94;
+        font-size: 14px;
         wrap: word-wrap;
     }
 
-    Text { x: 24px; y: 98px; text: "邮箱"; color: #3a5570; font-size: 12px; font-weight: 700; }
+    Text { x: 48px; y: 152px; text: "邮箱"; color: #3a5570; font-size: 12px; font-weight: 700; }
     LineEdit {
-        x: 24px;
-        y: 118px;
-        width: parent.width - 48px;
-        height: 40px;
+        x: 48px;
+        y: 172px;
+        width: parent.width - 96px;
+        height: 44px;
         text <=> root.email;
         placeholder-text: "name@example.com";
     }
 
-    Text { x: 24px; y: 172px; text: "密码"; color: #3a5570; font-size: 12px; font-weight: 700; }
+    Text { x: 48px; y: 238px; text: "密码"; color: #3a5570; font-size: 12px; font-weight: 700; }
     LineEdit {
-        x: 24px;
-        y: 192px;
-        width: parent.width - 48px;
-        height: 40px;
+        x: 48px;
+        y: 258px;
+        width: parent.width - 96px;
+        height: 44px;
         text <=> root.password;
         placeholder-text: "输入密码";
         input-type: InputType.password;
     }
 
-    Text { x: 24px; y: 246px; text: "验证码 / 2FA"; color: #3a5570; font-size: 12px; font-weight: 700; }
-    LineEdit {
-        x: 24px;
-        y: 266px;
-        width: parent.width - 160px;
-        height: 40px;
-        text <=> root.verification-code;
-        placeholder-text: "注册验证码或 2FA";
+    if root.show-totp-field: Text {
+        x: 48px;
+        y: 324px;
+        text: "验证码 / 2FA";
+        color: #3a5570;
+        font-size: 12px;
+        font-weight: 700;
     }
 
-    Button {
-        x: parent.width - 120px;
-        y: 266px;
+    if root.show-totp-field: LineEdit {
+        x: 48px;
+        y: 344px;
+        width: parent.width - 208px;
+        height: 44px;
+        text <=> root.verification-code;
+        placeholder-text: "输入 2FA 验证码";
+    }
+
+    if root.show-totp-field: Button {
+        x: parent.width - 144px;
+        y: 344px;
         width: 96px;
-        height: 40px;
+        height: 44px;
         text: "发验证码";
         clicked => { root.verify-code-requested(); }
     }
 
+    Rectangle {
+        x: 48px;
+        y: root.show-totp-field ? 416px : 332px;
+        width: 118px;
+        height: 36px;
+        background: root.remember-password ? #e9f1fb : #f2f5f8;
+        border-radius: 18px;
+        border-color: root.remember-password ? #c9d8ea : #d7e4f0;
+        border-width: 1px;
+        TouchArea { clicked => { root.remember-password = !root.remember-password; if (!root.remember-password) { root.auto-login = false; } } }
+        Text {
+            x: 16px;
+            y: 10px;
+            text: "记住密码";
+            color: root.remember-password ? #1d4b72 : #72849a;
+            font-size: 12px;
+            font-weight: 700;
+        }
+    }
+
+    Rectangle {
+        x: 178px;
+        y: root.show-totp-field ? 416px : 332px;
+        width: 100px;
+        height: 36px;
+        background: root.remember-password && root.auto-login ? #e9f1fb : #f2f5f8;
+        border-radius: 18px;
+        border-color: root.remember-password ? #c9d8ea : #d7e4f0;
+        border-width: 1px;
+        TouchArea { clicked => { if (root.remember-password) { root.auto-login = !root.auto-login; } } }
+        Text {
+            x: 18px;
+            y: 10px;
+            text: "免登录";
+            color: root.remember-password ? (root.auto-login ? #1d4b72 : #72849a) : #a1afbf;
+            font-size: 12px;
+            font-weight: 700;
+        }
+    }
+
     Button {
-        x: 24px;
-        y: 324px;
-        width: 112px;
-        height: 40px;
+        x: 48px;
+        y: root.show-totp-field ? 474px : 390px;
+        width: parent.width - 96px;
+        height: 48px;
         text: "登录";
         clicked => { root.login-requested(); }
     }
 
     Button {
-        x: 148px;
-        y: 324px;
+        x: 48px;
+        y: root.show-totp-field ? 534px : 450px;
         width: 112px;
-        height: 40px;
-        text: "注册";
+        height: 42px;
+        text: "创建账户";
         clicked => { root.register-requested(); }
     }
 
+    Button {
+        x: 172px;
+        y: root.show-totp-field ? 534px : 450px;
+        width: 112px;
+        height: 42px;
+        text: "忘记密码";
+        clicked => { root.forgot-password-requested(); }
+    }
+
     Rectangle {
-        x: 280px;
-        y: 320px;
-        width: parent.width - 304px;
-        height: 44px;
-        background: #ffffff;
-        border-radius: 14px;
+        x: 48px;
+        y: root.show-totp-field ? 594px : 510px;
+        width: parent.width - 96px;
+        height: 72px;
+        background: #f6f9fd;
+        border-radius: 18px;
         border-color: #d7e4f0;
         border-width: 1px;
 
         Text {
-            x: 14px;
+            x: 16px;
             y: 14px;
-            width: parent.width - 28px;
+            width: parent.width - 32px;
             text: root.status-text;
             color: #5b7490;
             font-size: 12px;

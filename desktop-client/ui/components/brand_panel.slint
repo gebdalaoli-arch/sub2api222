@@ -1,0 +1,99 @@
+export component BrandPanel inherits Rectangle {
+    in property <string> product-name: "一键开整";
+    in property <string> status-copy: "你的电子牛马已就位。";
+    in property <string> launch-copy: "少折腾，直接开工。";
+
+    background: #081524;
+    border-radius: 28px;
+    border-color: #173a57;
+    border-width: 1px;
+
+    Rectangle {
+        x: 28px;
+        y: 28px;
+        width: 124px;
+        height: 124px;
+        background: #112438;
+        border-radius: 34px;
+        border-color: #214864;
+        border-width: 1px;
+
+        Rectangle {
+            x: 33px;
+            y: 33px;
+            width: 58px;
+            height: 58px;
+            background: @linear-gradient(135deg, #ffe07f 0%, #ff9c44 60%, #ff7346 100%);
+            border-radius: 18px;
+        }
+    }
+
+    Rectangle {
+        x: 178px;
+        y: 88px;
+        width: parent.width - 212px;
+        height: 2px;
+        background: @linear-gradient(90deg, #ffb56f 0%, #53c7ff 100%);
+    }
+
+    Text {
+        x: 28px;
+        y: 188px;
+        text: root.product-name;
+        color: #f4fbff;
+        font-size: 34px;
+        font-weight: 800;
+    }
+
+    Text {
+        x: 28px;
+        y: 234px;
+        width: parent.width - 56px;
+        text: root.launch-copy;
+        color: #d4ebfb;
+        font-size: 16px;
+        font-weight: 600;
+        wrap: word-wrap;
+    }
+
+    Text {
+        x: 28px;
+        y: 286px;
+        width: parent.width - 56px;
+        text: root.status-copy;
+        color: #96b8cf;
+        font-size: 14px;
+        wrap: word-wrap;
+    }
+
+    Rectangle {
+        x: 28px;
+        y: parent.height - 156px;
+        width: parent.width - 56px;
+        height: 54px;
+        background: #102334;
+        border-radius: 18px;
+        border-color: #214763;
+        border-width: 1px;
+
+        Text {
+            x: 16px;
+            y: 10px;
+            text: "启动感"
+            ;
+            color: #8bb1cb;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        Text {
+            x: 16px;
+            y: 26px;
+            width: parent.width - 32px;
+            text: "一键进入，不让你卡在表单和环境折腾里。";
+            color: #d5ebfb;
+            font-size: 12px;
+            wrap: word-wrap;
+        }
+    }
+}
