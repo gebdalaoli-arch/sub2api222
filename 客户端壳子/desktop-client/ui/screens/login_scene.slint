@@ -1,0 +1,200 @@
+import { Button } from "std-widgets.slint";
+import { AnnouncementCenterScreen } from "announcements.slint";
+import { BrandPanel } from "../components/brand_panel.slint";
+import { ForgotPasswordScreen } from "forgot_password.slint";
+import { LoginScreen } from "login.slint";
+import { RegisterPanel } from "register_panel.slint";
+
+export component LoginScene inherits Rectangle {
+    in-out property <string> email;
+    in-out property <string> password;
+    in-out property <string> verification-code;
+    in-out property <string> reset-token;
+    in-out property <string> new-password;
+    in-out property <bool> remember-password: true;
+    in-out property <bool> auto-login: false;
+    in-out property <bool> show-totp-field: false;
+    in-out property <int> auth-subview: 0;
+    in-out property <bool> showing-announcements: false;
+    in property <string> auth-status-text: "请先登录以启用平台模式与账户同步。";
+    in property <string> reset-status-text: "可先发送重置邮件，再填写邮件中的重置码。";
+    in property <string> brand-status-copy: "你的电子牛马已就位。";
+
+    callback login-requested();
+    callback register-requested();
+    callback verify-code-requested();
+    callback forgot-password-requested();
+    callback reset-password-requested();
+
+    background: #f7f9fb;
+
+    property <length> content-left: self.width > 1320px ? 56px : 40px;
+    property <length> content-top: self.height > 860px ? 86px : 78px;
+    property <length> content-bottom-gap: 78px;
+    property <length> brand-width: self.width > 1360px ? 760px : self.width > 1180px ? 690px : self.width * 0.54;
+    property <length> card-width: self.width > 1360px ? 500px : self.width > 1180px ? 468px : self.width * 0.34;
+    property <length> card-height: self.height > 900px ? 620px : 566px;
+    property <length> card-x: self.width - root.card-width - (self.width > 1360px ? 88px : 64px);
+    property <length> card-y: self.height > 900px ? 170px : 148px;
+
+    Rectangle {
+        x: 0px;
+        y: 0px;
+        width: parent.width;
+        height: 66px;
+        background: #f7f9fb;
+
+        Text {
+            x: 40px;
+            y: 22px;
+            text: "一键开整";
+            color: #12639c;
+            font-size: 22px;
+            font-weight: 800;
+        }
+
+        Rectangle {
+            x: parent.width - 186px;
+            y: 18px;
+            width: 30px;
+            height: 30px;
+            background: #ffffff;
+            border-radius: 15px;
+            border-color: #d7e4f0;
+            border-width: 1px;
+            TouchArea { clicked => { root.showing-announcements = true; } }
+            Text { x: 8px; y: 6px; text: "🔔"; color: #274e70; font-size: 14px; }
+        }
+
+        Rectangle {
+            x: parent.width - 142px;
+            y: 18px;
+            width: 30px;
+            height: 30px;
+            background: transparent;
+            border-radius: 15px;
+            Text { x: 10px; y: 5px; text: "—"; color: #50687d; font-size: 16px; }
+        }
+
+        Rectangle {
+            x: parent.width - 98px;
+            y: 18px;
+            width: 30px;
+            height: 30px;
+            background: transparent;
+            border-radius: 15px;
+            Text { x: 8px; y: 7px; text: "□"; color: #50687d; font-size: 13px; }
+        }
+
+        Rectangle {
+            x: parent.width - 54px;
+            y: 18px;
+            width: 30px;
+            height: 30px;
+            background: transparent;
+            border-radius: 15px;
+            Text { x: 9px; y: 4px; text: "×"; color: #50687d; font-size: 16px; }
+        }
+    }
+
+    if !root.showing-announcements: BrandPanel {
+        x: root.content-left;
+        y: root.content-top;
+        width: root.brand-width;
+        height: parent.height - root.content-top - root.content-bottom-gap;
+        product-name: "一键开整";
+        status-copy: root.brand-status-copy;
+        launch-copy: "少折腾，直接开工。";
+        hero-title: "欢迎王者归来";
+        hero-subtitle: "Precision Editorial Engine. 极简，极速，极度专注。";
+    }
+
+    if !root.showing-announcements && root.auth-subview == 0: LoginScreen {
+        x: root.card-x;
+        y: root.card-y;
+        width: root.card-width;
+        height: root.card-height;
+        email <=> root.email;
+        password <=> root.password;
+        verification-code <=> root.verification-code;
+        remember-password <=> root.remember-password;
+        auto-login <=> root.auto-login;
+        show-totp-field: root.show-totp-field;
+        status-text: root.auth-status-text;
+        login-requested => { root.login-requested(); }
+        open-register-requested => { root.auth-subview = 1; }
+        open-forgot-password-requested => { root.auth-subview = 2; }
+    }
+
+    if !root.showing-announcements && root.auth-subview == 1: RegisterPanel {
+        x: root.card-x;
+        y: root.card-y + 18px;
+        width: root.card-width;
+        height: root.card-height - 20px;
+        email <=> root.email;
+        password <=> root.password;
+        verification-code <=> root.verification-code;
+        status-text: root.auth-status-text;
+        register-submit-requested => { root.register-requested(); }
+        verify-code-requested => { root.verify-code-requested(); }
+        back-requested => { root.auth-subview = 0; }
+    }
+
+    if !root.showing-announcements && root.auth-subview == 2: ForgotPasswordScreen {
+        x: root.card-x;
+        y: root.card-y + 18px;
+        width: root.card-width;
+        height: root.card-height - 20px;
+        email <=> root.email;
+        reset-token <=> root.reset-token;
+        new-password <=> root.new-password;
+        status-text: root.reset-status-text;
+        forgot-password-requested => { root.forgot-password-requested(); }
+        reset-password-requested => { root.reset-password-requested(); }
+        back-requested => { root.auth-subview = 0; }
+    }
+
+    if !root.showing-announcements: Rectangle {
+        x: 32px;
+        y: parent.height - 54px;
+        width: root.width > 1400px ? 560px : 520px;
+        height: 34px;
+        background: #ffffff;
+        border-radius: 17px;
+        border-color: #d7e4f0;
+        border-width: 1px;
+        Text {
+            x: 16px;
+            y: 8px;
+            text: "ⓘ 系统更新：V2.4 版本已发布，带来全新排版引擎";
+            color: #4f667b;
+            font-size: 12px;
+        }
+    }
+
+    if !root.showing-announcements: Text {
+        x: parent.width - 560px;
+        y: parent.height - 48px;
+        width: 520px;
+        text: "© 2026 一键开整 · ANNOUNCEMENTS · TERMS · PRIVACY · STATUS";
+        color: #667b8e;
+        font-size: 11px;
+        horizontal-alignment: right;
+    }
+
+    if root.showing-announcements: AnnouncementCenterScreen {
+        x: 40px;
+        y: 96px;
+        width: parent.width - 80px;
+        height: parent.height - 128px;
+    }
+
+    if root.showing-announcements: Button {
+        x: 40px;
+        y: 86px;
+        width: 84px;
+        height: 38px;
+        text: "返回";
+        clicked => { root.showing-announcements = false; }
+    }
+}

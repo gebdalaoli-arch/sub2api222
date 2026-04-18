@@ -1,0 +1,140 @@
+export component BrandPanel inherits Rectangle {
+    in property <string> product-name: "一键开整";
+    in property <string> status-copy: "你的电子牛马已就位。";
+    in property <string> launch-copy: "少折腾，直接开工。";
+    in property <string> hero-title: "欢迎王者归来";
+    in property <string> hero-subtitle: "Precision Editorial Engine. 极简，极速，极度专注。";
+
+    background: @linear-gradient(180deg, #f7fbff 0%, #eef6fb 100%);
+    border-radius: 28px;
+    border-color: #dbe8f1;
+    border-width: 1px;
+
+    Rectangle {
+        x: 32px;
+        y: 26px;
+        width: parent.width - 64px;
+        height: parent.height * 0.34;
+        background: @linear-gradient(135deg, #f9fdff 0%, #e8f7ff 45%, #f4fbff 100%);
+        border-radius: 34px;
+        border-color: #d9ebf5;
+        border-width: 1px;
+
+        Rectangle {
+            x: 38px;
+            y: 34px;
+            width: 168px;
+            height: 168px;
+            background: @radial-gradient(circle, #ffffff 0%, #ddf4ff 58%, #bfe9ff 100%);
+            border-radius: 84px;
+            border-color: #d0ebf8;
+            border-width: 1px;
+        }
+
+        Rectangle {
+            x: 96px;
+            y: 94px;
+            width: 76px;
+            height: 76px;
+            background: @linear-gradient(135deg, #9fe6ff 0%, #57bce8 100%);
+            border-radius: 26px;
+        }
+
+        Rectangle {
+            x: 228px;
+            y: 82px;
+            width: parent.width - 276px;
+            height: 2px;
+            background: @linear-gradient(90deg, #8bdcff 0%, #dff5ff 100%);
+        }
+
+        Rectangle {
+            x: 206px;
+            y: 158px;
+            width: parent.width - 252px;
+            height: 2px;
+            background: @linear-gradient(90deg, #8fe0ff 0%, #eef9ff 100%);
+        }
+    }
+
+    Text {
+        x: 28px;
+        y: parent.height * 0.50;
+        text: root.product-name;
+        color: #18324a;
+        font-size: 34px;
+        font-weight: 800;
+    }
+
+    Text {
+        x: 28px;
+        y: parent.height * 0.58;
+        width: parent.width - 56px;
+        text: root.launch-copy;
+        color: #2f5f7c;
+        font-size: 16px;
+        font-weight: 600;
+        wrap: word-wrap;
+    }
+
+    Text {
+        x: 28px;
+        y: parent.height * 0.64;
+        width: parent.width - 56px;
+        text: root.status-copy;
+        color: #586f82;
+        font-size: 14px;
+        wrap: word-wrap;
+    }
+
+    Text {
+        x: 28px;
+        y: parent.height - 220px;
+        width: parent.width - 56px;
+        text: root.hero-title;
+        color: #12639c;
+        font-size: 26px;
+        font-weight: 800;
+    }
+
+    Text {
+        x: 28px;
+        y: parent.height - 174px;
+        width: parent.width - 56px;
+        text: root.hero-subtitle;
+        color: #42596d;
+        font-size: 14px;
+        wrap: word-wrap;
+    }
+
+    Rectangle {
+        x: 28px;
+        y: parent.height - 112px;
+        width: parent.width - 56px;
+        height: 72px;
+        background: #ffffffcc;
+        border-radius: 18px;
+        border-color: #d6e7f1;
+        border-width: 1px;
+
+        Text {
+            x: 16px;
+            y: 10px;
+            text: "系统公告";
+            color: #2b5f82;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        Text {
+            x: 16px;
+            y: 26px;
+            width: parent.width - 32px;
+            text: "V2.4 版本已发布，现已支持更稳定的亮色客户端骨架。";
+            color: #4f667b;
+            font-size: 12px;
+            wrap: word-wrap;
+        }
+    }
+
+}

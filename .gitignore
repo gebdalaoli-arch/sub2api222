@@ -142,4 +142,7 @@ output/
 
 
 # Rust desktop client build artifacts
-desktop-client/target/
+.cargo/
+客户端壳子/desktop-client/target/
+客户端壳子/dist/
+客户端壳子/.cargo/
