@@ -24,6 +24,7 @@ use sub2api_desktop::{
         },
         groups::{fetch_available_groups_blocking, GroupSummary},
         http::ApiClient,
+        payment::{fetch_my_orders_blocking, PaymentOrder},
         redeem::{
             fetch_redeem_history_blocking, redeem_code_blocking, RedeemCodeRequest,
             RedeemHistoryItem,
@@ -62,6 +63,7 @@ type SharedAuthSession = Arc<Mutex<Option<AuthSession>>>;
 type SharedGroups = Arc<Mutex<Vec<GroupSummary>>>;
 type SharedSubscriptionSummary = Arc<Mutex<Option<SubscriptionSummary>>>;
 type SharedRedeemHistory = Arc<Mutex<Vec<RedeemHistoryItem>>>;
+type SharedOrders = Arc<Mutex<Vec<PaymentOrder>>>;
 
 fn main() -> anyhow::Result<()> {
     let app = AppWindow::new()?;
@@ -76,6 +78,7 @@ fn main() -> anyhow::Result<()> {
     let available_groups: SharedGroups = Arc::new(Mutex::new(Vec::new()));
     let subscription_summary: SharedSubscriptionSummary = Arc::new(Mutex::new(None));
     let redeem_history: SharedRedeemHistory = Arc::new(Mutex::new(Vec::new()));
+    let recent_orders: SharedOrders = Arc::new(Mutex::new(Vec::new()));
 
     apply_launch_state(&app, &targets.borrow());
     apply_logged_out_state(&app);
@@ -105,6 +108,7 @@ fn main() -> anyhow::Result<()> {
         Arc::clone(&available_groups),
         Arc::clone(&subscription_summary),
         Arc::clone(&redeem_history),
+        Arc::clone(&recent_orders),
     );
     wire_billing_callbacks(
         &app,
@@ -113,6 +117,7 @@ fn main() -> anyhow::Result<()> {
         Arc::clone(&available_groups),
         Arc::clone(&subscription_summary),
         Arc::clone(&redeem_history),
+        Arc::clone(&recent_orders),
     );
     restore_saved_session(
         &app,
@@ -123,6 +128,7 @@ fn main() -> anyhow::Result<()> {
         Arc::clone(&available_groups),
         Arc::clone(&subscription_summary),
         Arc::clone(&redeem_history),
+        Arc::clone(&recent_orders),
     );
 
     app.run()?;
@@ -367,6 +373,7 @@ fn wire_auth_callbacks(
     available_groups: SharedGroups,
     subscription_summary: SharedSubscriptionSummary,
     redeem_history: SharedRedeemHistory,
+    recent_orders: SharedOrders,
 ) {
     let login_app = app.as_weak();
     let login_config = Arc::clone(&config);
@@ -377,6 +384,7 @@ fn wire_auth_callbacks(
     let login_groups = Arc::clone(&available_groups);
     let login_summary = Arc::clone(&subscription_summary);
     let login_history = Arc::clone(&redeem_history);
+    let login_orders = Arc::clone(&recent_orders);
     app.on_login_requested(move || {
         let Some(app) = login_app.upgrade() else {
             return;
@@ -410,6 +418,7 @@ fn wire_auth_callbacks(
         let available_groups = Arc::clone(&login_groups);
         let subscription_summary = Arc::clone(&login_summary);
         let redeem_history = Arc::clone(&login_history);
+        let recent_orders = Arc::clone(&login_orders);
         thread::spawn(move || {
             let client = ApiClient::new(config.api_base_url.clone());
             let result = match submission {
@@ -438,11 +447,13 @@ fn wire_auth_callbacks(
                         &available_groups,
                         &subscription_summary,
                         &redeem_history,
+                        &recent_orders,
                         email,
                         auth,
                     );
                     let groups_snapshot = current_groups_snapshot(&available_groups);
-                    let billing_vm = current_billing_vm(&subscription_summary, &redeem_history);
+                    let billing_vm =
+                        current_billing_vm(&subscription_summary, &recent_orders, &redeem_history);
                     let group_count = Some(groups_snapshot.len());
                     let _ = ui_handle.upgrade_in_event_loop(move |app| {
                         if let Some(session) =
@@ -489,6 +500,7 @@ fn wire_auth_callbacks(
     let register_groups = Arc::clone(&available_groups);
     let register_summary = Arc::clone(&subscription_summary);
     let register_history = Arc::clone(&redeem_history);
+    let register_orders = Arc::clone(&recent_orders);
     app.on_register_requested(move || {
         let Some(app) = register_app.upgrade() else {
             return;
@@ -512,6 +524,7 @@ fn wire_auth_callbacks(
         let available_groups = Arc::clone(&register_groups);
         let subscription_summary = Arc::clone(&register_summary);
         let redeem_history = Arc::clone(&register_history);
+        let recent_orders = Arc::clone(&register_orders);
         thread::spawn(move || {
             let client = ApiClient::new(config.api_base_url.clone());
             let request = RegisterRequest::new(email.trim(), password)
@@ -527,11 +540,13 @@ fn wire_auth_callbacks(
                         &available_groups,
                         &subscription_summary,
                         &redeem_history,
+                        &recent_orders,
                         email,
                         auth,
                     );
                     let groups_snapshot = current_groups_snapshot(&available_groups);
-                    let billing_vm = current_billing_vm(&subscription_summary, &redeem_history);
+                    let billing_vm =
+                        current_billing_vm(&subscription_summary, &recent_orders, &redeem_history);
                     let group_count = Some(groups_snapshot.len());
                     let _ = ui_handle.upgrade_in_event_loop(move |app| {
                         if let Some(session) =
@@ -673,6 +688,7 @@ fn wire_billing_callbacks(
     available_groups: SharedGroups,
     subscription_summary: SharedSubscriptionSummary,
     redeem_history: SharedRedeemHistory,
+    recent_orders: SharedOrders,
 ) {
     let redeem_app = app.as_weak();
     let redeem_config = Arc::clone(&config);
@@ -680,6 +696,7 @@ fn wire_billing_callbacks(
     let redeem_groups = Arc::clone(&available_groups);
     let redeem_summary = Arc::clone(&subscription_summary);
     let redeem_history_store = Arc::clone(&redeem_history);
+    let redeem_orders = Arc::clone(&recent_orders);
     app.on_redeem_requested(move || {
         let Some(app) = redeem_app.upgrade() else {
             return;
@@ -697,6 +714,7 @@ fn wire_billing_callbacks(
         let available_groups = Arc::clone(&redeem_groups);
         let subscription_summary = Arc::clone(&redeem_summary);
         let redeem_history_store = Arc::clone(&redeem_history_store);
+        let recent_orders = Arc::clone(&redeem_orders);
         thread::spawn(move || {
             let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) else {
                 let _ = ui_handle.upgrade_in_event_loop(move |app| {
@@ -714,6 +732,7 @@ fn wire_billing_callbacks(
                         &client,
                         &available_groups,
                         &subscription_summary,
+                        &recent_orders,
                         &redeem_history_store,
                     );
 
@@ -758,6 +777,7 @@ fn restore_saved_session(
     available_groups: SharedGroups,
     subscription_summary: SharedSubscriptionSummary,
     redeem_history: SharedRedeemHistory,
+    recent_orders: SharedOrders,
 ) {
     let app_handle = app.as_weak();
     match token_store.load_refresh_token() {
@@ -787,6 +807,7 @@ fn restore_saved_session(
                                         &user_client,
                                         &available_groups,
                                         &subscription_summary,
+                                        &recent_orders,
                                         &redeem_history,
                                     );
                                 let _ = app_handle.upgrade_in_event_loop(move |app| {
@@ -834,6 +855,7 @@ fn handle_auth_success(
     available_groups: &SharedGroups,
     subscription_summary: &SharedSubscriptionSummary,
     redeem_history: &SharedRedeemHistory,
+    recent_orders: &SharedOrders,
     email: String,
     auth: AuthResponse,
 ) {
@@ -860,6 +882,7 @@ fn handle_auth_success(
         &client,
         available_groups,
         subscription_summary,
+        recent_orders,
         redeem_history,
     );
 }
@@ -984,12 +1007,13 @@ fn sync_user_side_state(
     client: &ApiClient,
     available_groups: &SharedGroups,
     subscription_summary: &SharedSubscriptionSummary,
+    recent_orders: &SharedOrders,
     redeem_history: &SharedRedeemHistory,
 ) -> (Option<usize>, Vec<GroupSummary>, BillingViewModel) {
     let group_count = refresh_available_groups_state(client, available_groups);
-    refresh_billing_state(client, subscription_summary, redeem_history);
+    refresh_billing_state(client, subscription_summary, recent_orders, redeem_history);
     let groups_snapshot = current_groups_snapshot(available_groups);
-    let billing_vm = current_billing_vm(subscription_summary, redeem_history);
+    let billing_vm = current_billing_vm(subscription_summary, recent_orders, redeem_history);
     (group_count, groups_snapshot, billing_vm)
 }
 
@@ -1012,6 +1036,7 @@ fn refresh_available_groups_state(
 fn refresh_billing_state(
     client: &ApiClient,
     subscription_summary: &SharedSubscriptionSummary,
+    recent_orders: &SharedOrders,
     redeem_history: &SharedRedeemHistory,
 ) {
     if let Ok(summary) = fetch_subscription_summary_blocking(client) {
@@ -1022,6 +1047,11 @@ fn refresh_billing_state(
     if let Ok(history) = fetch_redeem_history_blocking(client) {
         if let Ok(mut state) = redeem_history.lock() {
             *state = history;
+        }
+    }
+    if let Ok(page) = fetch_my_orders_blocking(client) {
+        if let Ok(mut state) = recent_orders.lock() {
+            *state = page.items;
         }
     }
 }
@@ -1036,18 +1066,24 @@ fn current_groups_snapshot(available_groups: &SharedGroups) -> Vec<GroupSummary>
 
 fn current_billing_vm(
     subscription_summary: &SharedSubscriptionSummary,
+    recent_orders: &SharedOrders,
     redeem_history: &SharedRedeemHistory,
 ) -> BillingViewModel {
     let summary = subscription_summary
         .lock()
         .ok()
         .and_then(|state| state.clone());
+    let orders = recent_orders
+        .lock()
+        .ok()
+        .map(|state| state.clone())
+        .unwrap_or_default();
     let history = redeem_history
         .lock()
         .ok()
         .map(|state| state.clone())
         .unwrap_or_default();
-    BillingViewModel::from_summary_and_history(summary.as_ref(), &history)
+    BillingViewModel::from_summary_and_history(summary.as_ref(), &orders, &history)
 }
 
 fn apply_launch_state(app: &AppWindow, targets: &[InstalledTarget]) {
@@ -1116,6 +1152,14 @@ fn apply_billing_state(app: &AppWindow, billing: &BillingViewModel) {
     app.set_subscription_lines(string_model(
         billing
             .subscription_lines
+            .iter()
+            .cloned()
+            .map(SharedString::from)
+            .collect(),
+    ));
+    app.set_order_lines(string_model(
+        billing
+            .order_lines
             .iter()
             .cloned()
             .map(SharedString::from)

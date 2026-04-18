@@ -22,6 +22,22 @@ $cargoConfigDir = Join-Path $repoRoot ".cargo"
 $cargoConfigPath = Join-Path $cargoConfigDir "config.toml"
 $installerPath = Join-Path $outputDir "Sub2API-Desktop-Setup-$appVersion.exe"
 
+function Normalize-ApiBaseUrl([string]$InputUrl) {
+    $trimmed = ""
+    if ($null -ne $InputUrl) {
+        $trimmed = $InputUrl.Trim()
+    }
+    if ([string]::IsNullOrWhiteSpace($trimmed)) {
+        throw "ApiBaseUrl 不能为空。"
+    }
+
+    $trimmed = $trimmed.TrimEnd('/')
+    if ($trimmed.EndsWith('/api/v1')) {
+        return $trimmed
+    }
+    return "$trimmed/api/v1"
+}
+
 if (-not (Test-Path $iscc)) {
     throw "未找到 Inno Setup 编译器：$iscc"
 }
@@ -37,7 +53,9 @@ registry = "sparse+https://rsproxy.cn/index/"
 '@ | Set-Content -Path $cargoConfigPath -Encoding UTF8
 
 Write-Host "==> 构建 release 二进制"
-$env:SUB2API_DESKTOP_API_BASE_URL = $ApiBaseUrl
+$normalizedApiBaseUrl = Normalize-ApiBaseUrl $ApiBaseUrl
+$env:SUB2API_DESKTOP_API_BASE_URL = $normalizedApiBaseUrl
+Write-Host "==> 使用 API 基地址: $normalizedApiBaseUrl"
 try {
     & cargo build --release --manifest-path desktop-client/Cargo.toml
 }

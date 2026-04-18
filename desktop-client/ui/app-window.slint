@@ -32,6 +32,7 @@ export component AppWindow inherits Window {
     in-out property <string> redeem-status-text: "输入 CDK 后点击兑换。";
     in-out property <string> subscription-summary-text: "暂无订阅摘要";
     in-out property <[string]> subscription-lines: ["登录后可查看当前订阅额度和到期时间。"];
+    in-out property <[string]> order-lines: ["最近订单会显示在这里。"];
     in-out property <[string]> redeem-history-lines: ["最近兑换记录会显示在这里。"];
     in-out property <int> current-section: 0;
     in-out property <[string]> launch-group-options: ["登录后加载可用分组"];
@@ -394,6 +395,7 @@ export component AppWindow inherits Window {
                 redeem-status-text: root.redeem-status-text;
                 subscription-summary-text: root.subscription-summary-text;
                 subscription-lines: root.subscription-lines;
+                order-lines: root.order-lines;
                 history-lines: root.redeem-history-lines;
                 redeem-requested => { root.redeem-requested(); }
             }

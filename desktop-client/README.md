@@ -43,6 +43,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build-desktop-installer.ps
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build-desktop-installer.ps1 -ApiBaseUrl "https://your-sub2api.example.com/api/v1"
 ```
 
+也可以直接传站点根地址，脚本会自动补成 `/api/v1`：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build-desktop-installer.ps1 -ApiBaseUrl "https://your-sub2api.example.com/"
+```
+
 脚本会：
 
 - 生成 `desktop-client\target\release\sub2api-desktop.exe`

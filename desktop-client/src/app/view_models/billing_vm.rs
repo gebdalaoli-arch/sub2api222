@@ -1,4 +1,5 @@
 use crate::api::{
+    payment::PaymentOrder,
     redeem::RedeemHistoryItem,
     subscriptions::{SubscriptionSummary, SubscriptionSummaryItem},
 };
@@ -7,6 +8,7 @@ use crate::api::{
 pub struct BillingViewModel {
     pub subscription_summary_text: String,
     pub subscription_lines: Vec<String>,
+    pub order_lines: Vec<String>,
     pub redeem_history_lines: Vec<String>,
 }
 
@@ -15,12 +17,14 @@ impl BillingViewModel {
         Self {
             subscription_summary_text: "暂无订阅摘要".to_string(),
             subscription_lines: vec!["登录后可查看当前订阅额度和到期时间。".to_string()],
+            order_lines: vec!["最近订单会显示在这里。".to_string()],
             redeem_history_lines: vec!["最近兑换记录会显示在这里。".to_string()],
         }
     }
 
     pub fn from_summary_and_history(
         summary: Option<&SubscriptionSummary>,
+        orders: &[PaymentOrder],
         history: &[RedeemHistoryItem],
     ) -> Self {
         let mut model = Self::empty();
@@ -40,6 +44,19 @@ impl BillingViewModel {
                     .map(subscription_line)
                     .collect()
             };
+        }
+
+        if !orders.is_empty() {
+            model.order_lines = orders
+                .iter()
+                .take(4)
+                .map(|order| {
+                    format!(
+                        "{} · {} · ￥{:.2}",
+                        order.out_trade_no, order.status, order.pay_amount
+                    )
+                })
+                .collect();
         }
 
         if !history.is_empty() {
@@ -71,6 +88,7 @@ fn subscription_line(item: &SubscriptionSummaryItem) -> String {
 mod tests {
     use super::BillingViewModel;
     use crate::api::{
+        payment::PaymentOrder,
         redeem::RedeemHistoryItem,
         subscriptions::{SubscriptionSummary, SubscriptionSummaryItem},
     };
@@ -107,11 +125,34 @@ mod tests {
             validity_days: Some(30),
             group: None,
         }];
+        let orders = vec![PaymentOrder {
+            id: 1,
+            user_id: 1,
+            amount: 20.0,
+            pay_amount: 20.0,
+            fee_rate: 0.0,
+            payment_type: "alipay".to_string(),
+            out_trade_no: "ORD-1".to_string(),
+            status: "COMPLETED".to_string(),
+            order_type: "balance".to_string(),
+            created_at: "2025-01-01T15:04:05Z".to_string(),
+            expires_at: "2025-01-01T16:04:05Z".to_string(),
+            paid_at: None,
+            completed_at: None,
+            refund_amount: 0.0,
+            refund_reason: None,
+            refund_requested_at: None,
+            refund_requested_by: None,
+            refund_request_reason: None,
+            plan_id: None,
+            provider_instance_id: None,
+        }];
 
-        let vm = BillingViewModel::from_summary_and_history(Some(&summary), &history);
+        let vm = BillingViewModel::from_summary_and_history(Some(&summary), &orders, &history);
 
         assert!(vm.subscription_summary_text.contains("活跃订阅 1 个"));
         assert!(vm.subscription_lines[0].contains("OpenAI Pro"));
+        assert!(vm.order_lines[0].contains("ORD-1"));
         assert!(vm.redeem_history_lines[0].contains("CDK-123"));
     }
 }
