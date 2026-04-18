@@ -1,79 +1,92 @@
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub enum AuthMode {
-    #[default]
-    Login,
-    Register,
-    ForgotPassword,
-}
+use crate::{
+    app::brand::{login_button_text, login_title},
+    storage::app_state::AuthPreferences,
+};
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthViewModel {
-    pub mode: AuthMode,
-    pub email: String,
-    pub password: String,
-    pub verification_code: String,
-    pub status_text: String,
+    pub remember_password: bool,
+    pub auto_login: bool,
+    pub show_totp_field: bool,
 }
 
 impl AuthViewModel {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn for_mode(mode: AuthMode) -> Self {
+    pub fn for_login(prefs: AuthPreferences, show_totp_field: bool) -> Self {
+        let prefs = prefs.sanitized();
         Self {
-            mode,
-            ..Self::default()
+            remember_password: prefs.remember_password,
+            auto_login: prefs.auto_login,
+            show_totp_field,
         }
     }
 
     pub fn title(&self) -> &'static str {
-        match self.mode {
-            AuthMode::Login => "登录到客户端",
-            AuthMode::Register => "创建账号",
-            AuthMode::ForgotPassword => "找回密码",
-        }
+        login_title()
     }
 
     pub fn primary_action_text(&self) -> &'static str {
-        match self.mode {
-            AuthMode::Login => "登录",
-            AuthMode::Register => "注册",
-            AuthMode::ForgotPassword => "发送重置邮件",
-        }
+        login_button_text()
     }
 
-    pub fn needs_password(&self) -> bool {
-        !matches!(self.mode, AuthMode::ForgotPassword)
+    pub fn remember_password_label(&self) -> &'static str {
+        "记住密码"
     }
 
-    pub fn needs_verification_code(&self) -> bool {
-        matches!(self.mode, AuthMode::Register)
+    pub fn auto_login_label(&self) -> &'static str {
+        "免登录"
+    }
+
+    pub fn auto_login_enabled(&self) -> bool {
+        self.remember_password
+    }
+
+    pub fn auto_login_checked(&self) -> bool {
+        self.remember_password && self.auto_login
+    }
+
+    pub fn show_password_fields(&self) -> bool {
+        true
+    }
+
+    pub fn show_totp_field(&self) -> bool {
+        self.show_totp_field
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{AuthMode, AuthViewModel};
+    use super::AuthViewModel;
+    use crate::storage::app_state::AuthPreferences;
 
     #[test]
-    fn auth_view_model_exposes_copy_for_login_register_and_forgot_password() {
-        let login = AuthViewModel::for_mode(AuthMode::Login);
-        assert_eq!(login.title(), "登录到客户端");
-        assert_eq!(login.primary_action_text(), "登录");
-        assert!(login.needs_password());
-        assert!(!login.needs_verification_code());
+    fn login_surface_state_matches_approved_copy_and_toggle_rules() {
+        let state = AuthViewModel::for_login(
+            AuthPreferences {
+                remember_password: true,
+                auto_login: true,
+            },
+            false,
+        );
 
-        let register = AuthViewModel::for_mode(AuthMode::Register);
-        assert_eq!(register.title(), "创建账号");
-        assert_eq!(register.primary_action_text(), "注册");
-        assert!(register.needs_password());
-        assert!(register.needs_verification_code());
+        assert_eq!(state.title(), "欢迎王者归来");
+        assert_eq!(state.primary_action_text(), "登录");
+        assert_eq!(state.remember_password_label(), "记住密码");
+        assert_eq!(state.auto_login_label(), "免登录");
+        assert!(state.show_password_fields());
+        assert!(!state.show_totp_field());
+    }
 
-        let forgot = AuthViewModel::for_mode(AuthMode::ForgotPassword);
-        assert_eq!(forgot.title(), "找回密码");
-        assert_eq!(forgot.primary_action_text(), "发送重置邮件");
-        assert!(!forgot.needs_password());
-        assert!(!forgot.needs_verification_code());
+    #[test]
+    fn auto_login_is_disabled_when_remember_password_is_off() {
+        let state = AuthViewModel::for_login(
+            AuthPreferences {
+                remember_password: false,
+                auto_login: true,
+            },
+            false,
+        );
+
+        assert!(!state.auto_login_enabled());
+        assert!(!state.auto_login_checked());
     }
 }

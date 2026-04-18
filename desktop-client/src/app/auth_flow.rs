@@ -1,9 +1,14 @@
 use crate::api::auth::{Login2FARequest, LoginRequest};
+use crate::storage::app_state::AuthPreferences;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LoginSubmission {
     Password(LoginRequest),
     TwoFactor(Login2FARequest),
+}
+
+pub fn should_restore_session(prefs: &AuthPreferences, has_refresh_token: bool) -> bool {
+    prefs.sanitized().auto_login && has_refresh_token
 }
 
 pub fn build_login_submission(
@@ -38,6 +43,7 @@ pub fn build_login_submission(
 #[cfg(test)]
 mod tests {
     use super::{build_login_submission, LoginSubmission};
+    use crate::storage::app_state::AuthPreferences;
 
     #[test]
     fn login_submission_uses_password_login_when_no_pending_totp() {
@@ -65,5 +71,21 @@ mod tests {
             }
             LoginSubmission::Password(_) => panic!("expected totp submission"),
         }
+    }
+
+    #[test]
+    fn should_restore_session_requires_saved_token_and_auto_login() {
+        let prefs = AuthPreferences {
+            remember_password: true,
+            auto_login: false,
+        };
+        assert!(!super::should_restore_session(&prefs, true));
+        assert!(super::should_restore_session(
+            &AuthPreferences {
+                remember_password: true,
+                auto_login: true,
+            },
+            true
+        ));
     }
 }
