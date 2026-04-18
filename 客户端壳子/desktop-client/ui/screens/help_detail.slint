@@ -1,7 +1,14 @@
 import { Button } from "std-widgets.slint";
 
 export component HelpDetailScreen inherits Rectangle {
+    in property <bool> desktop-available: false;
+    in property <bool> cli-available: false;
+    in property <string> launch-status-text: "尚未检测 Codex 安装";
+
     callback manual-update-check-requested();
+    callback refresh-installations-requested();
+    callback launch-official-desktop-requested();
+    callback launch-official-cli-requested();
 
     background: #eaeff2;
     border-radius: 12px;
@@ -53,33 +60,58 @@ export component HelpDetailScreen inherits Rectangle {
         x: 24px;
         y: 214px;
         width: parent.width - 48px;
-        height: 88px;
+        height: 116px;
         background: #ffffff;
         border-radius: 12px;
         border-color: #d7e4f0;
         border-width: 0px;
-        Text { x: 16px; y: 16px; text: "恢复与清理"; color: #2c3437; font-size: 16px; font-weight: 700; }
-        Text { x: 16px; y: 40px; width: parent.width - 32px; text: "如遇异常退出，下次启动会优先回收临时运行材料，不影响官方环境。"; color: #596064; font-size: 12px; wrap: word-wrap; }
+        Text { x: 16px; y: 16px; text: "环境状态"; color: #2c3437; font-size: 16px; font-weight: 700; }
+        Text { x: 16px; y: 40px; width: parent.width - 140px; text: "如遇异常退出，下次启动会优先回收临时运行材料，不影响官方环境。"; color: #596064; font-size: 12px; wrap: word-wrap; }
+        Button {
+            x: parent.width - 124px;
+            y: 36px;
+            width: 100px;
+            height: 40px;
+            text: "重新检测";
+            clicked => { root.refresh-installations-requested(); }
+        }
+        Text { x: 16px; y: 82px; text: (root.desktop-available ? "桌面版已检测到" : "桌面版未检测到") + " / " + (root.cli-available ? "CLI 已检测到" : "CLI 未检测到"); color: #596064; font-size: 12px; }
     }
 
     Rectangle {
         x: 24px;
-        y: 320px;
+        y: 348px;
         width: parent.width - 48px;
-        height: 88px;
+        height: 120px;
         background: #ffffff;
         border-radius: 12px;
         border-color: #d7e4f0;
         border-width: 0px;
         Text { x: 16px; y: 16px; text: "高级设置"; color: #2c3437; font-size: 16px; font-weight: 700; }
-        Text { x: 16px; y: 40px; width: parent.width - 32px; text: "官方模式默认不推荐，仅在特定调试或保底场景下启用。"; color: #596064; font-size: 12px; wrap: word-wrap; }
+        Text { x: 16px; y: 40px; width: parent.width - 32px; text: "官方模式默认不推荐，仅在特定调试或保底场景下启用。这里提供真正可用的保底入口。"; color: #596064; font-size: 12px; wrap: word-wrap; }
+        Button {
+            x: 16px;
+            y: 74px;
+            width: 132px;
+            height: 32px;
+            text: "启动官方桌面版";
+            clicked => { root.launch-official-desktop-requested(); }
+        }
+        Button {
+            x: 160px;
+            y: 74px;
+            width: 120px;
+            height: 32px;
+            text: "启动官方 CLI";
+            clicked => { root.launch-official-cli-requested(); }
+        }
     }
 
     Rectangle {
         x: 24px;
-        y: 426px;
+        y: 484px;
         width: parent.width - 48px;
-        height: max(144px, parent.height - 450px);
+        height: max(144px, parent.height - 508px);
         background: #ffffff;
         border-radius: 12px;
         border-color: #d7e4f0;
@@ -97,5 +129,6 @@ export component HelpDetailScreen inherits Rectangle {
         Text { x: 16px; y: 48px; text: "1. 不展示普通 API 凭据，也不要求手动复制网关地址。"; color: #596064; font-size: 12px; }
         Text { x: 16px; y: 72px; text: "2. 官方模式与平台代理模式严格隔离，减少对原环境的污染。"; color: #596064; font-size: 12px; }
         Text { x: 16px; y: 96px; text: "3. 更新弹窗属于系统级状态，强制更新时会直接拦住主界面。"; color: #596064; font-size: 12px; }
+        Text { x: 16px; y: 124px; width: parent.width - 32px; text: "最近启动状态：" + root.launch-status-text; color: #596064; font-size: 12px; wrap: word-wrap; }
     }
 }

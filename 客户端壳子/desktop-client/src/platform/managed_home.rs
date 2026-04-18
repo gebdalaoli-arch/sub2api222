@@ -16,6 +16,14 @@ pub struct ManagedHomePaths {
     pub codex_home: PathBuf,
 }
 
+const MANAGED_MODEL_PROVIDER: &str = "OpenAI";
+const MANAGED_MODEL_NAME: &str = "gpt-5.4";
+const MANAGED_REVIEW_MODEL_NAME: &str = "gpt-5.4";
+const MANAGED_MODEL_REASONING_EFFORT: &str = "xhigh";
+const MANAGED_NETWORK_ACCESS: &str = "enabled";
+const MANAGED_CONTEXT_WINDOW: i64 = 1_000_000;
+const MANAGED_AUTO_COMPACT_TOKEN_LIMIT: i64 = 900_000;
+
 impl ManagedHomePaths {
     pub fn new(root: PathBuf, profile_name: &str) -> Self {
         let codex_home = root.join(profile_name);
@@ -44,6 +52,74 @@ fn absent_marker_path(path: &Path) -> PathBuf {
         "{}.platform-backup.absent",
         path.to_string_lossy()
     ))
+}
+
+fn apply_managed_codex_contract(root: &mut toml::map::Map<String, TomlValue>, gateway_base_url: &str) {
+    root.insert(
+        "model_provider".to_string(),
+        TomlValue::String(MANAGED_MODEL_PROVIDER.to_string()),
+    );
+    root.insert(
+        "model".to_string(),
+        TomlValue::String(MANAGED_MODEL_NAME.to_string()),
+    );
+    root.insert(
+        "review_model".to_string(),
+        TomlValue::String(MANAGED_REVIEW_MODEL_NAME.to_string()),
+    );
+    root.insert(
+        "model_reasoning_effort".to_string(),
+        TomlValue::String(MANAGED_MODEL_REASONING_EFFORT.to_string()),
+    );
+    root.insert(
+        "disable_response_storage".to_string(),
+        TomlValue::Boolean(true),
+    );
+    root.insert(
+        "network_access".to_string(),
+        TomlValue::String(MANAGED_NETWORK_ACCESS.to_string()),
+    );
+    root.insert(
+        "windows_wsl_setup_acknowledged".to_string(),
+        TomlValue::Boolean(true),
+    );
+    root.insert(
+        "model_context_window".to_string(),
+        TomlValue::Integer(MANAGED_CONTEXT_WINDOW),
+    );
+    root.insert(
+        "model_auto_compact_token_limit".to_string(),
+        TomlValue::Integer(MANAGED_AUTO_COMPACT_TOKEN_LIMIT),
+    );
+
+    let model_providers = root
+        .entry("model_providers")
+        .or_insert_with(|| TomlValue::Table(Default::default()));
+    let model_providers = model_providers
+        .as_table_mut()
+        .expect("model_providers must be a TOML table");
+    let openai = model_providers
+        .entry(MANAGED_MODEL_PROVIDER.to_string())
+        .or_insert_with(|| TomlValue::Table(Default::default()));
+    let openai = openai
+        .as_table_mut()
+        .expect("model_providers.OpenAI must be a TOML table");
+    openai.insert(
+        "name".to_string(),
+        TomlValue::String(MANAGED_MODEL_PROVIDER.to_string()),
+    );
+    openai.insert(
+        "base_url".to_string(),
+        TomlValue::String(gateway_base_url.to_string()),
+    );
+    openai.insert(
+        "wire_api".to_string(),
+        TomlValue::String("responses".to_string()),
+    );
+    openai.insert(
+        "requires_openai_auth".to_string(),
+        TomlValue::Boolean(true),
+    );
 }
 
 pub fn resolve_user_codex_home() -> Result<PathBuf> {
@@ -97,36 +173,7 @@ pub fn inject_platform_config_into_user_home(
     let root = config
         .as_table_mut()
         .ok_or_else(|| anyhow!("config.toml 不是有效的 table"))?;
-    root.insert(
-        "model_provider".to_string(),
-        TomlValue::String("OpenAI".to_string()),
-    );
-
-    let model_providers = root
-        .entry("model_providers")
-        .or_insert_with(|| TomlValue::Table(Default::default()));
-    let model_providers = model_providers
-        .as_table_mut()
-        .ok_or_else(|| anyhow!("model_providers 不是有效的 table"))?;
-    let openai = model_providers
-        .entry("OpenAI")
-        .or_insert_with(|| TomlValue::Table(Default::default()));
-    let openai = openai
-        .as_table_mut()
-        .ok_or_else(|| anyhow!("model_providers.OpenAI 不是有效的 table"))?;
-    openai.insert("name".to_string(), TomlValue::String("OpenAI".to_string()));
-    openai.insert(
-        "base_url".to_string(),
-        TomlValue::String(gateway_base_url.to_string()),
-    );
-    openai.insert(
-        "wire_api".to_string(),
-        TomlValue::String("responses".to_string()),
-    );
-    openai.insert(
-        "requires_openai_auth".to_string(),
-        TomlValue::Boolean(true),
-    );
+    apply_managed_codex_contract(root, gateway_base_url);
 
     fs::write(&config_path, toml::to_string_pretty(&config)?)?;
 
@@ -174,12 +221,14 @@ pub fn write_platform_home(
     runtime_token: &str,
 ) -> Result<()> {
     fs::create_dir_all(&paths.codex_home)?;
+    let mut config = TomlValue::Table(Default::default());
+    let root = config
+        .as_table_mut()
+        .expect("fresh managed config must be a TOML table");
+    apply_managed_codex_contract(root, gateway_base_url);
     fs::write(
         paths.codex_home.join("config.toml"),
-        format!(
-            "model_provider = \"OpenAI\"\n[model_providers.OpenAI]\nname = \"OpenAI\"\nbase_url = \"{}\"\nwire_api = \"responses\"\nrequires_openai_auth = true\n",
-            gateway_base_url
-        ),
+        toml::to_string_pretty(&config)?,
     )?;
     fs::write(
         paths.codex_home.join("auth.json"),
@@ -279,6 +328,14 @@ mod tests {
         let config = std::fs::read_to_string(paths.codex_home.join("config.toml")).unwrap();
         let auth = std::fs::read_to_string(paths.codex_home.join("auth.json")).unwrap();
         assert!(config.contains("model_provider = \"OpenAI\""));
+        assert!(config.contains("model = \"gpt-5.4\""));
+        assert!(config.contains("review_model = \"gpt-5.4\""));
+        assert!(config.contains("model_reasoning_effort = \"xhigh\""));
+        assert!(config.contains("disable_response_storage = true"));
+        assert!(config.contains("network_access = \"enabled\""));
+        assert!(config.contains("windows_wsl_setup_acknowledged = true"));
+        assert!(config.contains("model_context_window = 1000000"));
+        assert!(config.contains("model_auto_compact_token_limit = 900000"));
         assert!(config.contains("base_url = \"http://127.0.0.1:8080/api/desktop/v1\""));
         assert!(auth.contains("runtime-token-abc"));
         assert!(!temp.path().join(".codex").exists());
@@ -392,6 +449,14 @@ base_url = "https://old.example.com"
         let injected_config = std::fs::read_to_string(user_home.join("config.toml")).unwrap();
         let injected_auth = std::fs::read_to_string(user_home.join("auth.json")).unwrap();
         assert!(injected_config.contains("model = \"gpt-5.4\""));
+        assert!(injected_config.contains("model_provider = \"OpenAI\""));
+        assert!(injected_config.contains("review_model = \"gpt-5.4\""));
+        assert!(injected_config.contains("model_reasoning_effort = \"xhigh\""));
+        assert!(injected_config.contains("disable_response_storage = true"));
+        assert!(injected_config.contains("network_access = \"enabled\""));
+        assert!(injected_config.contains("windows_wsl_setup_acknowledged = true"));
+        assert!(injected_config.contains("model_context_window = 1000000"));
+        assert!(injected_config.contains("model_auto_compact_token_limit = 900000"));
         assert!(injected_config.contains("enabled = true"));
         assert!(injected_config.contains("base_url = \"http://127.0.0.1:8080/api/desktop/v1\""));
         assert!(injected_auth.contains("runtime-token-abc"));

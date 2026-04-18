@@ -1,11 +1,11 @@
 import { Button } from "std-widgets.slint";
 import { BrandPanel } from "components/brand_panel.slint";
 import { AnnouncementCenterScreen } from "screens/announcements.slint";
+import { BillingDetailScreen } from "screens/billing_detail.slint";
 import { ForgotPasswordScreen } from "screens/forgot_password.slint";
 import { HelpDetailScreen } from "screens/help_detail.slint";
 import { LaunchPanel } from "screens/launch_panel.slint";
 import { LoginScene } from "screens/login_scene.slint";
-import { RedeemScreen } from "screens/redeem.slint";
 import { LoginScreen } from "screens/login.slint";
 import { OverviewScreen } from "screens/overview.slint";
 import { RegisterPanel } from "screens/register_panel.slint";
@@ -33,7 +33,7 @@ export component AppWindow inherits Window {
     in-out property <string> dashboard-balance-text: "余额：--";
     in-out property <string> dashboard-usage-text: "并发额度：--";
     in-out property <string> dashboard-account-status-text: "账户状态：待登录";
-    in-out property <string> dashboard-notice-text: "充值页当前作为公告区。首版优先支持 CDK 兑换、订阅状态查看和平台模式启动。";
+    in-out property <string> dashboard-notice-text: "计费中心已支持余额、套餐、订单与兑换记录的统一查看。";
     in-out property <bool> remember-password: true;
     in-out property <bool> auto-login: false;
     in-out property <bool> show-login-totp: false;
@@ -42,10 +42,21 @@ export component AppWindow inherits Window {
     in-out property <string> brand-status-copy: "你的电子牛马已就位。";
     in-out property <string> redeem-code;
     in-out property <string> redeem-status-text: "输入 CDK 后点击兑换。";
+    in-out property <string> billing-plan-title: "暂未开通订阅";
+    in-out property <string> billing-balance-headline: "¥--";
+    in-out property <string> billing-usage-caption: "登录后可查看余额与订单明细。";
     in-out property <string> subscription-summary-text: "暂无订阅摘要";
     in-out property <[string]> subscription-lines: ["登录后可查看当前订阅额度和到期时间。"];
+    in-out property <[string]> subscription-detail-lines: ["暂无订阅明细。"];
     in-out property <[string]> order-lines: ["最近订单会显示在这里。"];
+    in-out property <[string]> order-detail-lines: ["暂无订单明细。"];
     in-out property <[string]> redeem-history-lines: ["最近兑换记录会显示在这里。"];
+    in-out property <string> billing-recharge-amount: "";
+    in-out property <[string]> billing-payment-method-options: ["暂无可用支付方式"];
+    in-out property <int> billing-selected-payment-method-index: 0;
+    in-out property <[string]> billing-subscription-plan-options: ["暂无可用套餐"];
+    in-out property <int> billing-selected-subscription-plan-index: 0;
+    in-out property <string> billing-checkout-status-text: "支付创建后会在这里显示状态。";
     in-out property <int> current-section: 0;
     in-out property <[string]> launch-group-options: ["登录后加载可用分组"];
     in-out property <int> launch-selected-group-index: 0;
@@ -73,6 +84,10 @@ export component AppWindow inherits Window {
     callback forgot-password-requested();
     callback reset-password-requested();
     callback redeem-requested();
+    callback billing-recharge-requested();
+    callback billing-subscription-requested();
+    callback billing-open-last-payment-requested();
+    callback billing-refresh-requested();
     callback manual-update-check-requested();
     callback update-primary-requested();
     callback update-secondary-requested();
@@ -323,17 +338,31 @@ export component AppWindow inherits Window {
             height: parent.height - 64px - 96px;
             background: transparent;
 
-            RedeemScreen {
+            BillingDetailScreen {
                 x: 0px; y: 0px;
                 width: parent.width;
                 height: parent.height;
+                plan-title: root.billing-plan-title;
+                balance-headline: root.billing-balance-headline;
+                usage-caption: root.billing-usage-caption;
                 redeem-code <=> root.redeem-code;
                 redeem-status-text: root.redeem-status-text;
                 subscription-summary-text: root.subscription-summary-text;
                 subscription-lines: root.subscription-lines;
-                order-lines: root.order-lines;
+                subscription-detail-lines: root.subscription-detail-lines;
+                order-detail-lines: root.order-detail-lines;
                 history-lines: root.redeem-history-lines;
+                recharge-amount <=> root.billing-recharge-amount;
+                payment-method-options: root.billing-payment-method-options;
+                selected-payment-method-index <=> root.billing-selected-payment-method-index;
+                subscription-plan-options: root.billing-subscription-plan-options;
+                selected-subscription-plan-index <=> root.billing-selected-subscription-plan-index;
+                checkout-status-text: root.billing-checkout-status-text;
                 redeem-requested => { root.redeem-requested(); }
+                billing-recharge-requested => { root.billing-recharge-requested(); }
+                billing-subscription-requested => { root.billing-subscription-requested(); }
+                billing-open-last-payment-requested => { root.billing-open-last-payment-requested(); }
+                billing-refresh-requested => { root.billing-refresh-requested(); }
             }
         }
 
@@ -349,7 +378,13 @@ export component AppWindow inherits Window {
                 x: 0px; y: 0px;
                 width: parent.width;
                 height: parent.height;
+                desktop-available: root.desktop-available;
+                cli-available: root.cli-available;
+                launch-status-text: root.launch-status-text;
                 manual-update-check-requested => { root.manual-update-check-requested(); }
+                refresh-installations-requested => { root.refresh-installations-requested(); }
+                launch-official-desktop-requested => { root.launch-desktop-requested(); }
+                launch-official-cli-requested => { root.launch-cli-requested(); }
             }
         }
 

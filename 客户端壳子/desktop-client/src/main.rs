@@ -3,6 +3,7 @@ slint::include_modules!();
 use slint::{ModelRc, SharedString, VecModel};
 use std::{
     cell::RefCell,
+    path::PathBuf,
     rc::Rc,
     sync::{Arc, Mutex},
     thread,
@@ -24,7 +25,10 @@ use sub2api_desktop::{
         },
         groups::{fetch_available_groups_blocking, GroupPlatform, GroupSummary},
         http::ApiClient,
-        payment::{fetch_my_orders_blocking, PaymentOrder},
+        payment::{
+            create_order_blocking, fetch_checkout_info_blocking, fetch_my_orders_blocking,
+            fetch_order_blocking, CheckoutInfo, CreateOrderRequest, PaymentOrder, SubscriptionPlan,
+        },
         redeem::{
             fetch_redeem_history_blocking, redeem_code_blocking, RedeemCodeRequest,
             RedeemHistoryItem,
@@ -77,6 +81,14 @@ type SharedGroups = Arc<Mutex<Vec<GroupSummary>>>;
 type SharedSubscriptionSummary = Arc<Mutex<Option<SubscriptionSummary>>>;
 type SharedRedeemHistory = Arc<Mutex<Vec<RedeemHistoryItem>>>;
 type SharedOrders = Arc<Mutex<Vec<PaymentOrder>>>;
+type SharedCheckoutInfo = Arc<Mutex<Option<CheckoutInfo>>>;
+type SharedPendingPayment = Arc<Mutex<Option<PendingPaymentState>>>;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PendingPaymentState {
+    order_id: i64,
+    open_target: String,
+}
 
 fn main() -> anyhow::Result<()> {
     let startup_diagnostics = StartupDiagnostics::initialize();
@@ -103,6 +115,8 @@ fn main() -> anyhow::Result<()> {
     let subscription_summary: SharedSubscriptionSummary = Arc::new(Mutex::new(None));
     let redeem_history: SharedRedeemHistory = Arc::new(Mutex::new(Vec::new()));
     let recent_orders: SharedOrders = Arc::new(Mutex::new(Vec::new()));
+    let checkout_info: SharedCheckoutInfo = Arc::new(Mutex::new(None));
+    let pending_payment: SharedPendingPayment = Arc::new(Mutex::new(None));
 
     apply_launch_state(&app, &targets.borrow());
     apply_logged_out_state(&app);
@@ -133,6 +147,8 @@ fn main() -> anyhow::Result<()> {
         Arc::clone(&subscription_summary),
         Arc::clone(&redeem_history),
         Arc::clone(&recent_orders),
+        Arc::clone(&checkout_info),
+        Arc::clone(&pending_payment),
     );
     wire_billing_callbacks(
         &app,
@@ -142,6 +158,8 @@ fn main() -> anyhow::Result<()> {
         Arc::clone(&subscription_summary),
         Arc::clone(&redeem_history),
         Arc::clone(&recent_orders),
+        Arc::clone(&checkout_info),
+        Arc::clone(&pending_payment),
     );
     wire_update_callbacks(&app, Arc::clone(&config));
     restore_saved_session(
@@ -155,6 +173,8 @@ fn main() -> anyhow::Result<()> {
         Arc::clone(&subscription_summary),
         Arc::clone(&redeem_history),
         Arc::clone(&recent_orders),
+        Arc::clone(&checkout_info),
+        Arc::clone(&pending_payment),
     );
 
     startup_diagnostics.log(format!(
@@ -467,6 +487,8 @@ fn wire_auth_callbacks(
     subscription_summary: SharedSubscriptionSummary,
     redeem_history: SharedRedeemHistory,
     recent_orders: SharedOrders,
+    checkout_info: SharedCheckoutInfo,
+    pending_payment: SharedPendingPayment,
 ) {
     let login_app = app.as_weak();
     let login_config = Arc::clone(&config);
@@ -478,6 +500,8 @@ fn wire_auth_callbacks(
     let login_summary = Arc::clone(&subscription_summary);
     let login_history = Arc::clone(&redeem_history);
     let login_orders = Arc::clone(&recent_orders);
+    let login_checkout = Arc::clone(&checkout_info);
+    let login_pending_payment = Arc::clone(&pending_payment);
     app.on_login_requested(move || {
         let Some(app) = login_app.upgrade() else {
             return;
@@ -521,6 +545,8 @@ fn wire_auth_callbacks(
         let subscription_summary = Arc::clone(&login_summary);
         let redeem_history = Arc::clone(&login_history);
         let recent_orders = Arc::clone(&login_orders);
+        let checkout_info = Arc::clone(&login_checkout);
+        let pending_payment = Arc::clone(&login_pending_payment);
         thread::spawn(move || {
             let client = ApiClient::new(config.api_base_url.clone());
             let result = match submission {
@@ -551,12 +577,15 @@ fn wire_auth_callbacks(
                         &subscription_summary,
                         &redeem_history,
                         &recent_orders,
+                        &checkout_info,
+                        &pending_payment,
                         email,
                         auth,
                     );
                     let groups_snapshot = current_groups_snapshot(&available_groups);
                     let billing_vm =
-                        current_billing_vm(&subscription_summary, &recent_orders, &redeem_history);
+                        current_billing_vm(&auth_session, &subscription_summary, &recent_orders, &redeem_history);
+                    let checkout_snapshot = current_checkout_snapshot(&checkout_info);
                     let group_count = Some(groups_snapshot.len());
                     let _ = ui_handle.upgrade_in_event_loop(move |app| {
                         if let Some(session) =
@@ -565,6 +594,7 @@ fn wire_auth_callbacks(
                             apply_authenticated_state(&app, &session, group_count);
                             apply_available_groups_state(&app, &groups_snapshot);
                             apply_billing_state(&app, &billing_vm);
+                            apply_checkout_state(&app, checkout_snapshot.as_ref());
                         }
                     });
                 }
@@ -605,6 +635,8 @@ fn wire_auth_callbacks(
     let register_summary = Arc::clone(&subscription_summary);
     let register_history = Arc::clone(&redeem_history);
     let register_orders = Arc::clone(&recent_orders);
+    let register_checkout = Arc::clone(&checkout_info);
+    let register_pending_payment = Arc::clone(&pending_payment);
     app.on_register_requested(move || {
         let Some(app) = register_app.upgrade() else {
             return;
@@ -638,6 +670,8 @@ fn wire_auth_callbacks(
         let subscription_summary = Arc::clone(&register_summary);
         let redeem_history = Arc::clone(&register_history);
         let recent_orders = Arc::clone(&register_orders);
+        let checkout_info = Arc::clone(&register_checkout);
+        let pending_payment = Arc::clone(&register_pending_payment);
         thread::spawn(move || {
             let client = ApiClient::new(config.api_base_url.clone());
             let request = RegisterRequest::new(email.trim(), password)
@@ -655,12 +689,15 @@ fn wire_auth_callbacks(
                         &subscription_summary,
                         &redeem_history,
                         &recent_orders,
+                        &checkout_info,
+                        &pending_payment,
                         email,
                         auth,
                     );
                     let groups_snapshot = current_groups_snapshot(&available_groups);
                     let billing_vm =
-                        current_billing_vm(&subscription_summary, &recent_orders, &redeem_history);
+                        current_billing_vm(&auth_session, &subscription_summary, &recent_orders, &redeem_history);
+                    let checkout_snapshot = current_checkout_snapshot(&checkout_info);
                     let group_count = Some(groups_snapshot.len());
                     let _ = ui_handle.upgrade_in_event_loop(move |app| {
                         if let Some(session) =
@@ -669,6 +706,7 @@ fn wire_auth_callbacks(
                             apply_authenticated_state(&app, &session, group_count);
                             apply_available_groups_state(&app, &groups_snapshot);
                             apply_billing_state(&app, &billing_vm);
+                            apply_checkout_state(&app, checkout_snapshot.as_ref());
                             app.set_auth_status_text(SharedString::from(
                                 "注册成功，已自动登录当前账户。",
                             ));
@@ -816,6 +854,8 @@ fn wire_billing_callbacks(
     subscription_summary: SharedSubscriptionSummary,
     redeem_history: SharedRedeemHistory,
     recent_orders: SharedOrders,
+    checkout_info: SharedCheckoutInfo,
+    pending_payment: SharedPendingPayment,
 ) {
     let redeem_app = app.as_weak();
     let redeem_config = Arc::clone(&config);
@@ -824,6 +864,7 @@ fn wire_billing_callbacks(
     let redeem_summary = Arc::clone(&subscription_summary);
     let redeem_history_store = Arc::clone(&redeem_history);
     let redeem_orders = Arc::clone(&recent_orders);
+    let redeem_checkout = Arc::clone(&checkout_info);
     app.on_redeem_requested(move || {
         let Some(app) = redeem_app.upgrade() else {
             return;
@@ -842,6 +883,7 @@ fn wire_billing_callbacks(
         let subscription_summary = Arc::clone(&redeem_summary);
         let redeem_history_store = Arc::clone(&redeem_history_store);
         let recent_orders = Arc::clone(&redeem_orders);
+        let checkout_info = Arc::clone(&redeem_checkout);
         thread::spawn(move || {
             let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) else {
                 let _ = ui_handle.upgrade_in_event_loop(move |app| {
@@ -857,11 +899,14 @@ fn wire_billing_callbacks(
                     let updated_user = fetch_current_user_blocking(&client).ok();
                     let (group_count, groups_snapshot, billing_vm) = sync_user_side_state(
                         &client,
+                        &auth_session,
                         &available_groups,
                         &subscription_summary,
                         &recent_orders,
                         &redeem_history_store,
+                        &checkout_info,
                     );
+                    let checkout_snapshot = current_checkout_snapshot(&checkout_info);
 
                     if let Some(user) = updated_user {
                         if let Ok(mut state) = auth_session.lock() {
@@ -881,6 +926,7 @@ fn wire_billing_callbacks(
                         }
                         apply_available_groups_state(&app, &groups_snapshot);
                         apply_billing_state(&app, &billing_vm);
+                        apply_checkout_state(&app, checkout_snapshot.as_ref());
                         app.set_redeem_status_text(SharedString::from(status_message));
                         app.set_redeem_code(SharedString::from(""));
                     });
@@ -891,6 +937,325 @@ fn wire_billing_callbacks(
                     });
                 }
             }
+        });
+    });
+
+    let recharge_app = app.as_weak();
+    let recharge_config = Arc::clone(&config);
+    let recharge_session = Arc::clone(&auth_session);
+    let recharge_summary = Arc::clone(&subscription_summary);
+    let recharge_history = Arc::clone(&redeem_history);
+    let recharge_orders = Arc::clone(&recent_orders);
+    let recharge_groups = Arc::clone(&available_groups);
+    let recharge_checkout = Arc::clone(&checkout_info);
+    let recharge_pending = Arc::clone(&pending_payment);
+    app.on_billing_recharge_requested(move || {
+        let Some(app) = recharge_app.upgrade() else {
+            return;
+        };
+        let amount_text = app.get_billing_recharge_amount().to_string();
+        let amount = amount_text.trim().parse::<f64>().unwrap_or(0.0);
+        if amount <= 0.0 {
+            app.set_billing_checkout_status_text(SharedString::from("请输入有效的充值金额。"));
+            return;
+        }
+        app.set_billing_checkout_status_text(SharedString::from("正在创建充值订单..."));
+
+        let ui_handle = recharge_app.clone();
+        let config = Arc::clone(&recharge_config);
+        let auth_session = Arc::clone(&recharge_session);
+        let subscription_summary = Arc::clone(&recharge_summary);
+        let redeem_history = Arc::clone(&recharge_history);
+        let recent_orders = Arc::clone(&recharge_orders);
+        let available_groups = Arc::clone(&recharge_groups);
+        let checkout_info = Arc::clone(&recharge_checkout);
+        let pending_payment = Arc::clone(&recharge_pending);
+        let selected_method_index = app.get_billing_selected_payment_method_index() as usize;
+        thread::spawn(move || {
+            let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) else {
+                let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                    app.set_billing_checkout_status_text(SharedString::from("请先登录后再创建充值订单。"))
+                });
+                return;
+            };
+            let checkout_snapshot = current_checkout_snapshot(&checkout_info);
+            let Some(checkout) = checkout_snapshot.as_ref() else {
+                let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                    app.set_billing_checkout_status_text(SharedString::from("当前支付配置尚未加载，请先刷新计费数据。"))
+                });
+                return;
+            };
+            let payment_keys = ordered_payment_method_keys(checkout);
+            let Some(payment_type) = payment_keys.get(selected_method_index) else {
+                let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                    app.set_billing_checkout_status_text(SharedString::from("请选择可用支付方式。"))
+                });
+                return;
+            };
+
+            let client = ApiClient::new(config.api_base_url.clone())
+                .with_access_token(Some(session.access_token));
+            let request = CreateOrderRequest {
+                amount,
+                payment_type: payment_type.clone(),
+                order_type: "balance".to_string(),
+                plan_id: None,
+            };
+            match create_order_blocking(&client, &request) {
+                Ok(result) => {
+                    let open_target = match create_payment_open_target(&result, &request) {
+                        Ok(target) => target,
+                        Err(error) => {
+                            let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                                app.set_billing_checkout_status_text(SharedString::from(format!(
+                                    "订单已创建，但生成支付入口失败：{error}"
+                                )))
+                            });
+                            return;
+                        }
+                    };
+                    let _ = open_external_target(&open_target);
+                    if let Ok(mut state) = pending_payment.lock() {
+                        *state = Some(PendingPaymentState {
+                            order_id: result.order_id,
+                            open_target: open_target.clone(),
+                        });
+                    }
+                    let (_, groups_snapshot, billing_vm) = sync_user_side_state(
+                        &client,
+                        &auth_session,
+                        &available_groups,
+                        &subscription_summary,
+                        &recent_orders,
+                        &redeem_history,
+                        &checkout_info,
+                    );
+                    let checkout_snapshot = current_checkout_snapshot(&checkout_info);
+                    let message = format!(
+                        "充值订单 #{} 已创建，已为你打开支付入口；可在桌面端继续刷新订单状态。",
+                        result.order_id
+                    );
+                    let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                        apply_available_groups_state(&app, &groups_snapshot);
+                        apply_billing_state(&app, &billing_vm);
+                        apply_checkout_state(&app, checkout_snapshot.as_ref());
+                        app.set_billing_checkout_status_text(SharedString::from(message));
+                        app.set_billing_recharge_amount(SharedString::from(""));
+                    });
+                }
+                Err(error) => {
+                    let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                        app.set_billing_checkout_status_text(SharedString::from(format!(
+                            "创建充值订单失败：{error}"
+                        )))
+                    });
+                }
+            }
+        });
+    });
+
+    let subscribe_app = app.as_weak();
+    let subscribe_config = Arc::clone(&config);
+    let subscribe_session = Arc::clone(&auth_session);
+    let subscribe_summary = Arc::clone(&subscription_summary);
+    let subscribe_history = Arc::clone(&redeem_history);
+    let subscribe_orders = Arc::clone(&recent_orders);
+    let subscribe_groups = Arc::clone(&available_groups);
+    let subscribe_checkout = Arc::clone(&checkout_info);
+    let subscribe_pending = Arc::clone(&pending_payment);
+    app.on_billing_subscription_requested(move || {
+        let Some(app) = subscribe_app.upgrade() else {
+            return;
+        };
+        app.set_billing_checkout_status_text(SharedString::from("正在创建订阅订单..."));
+
+        let ui_handle = subscribe_app.clone();
+        let config = Arc::clone(&subscribe_config);
+        let auth_session = Arc::clone(&subscribe_session);
+        let subscription_summary = Arc::clone(&subscribe_summary);
+        let redeem_history = Arc::clone(&subscribe_history);
+        let recent_orders = Arc::clone(&subscribe_orders);
+        let available_groups = Arc::clone(&subscribe_groups);
+        let checkout_info = Arc::clone(&subscribe_checkout);
+        let pending_payment = Arc::clone(&subscribe_pending);
+        let selected_method_index = app.get_billing_selected_payment_method_index() as usize;
+        let selected_plan_index = app.get_billing_selected_subscription_plan_index() as usize;
+        thread::spawn(move || {
+            let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) else {
+                let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                    app.set_billing_checkout_status_text(SharedString::from("请先登录后再创建订阅订单。"))
+                });
+                return;
+            };
+            let checkout_snapshot = current_checkout_snapshot(&checkout_info);
+            let Some(checkout) = checkout_snapshot.as_ref() else {
+                let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                    app.set_billing_checkout_status_text(SharedString::from("当前支付配置尚未加载，请先刷新计费数据。"))
+                });
+                return;
+            };
+            let payment_keys = ordered_payment_method_keys(checkout);
+            let Some(payment_type) = payment_keys.get(selected_method_index) else {
+                let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                    app.set_billing_checkout_status_text(SharedString::from("请选择可用支付方式。"))
+                });
+                return;
+            };
+            let plans = ordered_subscription_plans(checkout);
+            let Some(plan) = plans.get(selected_plan_index) else {
+                let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                    app.set_billing_checkout_status_text(SharedString::from("请选择可购买套餐。"))
+                });
+                return;
+            };
+
+            let client = ApiClient::new(config.api_base_url.clone())
+                .with_access_token(Some(session.access_token));
+            let request = CreateOrderRequest {
+                amount: plan.price,
+                payment_type: payment_type.clone(),
+                order_type: "subscription".to_string(),
+                plan_id: Some(plan.id),
+            };
+            match create_order_blocking(&client, &request) {
+                Ok(result) => {
+                    let open_target = match create_payment_open_target(&result, &request) {
+                        Ok(target) => target,
+                        Err(error) => {
+                            let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                                app.set_billing_checkout_status_text(SharedString::from(format!(
+                                    "订阅订单已创建，但生成支付入口失败：{error}"
+                                )))
+                            });
+                            return;
+                        }
+                    };
+                    let _ = open_external_target(&open_target);
+                    if let Ok(mut state) = pending_payment.lock() {
+                        *state = Some(PendingPaymentState {
+                            order_id: result.order_id,
+                            open_target: open_target.clone(),
+                        });
+                    }
+                    let (_, groups_snapshot, billing_vm) = sync_user_side_state(
+                        &client,
+                        &auth_session,
+                        &available_groups,
+                        &subscription_summary,
+                        &recent_orders,
+                        &redeem_history,
+                        &checkout_info,
+                    );
+                    let checkout_snapshot = current_checkout_snapshot(&checkout_info);
+                    let message = format!(
+                        "订阅订单 #{}（{}）已创建，已打开支付入口。",
+                        result.order_id, plan.name
+                    );
+                    let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                        apply_available_groups_state(&app, &groups_snapshot);
+                        apply_billing_state(&app, &billing_vm);
+                        apply_checkout_state(&app, checkout_snapshot.as_ref());
+                        app.set_billing_checkout_status_text(SharedString::from(message));
+                    });
+                }
+                Err(error) => {
+                    let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                        app.set_billing_checkout_status_text(SharedString::from(format!(
+                            "创建订阅订单失败：{error}"
+                        )))
+                    });
+                }
+            }
+        });
+    });
+
+    let reopen_payment_app = app.as_weak();
+    let reopen_pending_payment = Arc::clone(&pending_payment);
+    app.on_billing_open_last_payment_requested(move || {
+        let Some(app) = reopen_payment_app.upgrade() else {
+            return;
+        };
+        let Some(pending) = reopen_pending_payment.lock().ok().and_then(|state| state.clone()) else {
+            app.set_billing_checkout_status_text(SharedString::from("当前没有可重新打开的待支付订单。"));
+            return;
+        };
+        match open_external_target(&pending.open_target) {
+            Ok(()) => app.set_billing_checkout_status_text(SharedString::from(format!(
+                "已重新打开订单 #{} 的支付入口。",
+                pending.order_id
+            ))),
+            Err(error) => app.set_billing_checkout_status_text(SharedString::from(format!(
+                "重新打开支付入口失败：{error}"
+            ))),
+        }
+    });
+
+    let refresh_billing_app = app.as_weak();
+    let refresh_billing_config = Arc::clone(&config);
+    let refresh_billing_session = Arc::clone(&auth_session);
+    let refresh_billing_groups = Arc::clone(&available_groups);
+    let refresh_billing_summary = Arc::clone(&subscription_summary);
+    let refresh_billing_history = Arc::clone(&redeem_history);
+    let refresh_billing_orders = Arc::clone(&recent_orders);
+    let refresh_billing_checkout = Arc::clone(&checkout_info);
+    let refresh_billing_pending = Arc::clone(&pending_payment);
+    app.on_billing_refresh_requested(move || {
+        let Some(app) = refresh_billing_app.upgrade() else {
+            return;
+        };
+        app.set_billing_checkout_status_text(SharedString::from("正在刷新计费数据..."));
+
+        let ui_handle = refresh_billing_app.clone();
+        let config = Arc::clone(&refresh_billing_config);
+        let auth_session = Arc::clone(&refresh_billing_session);
+        let available_groups = Arc::clone(&refresh_billing_groups);
+        let subscription_summary = Arc::clone(&refresh_billing_summary);
+        let redeem_history = Arc::clone(&refresh_billing_history);
+        let recent_orders = Arc::clone(&refresh_billing_orders);
+        let checkout_info = Arc::clone(&refresh_billing_checkout);
+        let pending_payment = Arc::clone(&refresh_billing_pending);
+        thread::spawn(move || {
+            let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) else {
+                let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                    apply_checkout_state(&app, None);
+                    app.set_billing_checkout_status_text(SharedString::from("请先登录后再刷新计费数据。"))
+                });
+                return;
+            };
+            let client = ApiClient::new(config.api_base_url.clone())
+                .with_access_token(Some(session.access_token));
+
+            let pending_order_status = pending_payment
+                .lock()
+                .ok()
+                .and_then(|state| state.clone())
+                .and_then(|pending| {
+                    fetch_order_blocking(&client, pending.order_id)
+                        .ok()
+                        .map(|order| format!("最近订单 #{} 当前状态：{}", pending.order_id, order.status))
+                });
+
+            let (group_count, groups_snapshot, billing_vm) = sync_user_side_state(
+                &client,
+                &auth_session,
+                &available_groups,
+                &subscription_summary,
+                &recent_orders,
+                &redeem_history,
+                &checkout_info,
+            );
+            let checkout_snapshot = current_checkout_snapshot(&checkout_info);
+            let status_message = pending_order_status
+                .unwrap_or_else(|| "计费数据已刷新，可继续创建或追踪订单。".to_string());
+            let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                if let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) {
+                    apply_authenticated_state(&app, &session, group_count);
+                }
+                apply_available_groups_state(&app, &groups_snapshot);
+                apply_billing_state(&app, &billing_vm);
+                apply_checkout_state(&app, checkout_snapshot.as_ref());
+                app.set_billing_checkout_status_text(SharedString::from(status_message));
+            });
         });
     });
 }
@@ -906,6 +1271,8 @@ fn restore_saved_session(
     subscription_summary: SharedSubscriptionSummary,
     redeem_history: SharedRedeemHistory,
     recent_orders: SharedOrders,
+    checkout_info: SharedCheckoutInfo,
+    pending_payment: SharedPendingPayment,
 ) {
     let app_handle = app.as_weak();
     if let Some(message) = config.packaged_local_debug_api_message() {
@@ -941,19 +1308,26 @@ fn restore_saved_session(
                                 if let Ok(mut pending) = pending_totp_token.lock() {
                                     *pending = None;
                                 }
+                                if let Ok(mut pending) = pending_payment.lock() {
+                                    *pending = None;
+                                }
 
                                 let (group_count, groups_snapshot, billing_vm) =
                                     sync_user_side_state(
                                         &user_client,
+                                        &auth_session,
                                         &available_groups,
                                         &subscription_summary,
                                         &recent_orders,
                                         &redeem_history,
+                                        &checkout_info,
                                     );
+                                let checkout_snapshot = current_checkout_snapshot(&checkout_info);
                                 let _ = app_handle.upgrade_in_event_loop(move |app| {
                                     apply_authenticated_state(&app, &session, group_count);
                                     apply_available_groups_state(&app, &groups_snapshot);
                                     apply_billing_state(&app, &billing_vm);
+                                    apply_checkout_state(&app, checkout_snapshot.as_ref());
                                     app.set_auth_status_text(SharedString::from(
                                         "已恢复上次登录状态。",
                                     ));
@@ -1001,6 +1375,8 @@ fn handle_auth_success(
     subscription_summary: &SharedSubscriptionSummary,
     redeem_history: &SharedRedeemHistory,
     recent_orders: &SharedOrders,
+    checkout_info: &SharedCheckoutInfo,
+    pending_payment: &SharedPendingPayment,
     email: String,
     auth: AuthResponse,
 ) {
@@ -1028,12 +1404,17 @@ fn handle_auth_success(
 
     let client =
         ApiClient::new(config.api_base_url.clone()).with_access_token(Some(session.access_token));
+    if let Ok(mut state) = pending_payment.lock() {
+        *state = None;
+    }
     let _ = sync_user_side_state(
         &client,
+        auth_session,
         available_groups,
         subscription_summary,
         recent_orders,
         redeem_history,
+        checkout_info,
     );
 }
 
@@ -1215,15 +1596,18 @@ fn authenticated_client(
 
 fn sync_user_side_state(
     client: &ApiClient,
+    auth_session: &SharedAuthSession,
     available_groups: &SharedGroups,
     subscription_summary: &SharedSubscriptionSummary,
     recent_orders: &SharedOrders,
     redeem_history: &SharedRedeemHistory,
+    checkout_info: &SharedCheckoutInfo,
 ) -> (Option<usize>, Vec<GroupSummary>, BillingViewModel) {
     let group_count = refresh_available_groups_state(client, available_groups);
     refresh_billing_state(client, subscription_summary, recent_orders, redeem_history);
+    refresh_checkout_info_state(client, checkout_info);
     let groups_snapshot = current_groups_snapshot(available_groups);
-    let billing_vm = current_billing_vm(subscription_summary, recent_orders, redeem_history);
+    let billing_vm = current_billing_vm(auth_session, subscription_summary, recent_orders, redeem_history);
     (group_count, groups_snapshot, billing_vm)
 }
 
@@ -1266,6 +1650,14 @@ fn refresh_billing_state(
     }
 }
 
+fn refresh_checkout_info_state(client: &ApiClient, checkout_info: &SharedCheckoutInfo) {
+    if let Ok(checkout) = fetch_checkout_info_blocking(client) {
+        if let Ok(mut state) = checkout_info.lock() {
+            *state = Some(checkout);
+        }
+    }
+}
+
 fn current_groups_snapshot(available_groups: &SharedGroups) -> Vec<GroupSummary> {
     available_groups
         .lock()
@@ -1286,11 +1678,23 @@ fn platform_launch_groups(groups: &[GroupSummary]) -> Vec<GroupSummary> {
         .collect()
 }
 
+fn current_checkout_snapshot(checkout_info: &SharedCheckoutInfo) -> Option<CheckoutInfo> {
+    checkout_info
+        .lock()
+        .ok()
+        .and_then(|state| state.clone())
+}
+
 fn current_billing_vm(
+    auth_session: &SharedAuthSession,
     subscription_summary: &SharedSubscriptionSummary,
     recent_orders: &SharedOrders,
     redeem_history: &SharedRedeemHistory,
 ) -> BillingViewModel {
+    let user = auth_session
+        .lock()
+        .ok()
+        .and_then(|state| state.as_ref().map(|session| session.user.clone()));
     let summary = subscription_summary
         .lock()
         .ok()
@@ -1305,7 +1709,7 @@ fn current_billing_vm(
         .ok()
         .map(|state| state.clone())
         .unwrap_or_default();
-    BillingViewModel::from_summary_and_history(summary.as_ref(), &orders, &history)
+    BillingViewModel::from_account_state(user.as_ref(), summary.as_ref(), &orders, &history)
 }
 
 fn apply_launch_state(app: &AppWindow, targets: &[InstalledTarget]) {
@@ -1325,9 +1729,14 @@ fn apply_logged_out_state(app: &AppWindow) {
     app.set_dashboard_balance_text(SharedString::from("余额：--"));
     app.set_dashboard_usage_text(SharedString::from("并发额度：--"));
     app.set_dashboard_account_status_text(SharedString::from("账户状态：待登录"));
+    app.set_dashboard_notice_text(SharedString::from(
+        "登录后可直接查看余额、套餐、订单与兑换记录，并在需要时切换到官方模式。",
+    ));
     app.set_launch_group_options(single_option_model("登录后加载可用分组"));
     app.set_launch_selected_group_index(0);
     apply_billing_state(app, &BillingViewModel::empty());
+    apply_checkout_state(app, None);
+    app.set_billing_checkout_status_text(SharedString::from("登录后可创建充值或订阅订单。"));
 }
 
 fn apply_authenticated_state(app: &AppWindow, session: &AuthSession, group_count: Option<usize>) {
@@ -1578,17 +1987,7 @@ fn announcement_kind_label(kind: &str) -> &'static str {
 }
 
 fn open_update_download_url(url: &str) -> anyhow::Result<()> {
-    #[cfg(target_os = "windows")]
-    {
-        std::process::Command::new("explorer.exe").arg(url).spawn()?;
-        return Ok(());
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = url;
-        Err(anyhow::anyhow!("当前平台暂未实现更新下载跳转"))
-    }
+    open_external_target(url)
 }
 
 fn apply_available_groups_state(app: &AppWindow, groups: &[GroupSummary]) {
@@ -1608,12 +2007,23 @@ fn apply_available_groups_state(app: &AppWindow, groups: &[GroupSummary]) {
 }
 
 fn apply_billing_state(app: &AppWindow, billing: &BillingViewModel) {
+    app.set_billing_plan_title(SharedString::from(billing.plan_title.clone()));
+    app.set_billing_balance_headline(SharedString::from(billing.balance_headline.clone()));
+    app.set_billing_usage_caption(SharedString::from(billing.usage_caption.clone()));
     app.set_subscription_summary_text(SharedString::from(
         billing.subscription_summary_text.clone(),
     ));
     app.set_subscription_lines(string_model(
         billing
             .subscription_lines
+            .iter()
+            .cloned()
+            .map(SharedString::from)
+            .collect(),
+    ));
+    app.set_subscription_detail_lines(string_model(
+        billing
+            .subscription_detail_lines
             .iter()
             .cloned()
             .map(SharedString::from)
@@ -1627,6 +2037,14 @@ fn apply_billing_state(app: &AppWindow, billing: &BillingViewModel) {
             .map(SharedString::from)
             .collect(),
     ));
+    app.set_order_detail_lines(string_model(
+        billing
+            .order_detail_lines
+            .iter()
+            .cloned()
+            .map(SharedString::from)
+            .collect(),
+    ));
     app.set_redeem_history_lines(string_model(
         billing
             .redeem_history_lines
@@ -1635,6 +2053,241 @@ fn apply_billing_state(app: &AppWindow, billing: &BillingViewModel) {
             .map(SharedString::from)
             .collect(),
     ));
+}
+
+fn apply_checkout_state(app: &AppWindow, checkout: Option<&CheckoutInfo>) {
+    let payment_methods = checkout
+        .map(ordered_payment_method_labels)
+        .filter(|items| !items.is_empty())
+        .unwrap_or_else(|| vec!["暂无可用支付方式".to_string()]);
+    app.set_billing_payment_method_options(string_model(
+        payment_methods
+            .into_iter()
+            .map(SharedString::from)
+            .collect(),
+    ));
+    app.set_billing_selected_payment_method_index(0);
+
+    let subscription_plans = checkout
+        .map(ordered_subscription_plan_labels)
+        .filter(|items| !items.is_empty())
+        .unwrap_or_else(|| vec!["暂无可用套餐".to_string()]);
+    app.set_billing_subscription_plan_options(string_model(
+        subscription_plans
+            .into_iter()
+            .map(SharedString::from)
+            .collect(),
+    ));
+    app.set_billing_selected_subscription_plan_index(0);
+}
+
+fn ordered_payment_method_keys(checkout: &CheckoutInfo) -> Vec<String> {
+    const PREFERRED_ORDER: [&str; 6] = [
+        "alipay_direct",
+        "alipay",
+        "wxpay_direct",
+        "wxpay",
+        "stripe",
+        "easypay",
+    ];
+    let mut keys = checkout
+        .methods
+        .iter()
+        .filter(|(_, limit)| limit.available)
+        .map(|(key, _)| key.clone())
+        .collect::<Vec<_>>();
+    keys.sort_by_key(|key| {
+        PREFERRED_ORDER
+            .iter()
+            .position(|candidate| *candidate == key)
+            .unwrap_or(PREFERRED_ORDER.len())
+    });
+    keys
+}
+
+fn ordered_payment_method_labels(checkout: &CheckoutInfo) -> Vec<String> {
+    ordered_payment_method_keys(checkout)
+        .into_iter()
+        .map(|key| {
+            let limit = checkout.methods.get(&key);
+            let fee = limit.map(|item| item.fee_rate).unwrap_or_default();
+            let title = match key.as_str() {
+                "alipay" => "支付宝",
+                "alipay_direct" => "支付宝直连",
+                "wxpay" => "微信支付",
+                "wxpay_direct" => "微信直连",
+                "stripe" => "Stripe",
+                "easypay" => "易支付",
+                _ => key.as_str(),
+            };
+            if fee > 0.0 {
+                format!("{title} · 手续费 {fee:.2}%")
+            } else {
+                title.to_string()
+            }
+        })
+        .collect()
+}
+
+fn ordered_subscription_plans(checkout: &CheckoutInfo) -> Vec<SubscriptionPlan> {
+    let mut plans = checkout
+        .plans
+        .iter()
+        .filter(|plan| plan.for_sale)
+        .cloned()
+        .collect::<Vec<_>>();
+    plans.sort_by(|left, right| {
+        left.sort_order
+            .cmp(&right.sort_order)
+            .then_with(|| left.price.partial_cmp(&right.price).unwrap_or(std::cmp::Ordering::Equal))
+    });
+    plans
+}
+
+fn ordered_subscription_plan_labels(checkout: &CheckoutInfo) -> Vec<String> {
+    ordered_subscription_plans(checkout)
+        .into_iter()
+        .map(|plan| format!("{} · ￥{:.2} / {}{}", plan.name, plan.price, plan.validity_days, plan.validity_unit))
+        .collect()
+}
+
+fn create_payment_open_target(
+    result: &sub2api_desktop::api::payment::CreateOrderResult,
+    request: &CreateOrderRequest,
+) -> anyhow::Result<String> {
+    if let Some(pay_url) = result.pay_url.as_deref().filter(|url| !url.trim().is_empty()) {
+        return Ok(pay_url.to_string());
+    }
+
+    if let Some(qr_code) = result.qr_code.as_deref().filter(|code| !code.trim().is_empty()) {
+        let path = write_payment_qr_page(
+            result.order_id,
+            qr_code,
+            &request.payment_type,
+            request.order_type.as_str(),
+            result.expires_at.as_deref(),
+        )?;
+        return Ok(path.to_string_lossy().into_owned());
+    }
+
+    anyhow::bail!("后端没有返回可用的支付入口");
+}
+
+fn write_payment_qr_page(
+    order_id: i64,
+    qr_code: &str,
+    payment_type: &str,
+    order_type: &str,
+    expires_at: Option<&str>,
+) -> anyhow::Result<PathBuf> {
+    let temp_dir = std::env::temp_dir().join("sub2api-desktop-payments");
+    std::fs::create_dir_all(&temp_dir)?;
+    let file_path = temp_dir.join(format!("order-{order_id}.html"));
+    let expires_text = expires_at.unwrap_or("未返回截止时间");
+    let payment_label = match payment_type {
+        "alipay" | "alipay_direct" => "支付宝",
+        "wxpay" | "wxpay_direct" => "微信支付",
+        "stripe" => "Stripe",
+        "easypay" => "易支付",
+        _ => payment_type,
+    };
+    let title = if order_type == "subscription" {
+        "订阅支付"
+    } else {
+        "余额充值"
+    };
+    let escaped_qr = escape_html(qr_code);
+    let html = format!(
+        r#"<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{title} - 订单 #{order_id}</title>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+  <style>
+    body {{
+      font-family: "Inter", "Microsoft YaHei UI", sans-serif;
+      background: #f7f9fb;
+      color: #2c3437;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }}
+    .card {{
+      width: min(92vw, 540px);
+      background: #ffffff;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(44, 52, 55, 0.08);
+      padding: 32px;
+    }}
+    h1 {{ margin: 0 0 8px; font-size: 28px; }}
+    p {{ margin: 0 0 10px; color: #596064; }}
+    #qr {{
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 24px 0;
+    }}
+    code {{
+      display: block;
+      background: #f0f4f7;
+      border-radius: 12px;
+      padding: 12px;
+      word-break: break-all;
+      white-space: pre-wrap;
+      color: #51616b;
+    }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>{title}</h1>
+    <p>订单 #{order_id} · 支付方式：{payment_label}</p>
+    <p>请使用手机扫码完成支付，完成后回到桌面客户端点击“刷新订单”。</p>
+    <p>订单有效期：{expires_text}</p>
+    <div id="qr"></div>
+    <p>如果二维码无法显示，可使用下面的原始内容手动处理：</p>
+    <code>{escaped_qr}</code>
+  </div>
+  <script>
+    QRCode.toCanvas(document.getElementById('qr'), {qr_json}, {{
+      width: 280,
+      margin: 2,
+      errorCorrectionLevel: 'M'
+    }});
+  </script>
+</body>
+</html>"#,
+        qr_json = serde_json::to_string(qr_code)?,
+    );
+    std::fs::write(&file_path, html)?;
+    Ok(file_path)
+}
+
+fn escape_html(input: &str) -> String {
+    input
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}
+
+fn open_external_target(target: &str) -> anyhow::Result<()> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer.exe").arg(target).spawn()?;
+        return Ok(());
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = target;
+        Err(anyhow::anyhow!("当前平台暂未实现外部链接跳转"))
+    }
 }
 
 fn launch_first_target(app: &AppWindow, targets: &[InstalledTarget], kind: LaunchTarget) {

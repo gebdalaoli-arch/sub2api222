@@ -1,0 +1,395 @@
+import { Button, ComboBox, LineEdit } from "std-widgets.slint";
+
+export component BillingDetailScreen inherits Rectangle {
+    in property <string> plan-title: "暂未开通订阅";
+    in property <string> balance-headline: "¥--";
+    in property <string> usage-caption: "登录后可查看余额与订单明细。";
+    in property <string> subscription-summary-text: "暂无订阅摘要";
+    in property <[string]> subscription-lines: ["登录后可查看当前订阅额度和到期时间。"];
+    in property <[string]> subscription-detail-lines: ["暂无订阅明细。"];
+    in property <[string]> order-detail-lines: ["暂无订单明细。"];
+    in property <[string]> history-lines: ["最近兑换记录会显示在这里。"];
+    in-out property <string> redeem-code;
+    in property <string> redeem-status-text: "输入 CDK 后点击兑换。";
+    in-out property <string> recharge-amount: "";
+    in property <[string]> payment-method-options: ["暂无可用支付方式"];
+    in-out property <int> selected-payment-method-index: 0;
+    in property <[string]> subscription-plan-options: ["暂无可用套餐"];
+    in-out property <int> selected-subscription-plan-index: 0;
+    in property <string> checkout-status-text: "支付创建后会在这里显示状态。";
+
+    callback redeem-requested();
+    callback billing-recharge-requested();
+    callback billing-subscription-requested();
+    callback billing-open-last-payment-requested();
+    callback billing-refresh-requested();
+
+    background: #ffffff;
+    border-radius: 12px;
+    border-color: #dce6ef;
+    border-width: 0px;
+
+    property <length> content-width: self.width - 48px;
+    property <length> left-column-width: (root.content-width - 24px) * 0.42;
+    property <length> middle-column-width: (root.content-width - 24px) * 0.33;
+    property <length> right-column-width: root.content-width - root.left-column-width - root.middle-column-width - 24px;
+
+    Text {
+        x: 24px;
+        y: 20px;
+        text: "计费中心";
+        color: #2c3437;
+        font-size: 28px;
+        font-weight: 800;
+    }
+
+    Text {
+        x: 24px;
+        y: 56px;
+        width: parent.width - 48px;
+        text: "统一处理余额充值、套餐购买、订单追踪与兑换记录。";
+        color: #596064;
+        font-size: 13px;
+        wrap: word-wrap;
+    }
+
+    Rectangle {
+        x: 24px;
+        y: 96px;
+        width: root.content-width - 248px;
+        height: 154px;
+        background: @linear-gradient(135deg, #fafdff 0%, #eef7fc 100%);
+        border-radius: 16px;
+
+        Text {
+            x: 20px;
+            y: 18px;
+            text: "当前套餐";
+            color: #596064;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        Text {
+            x: 20px;
+            y: 40px;
+            width: parent.width - 40px;
+            text: root.plan-title;
+            color: #2c3437;
+            font-size: 26px;
+            font-weight: 800;
+            wrap: word-wrap;
+        }
+
+        Text {
+            x: 20px;
+            y: 78px;
+            width: parent.width - 40px;
+            text: root.subscription-summary-text;
+            color: #51616b;
+            font-size: 13px;
+            wrap: word-wrap;
+        }
+
+        for line[index] in root.subscription-lines : Rectangle {
+            x: 20px;
+            y: 108px + index * 14px;
+            width: parent.width - 40px;
+            height: 12px;
+            background: #ffffff;
+            border-radius: 6px;
+
+            Text {
+                x: 10px;
+                y: 0px;
+                width: parent.width - 24px;
+                text: line;
+                color: #596064;
+                font-size: 10px;
+                font-weight: 600;
+                wrap: word-wrap;
+            }
+        }
+    }
+
+    Rectangle {
+        x: 24px + root.content-width - 224px;
+        y: 96px;
+        width: 224px;
+        height: 154px;
+        background: #f0f4f7;
+        border-radius: 16px;
+
+        Text {
+            x: 18px;
+            y: 18px;
+            text: "钱包余额";
+            color: #596064;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        Text {
+            x: 18px;
+            y: 44px;
+            text: root.balance-headline;
+            color: #2c3437;
+            font-size: 32px;
+            font-weight: 800;
+        }
+
+        Text {
+            x: 18px;
+            y: 92px;
+            width: parent.width - 36px;
+            text: root.usage-caption;
+            color: #596064;
+            font-size: 12px;
+            wrap: word-wrap;
+        }
+
+        Button {
+            x: 18px;
+            y: 112px;
+            width: parent.width - 36px;
+            height: 28px;
+            text: "刷新计费数据";
+            clicked => { root.billing-refresh-requested(); }
+        }
+    }
+
+    Rectangle {
+        x: 24px;
+        y: 272px;
+        width: (root.content-width - 16px) / 2;
+        height: 164px;
+        background: #f7f9fb;
+        border-radius: 16px;
+
+        Text { x: 18px; y: 16px; text: "余额充值"; color: #2c3437; font-size: 18px; font-weight: 800; }
+        Text { x: 18px; y: 42px; width: parent.width - 36px; text: "输入金额后直接创建订单，适合企业版按量付费。"; color: #596064; font-size: 12px; wrap: word-wrap; }
+
+        LineEdit {
+            x: 18px;
+            y: 72px;
+            width: parent.width - 36px;
+            height: 40px;
+            text <=> root.recharge-amount;
+            placeholder-text: "输入充值金额，例如 99";
+        }
+
+        ComboBox {
+            x: 18px;
+            y: 120px;
+            width: parent.width - 160px;
+            height: 32px;
+            model: root.payment-method-options;
+            current-index <=> root.selected-payment-method-index;
+        }
+
+        Button {
+            x: parent.width - 126px;
+            y: 120px;
+            width: 108px;
+            height: 32px;
+            text: "创建充值订单";
+            clicked => { root.billing-recharge-requested(); }
+        }
+    }
+
+    Rectangle {
+        x: 24px + (root.content-width - 16px) / 2 + 16px;
+        y: 272px;
+        width: (root.content-width - 16px) / 2;
+        height: 164px;
+        background: #f7f9fb;
+        border-radius: 16px;
+
+        Text { x: 18px; y: 16px; text: "套餐购买"; color: #2c3437; font-size: 18px; font-weight: 800; }
+        Text { x: 18px; y: 42px; width: parent.width - 36px; text: "桌面端可直接选择套餐并创建订阅订单，后端接口未接通时先保留契约。"; color: #596064; font-size: 12px; wrap: word-wrap; }
+
+        ComboBox {
+            x: 18px;
+            y: 82px;
+            width: parent.width - 36px;
+            height: 36px;
+            model: root.subscription-plan-options;
+            current-index <=> root.selected-subscription-plan-index;
+        }
+
+        Button {
+            x: 18px;
+            y: 126px;
+            width: 128px;
+            height: 28px;
+            text: "购买/续费套餐";
+            clicked => { root.billing-subscription-requested(); }
+        }
+
+        Button {
+            x: 158px;
+            y: 126px;
+            width: 96px;
+            height: 28px;
+            text: "打开付款页";
+            clicked => { root.billing-open-last-payment-requested(); }
+        }
+
+        Button {
+            x: 266px;
+            y: 126px;
+            width: parent.width - 284px;
+            height: 28px;
+            text: "刷新订单";
+            clicked => { root.billing-refresh-requested(); }
+        }
+    }
+
+    Rectangle {
+        x: 24px;
+        y: 452px;
+        width: root.content-width;
+        height: 58px;
+        background: #ffffff;
+        border-radius: 10px;
+        border-color: #dce6ef;
+        border-width: 1px;
+
+        Text {
+            x: 16px;
+            y: 10px;
+            width: parent.width - 32px;
+            text: root.checkout-status-text;
+            color: #596064;
+            font-size: 12px;
+            wrap: word-wrap;
+        }
+    }
+
+    Rectangle {
+        x: 24px;
+        y: 526px;
+        width: root.left-column-width;
+        height: parent.height - 550px;
+        background: #eaeff2;
+        border-radius: 18px;
+
+        Text { x: 18px; y: 18px; text: "订阅明细"; color: #2c3437; font-size: 18px; font-weight: 800; }
+
+        for line[index] in root.subscription-detail-lines : Rectangle {
+            x: 18px;
+            y: 52px + index * 58px;
+            width: parent.width - 36px;
+            height: 46px;
+            background: #ffffff;
+            border-radius: 12px;
+
+            Text {
+                x: 12px;
+                y: 8px;
+                width: parent.width - 24px;
+                text: line;
+                color: #596064;
+                font-size: 11px;
+                wrap: word-wrap;
+            }
+        }
+    }
+
+    Rectangle {
+        x: 24px + root.left-column-width + 12px;
+        y: 526px;
+        width: root.middle-column-width;
+        height: parent.height - 550px;
+        background: #eaeff2;
+        border-radius: 18px;
+
+        Text { x: 18px; y: 18px; text: "订单明细"; color: #2c3437; font-size: 18px; font-weight: 800; }
+
+        for line[index] in root.order-detail-lines : Rectangle {
+            x: 18px;
+            y: 52px + index * 58px;
+            width: parent.width - 36px;
+            height: 46px;
+            background: #ffffff;
+            border-radius: 12px;
+
+            Text {
+                x: 12px;
+                y: 8px;
+                width: parent.width - 24px;
+                text: line;
+                color: #596064;
+                font-size: 11px;
+                wrap: word-wrap;
+            }
+        }
+    }
+
+    Rectangle {
+        x: 24px + root.left-column-width + root.middle-column-width + 24px;
+        y: 526px;
+        width: root.right-column-width;
+        height: parent.height - 550px;
+        background: #eaeff2;
+        border-radius: 18px;
+
+        Text { x: 18px; y: 18px; text: "兑换与恢复"; color: #2c3437; font-size: 18px; font-weight: 800; }
+
+        LineEdit {
+            x: 18px;
+            y: 52px;
+            width: parent.width - 126px;
+            height: 34px;
+            text <=> root.redeem-code;
+            placeholder-text: "输入 CDK";
+        }
+
+        Button {
+            x: parent.width - 96px;
+            y: 52px;
+            width: 78px;
+            height: 34px;
+            text: "兑换";
+            clicked => { root.redeem-requested(); }
+        }
+
+        Rectangle {
+            x: 18px;
+            y: 98px;
+            width: parent.width - 36px;
+            height: 48px;
+            background: #ffffff;
+            border-radius: 12px;
+
+            Text {
+                x: 12px;
+                y: 8px;
+                width: parent.width - 24px;
+                text: root.redeem-status-text;
+                color: #596064;
+                font-size: 11px;
+                wrap: word-wrap;
+            }
+        }
+
+        for line[index] in root.history-lines : Rectangle {
+            x: 18px;
+            y: 158px + index * 54px;
+            width: parent.width - 36px;
+            height: 42px;
+            background: #ffffff;
+            border-radius: 12px;
+
+            Text {
+                x: 12px;
+                y: 8px;
+                width: parent.width - 24px;
+                text: line;
+                color: #596064;
+                font-size: 11px;
+                wrap: word-wrap;
+            }
+        }
+    }
+}

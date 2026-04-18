@@ -12,7 +12,7 @@ impl DashboardViewModel {
         Self {
             balance_text: "余额：--".to_string(),
             usage_text: "今日用量：--".to_string(),
-            recharge_notice: "充值页面暂作为公告页，首版仅支持 CDK 兑换。".to_string(),
+            recharge_notice: "计费中心已支持余额、套餐、订单与兑换记录的统一查看。".to_string(),
         }
     }
 
@@ -21,7 +21,7 @@ impl DashboardViewModel {
             balance_text: format!("余额：¥{:.2}", user.balance),
             usage_text: format!("并发额度：{} 路", user.concurrency),
             recharge_notice:
-                "充值页面暂作为公告页，首版仅支持 CDK 兑换；余额和套餐说明以平台公告为准。"
+                "可在计费中心创建充值/订阅订单，查看套餐明细、历史订单与兑换记录。"
                     .to_string(),
         }
     }
@@ -50,7 +50,7 @@ mod tests {
 
         assert_eq!(vm.balance_text, "余额：¥20.00");
         assert_eq!(vm.usage_text, "并发额度：3 路");
-        assert!(vm.recharge_notice.contains("CDK"));
+        assert!(vm.recharge_notice.contains("充值/订阅订单"));
         assert!(!vm.recharge_notice.contains("API Key"));
     }
 }

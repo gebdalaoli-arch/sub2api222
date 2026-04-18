@@ -2,10 +2,11 @@
 pub enum Route {
     Login,
     ForgotPassword,
-    Dashboard,
+    Overview,
     Launch,
-    Redeem,
-    RechargeNotice,
+    Billing,
+    Announcements,
+    Settings,
     About,
 }
 
@@ -14,10 +15,11 @@ impl Route {
         match self {
             Self::Login => "登录",
             Self::ForgotPassword => "找回密码",
-            Self::Dashboard => "账户总览",
+            Self::Overview => "账户总览",
             Self::Launch => "启动 Codex",
-            Self::Redeem => "兑换 CDK",
-            Self::RechargeNotice => "充值说明",
+            Self::Billing => "计费中心",
+            Self::Announcements => "公告中心",
+            Self::Settings => "设置与帮助",
             Self::About => "关于",
         }
     }
