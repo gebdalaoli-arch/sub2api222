@@ -81,6 +81,10 @@ func ProvideDesktopHandler(service *service.DesktopSessionService) *DesktopHandl
 	return NewDesktopHandler(service)
 }
 
+func ProvideDesktopUpdateHandler(service *service.DesktopUpdateService) *DesktopUpdateHandler {
+	return NewDesktopUpdateHandler(service)
+}
+
 // ProvideHandlers creates the Handlers struct
 func ProvideHandlers(
 	authHandler *AuthHandler,
@@ -94,6 +98,7 @@ func ProvideHandlers(
 	gatewayHandler *GatewayHandler,
 	openaiGatewayHandler *OpenAIGatewayHandler,
 	desktopHandler *DesktopHandler,
+	desktopUpdateHandler *DesktopUpdateHandler,
 	settingHandler *SettingHandler,
 	totpHandler *TotpHandler,
 	paymentHandler *PaymentHandler,
@@ -113,6 +118,7 @@ func ProvideHandlers(
 		Gateway:        gatewayHandler,
 		OpenAIGateway:  openaiGatewayHandler,
 		Desktop:        desktopHandler,
+		DesktopUpdates: desktopUpdateHandler,
 		Setting:        settingHandler,
 		Totp:           totpHandler,
 		Payment:        paymentHandler,
@@ -133,6 +139,7 @@ var ProviderSet = wire.NewSet(
 	NewGatewayHandler,
 	NewOpenAIGatewayHandler,
 	ProvideDesktopHandler,
+	ProvideDesktopUpdateHandler,
 	NewTotpHandler,
 	ProvideSettingHandler,
 	NewPaymentHandler,

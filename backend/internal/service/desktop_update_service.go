@@ -7,16 +7,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
 
 type DesktopUpdateService struct {
 	settingRepo SettingRepository
 	rootDir     string
 }
+
+var ErrDesktopReleaseNotFound = infraerrors.NotFound("DESKTOP_RELEASE_NOT_FOUND", "desktop release not found")
 
 func NewDesktopUpdateService(settingRepo SettingRepository, rootDir string) *DesktopUpdateService {
 	return &DesktopUpdateService{
@@ -148,6 +153,55 @@ func (s *DesktopUpdateService) CheckForClient(ctx context.Context, input Desktop
 		ReleaseNotes:      latest.ReleaseNotesMarkdown,
 		AnnouncementItems: append([]DesktopAnnouncementItem(nil), latest.AnnouncementItems...),
 	}, nil
+}
+
+func (s *DesktopUpdateService) GetPublishedRelease(ctx context.Context, releaseID int64) (*DesktopReleaseRecord, error) {
+	feed, err := s.loadFeed(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range feed.Releases {
+		release := feed.Releases[i]
+		if release.ID == releaseID && release.Published {
+			return &release, nil
+		}
+	}
+	return nil, ErrDesktopReleaseNotFound
+}
+
+func (s *DesktopUpdateService) ListAnnouncements(ctx context.Context, platform, arch string) ([]DesktopAnnouncementItem, error) {
+	feed, err := s.loadFeed(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	release := latestPublishedDesktopRelease(feed.Releases, platform, arch)
+	if release == nil {
+		return []DesktopAnnouncementItem{}, nil
+	}
+	return append([]DesktopAnnouncementItem(nil), release.AnnouncementItems...), nil
+}
+
+func (s *DesktopUpdateService) ServePackage(ctx context.Context, releaseID int64) (string, string, error) {
+	release, err := s.GetPublishedRelease(ctx, releaseID)
+	if err != nil {
+		return "", "", err
+	}
+
+	path := filepath.Join(s.releasesRoot(), release.ReleaseSlug, release.FileName)
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return "", "", ErrDesktopReleaseNotFound
+		}
+		return "", "", fmt.Errorf("stat desktop release package: %w", err)
+	}
+
+	contentType := mime.TypeByExtension(filepath.Ext(release.FileName))
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	return contentType, path, nil
 }
 
 func latestPublishedDesktopRelease(releases []DesktopReleaseRecord, platform, arch string) *DesktopReleaseRecord {

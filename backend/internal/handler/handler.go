@@ -47,6 +47,7 @@ type Handlers struct {
 	Gateway        *GatewayHandler
 	OpenAIGateway  *OpenAIGatewayHandler
 	Desktop        *DesktopHandler
+	DesktopUpdates *DesktopUpdateHandler
 	Setting        *SettingHandler
 	Totp           *TotpHandler
 	Payment        *PaymentHandler
