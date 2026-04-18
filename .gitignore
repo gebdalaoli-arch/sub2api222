@@ -134,6 +134,7 @@ docs/*
 frontend/coverage/
 aicodex
 output/
+.gomodcache/
 
 
 # Rust desktop client build artifacts
