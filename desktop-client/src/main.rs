@@ -22,7 +22,7 @@ use sub2api_desktop::{
             create_desktop_session_blocking, refresh_desktop_session_blocking,
             revoke_desktop_session_blocking, DesktopSessionCreateRequest, DesktopSessionTarget,
         },
-        groups::{fetch_available_groups_blocking, GroupSummary},
+        groups::{fetch_available_groups_blocking, GroupPlatform, GroupSummary},
         http::ApiClient,
         payment::{fetch_my_orders_blocking, PaymentOrder},
         redeem::{
@@ -246,11 +246,11 @@ fn start_platform_launch(
             return;
         };
 
-        let groups = current_groups_snapshot(&available_groups);
+        let groups = platform_launch_groups(&current_groups_snapshot(&available_groups));
         let Some(group) = groups.get(selected_group_index).cloned() else {
             let _ = ui_handle.upgrade_in_event_loop(move |app| {
                 app.set_launch_status_text(SharedString::from(
-                    "当前没有可用分组，请先登录并确认订阅状态。",
+                    "当前没有可用于 Codex 的 OpenAI 分组，请先检查套餐或切换分组。",
                 ))
             });
             return;
@@ -315,11 +315,18 @@ fn start_platform_launch(
                     .and_then(|_| launch_platform(&target, &paths.codex_home));
 
                 match result {
-                    Ok(child) => {
-                        let message = format!(
-                            "已为分组“{}”创建平台代理会话，并启动 {}。",
-                            group.name, target.display_name
-                        );
+                    Ok(maybe_child) => {
+                        let message = if maybe_child.is_some() {
+                            format!(
+                                "已为分组“{}”创建平台代理会话，并启动 {}。",
+                                group.name, target.display_name
+                            )
+                        } else {
+                            format!(
+                                "已为分组“{}”创建平台代理会话，并启动 {}。当前启动方式不支持退出跟踪，会话将按超时自动回收。",
+                                group.name, target.display_name
+                            )
+                        };
                         let stop_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
                         spawn_platform_refresh_loop(
                             ui_handle.clone(),
@@ -330,16 +337,18 @@ fn start_platform_launch(
                             platform_session.refresh_after_duration(),
                             Arc::clone(&stop_flag),
                         );
-                        spawn_platform_exit_watcher(
-                            ui_handle.clone(),
-                            Arc::clone(&config),
-                            Arc::clone(&auth_session),
-                            token_store.clone(),
-                            platform_session.session_id.clone(),
-                            paths.root.clone(),
-                            stop_flag,
-                            child,
-                        );
+                        if let Some(child) = maybe_child {
+                            spawn_platform_exit_watcher(
+                                ui_handle.clone(),
+                                Arc::clone(&config),
+                                Arc::clone(&auth_session),
+                                token_store.clone(),
+                                platform_session.session_id.clone(),
+                                paths.root.clone(),
+                                stop_flag,
+                                child,
+                            );
+                        }
                         let _ = ui_handle.upgrade_in_event_loop(move |app| {
                             app.set_launch_status_text(SharedString::from(message))
                         });
@@ -1063,6 +1072,18 @@ fn current_groups_snapshot(available_groups: &SharedGroups) -> Vec<GroupSummary>
         .unwrap_or_default()
 }
 
+fn platform_launch_groups(groups: &[GroupSummary]) -> Vec<GroupSummary> {
+    groups
+        .iter()
+        .filter(|group| {
+            group.platform == GroupPlatform::OpenAI
+                && group.status.eq_ignore_ascii_case("active")
+                && !group.claude_code_only
+        })
+        .cloned()
+        .collect()
+}
+
 fn current_billing_vm(
     subscription_summary: &SharedSubscriptionSummary,
     recent_orders: &SharedOrders,
@@ -1130,13 +1151,14 @@ fn apply_authenticated_state(app: &AppWindow, session: &AuthSession, group_count
 }
 
 fn apply_available_groups_state(app: &AppWindow, groups: &[GroupSummary]) {
-    if groups.is_empty() {
-        app.set_launch_group_options(single_option_model("当前没有可用分组"));
+    let launchable_groups = platform_launch_groups(groups);
+    if launchable_groups.is_empty() {
+        app.set_launch_group_options(single_option_model("当前没有可用于 Codex 的 OpenAI 分组"));
         app.set_launch_selected_group_index(0);
         return;
     }
 
-    let labels = groups
+    let labels = launchable_groups
         .iter()
         .map(|group| SharedString::from(format!("{} · {}", group.name, group.status)))
         .collect::<Vec<_>>();
@@ -1223,4 +1245,63 @@ fn local_device_id(target_kind: LaunchTarget) -> String {
         LaunchTarget::Cli => "cli",
     };
     format!("{host}-{suffix}").to_lowercase()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::platform_launch_groups;
+    use sub2api_desktop::api::groups::{GroupPlatform, GroupSummary, SubscriptionType};
+
+    fn test_group(id: i64, name: &str, platform: GroupPlatform) -> GroupSummary {
+        GroupSummary {
+            id,
+            name: name.to_string(),
+            description: None,
+            platform,
+            rate_multiplier: 1.0,
+            is_exclusive: false,
+            status: "active".to_string(),
+            subscription_type: SubscriptionType::Standard,
+            daily_limit_usd: None,
+            weekly_limit_usd: None,
+            monthly_limit_usd: None,
+            image_price_1k: None,
+            image_price_2k: None,
+            image_price_4k: None,
+            claude_code_only: false,
+            fallback_group_id: None,
+            fallback_group_id_on_invalid_request: None,
+            require_oauth_only: false,
+            require_privacy_set: false,
+            created_at: "2025-01-02T15:04:05Z".to_string(),
+            updated_at: "2025-01-02T15:04:05Z".to_string(),
+        }
+    }
+
+    #[test]
+    fn platform_launch_groups_keep_only_active_openai_groups() {
+        let groups = vec![
+            test_group(5, "Anthropic", GroupPlatform::Anthropic),
+            test_group(6, "OpenAI", GroupPlatform::OpenAI),
+            test_group(7, "GPT", GroupPlatform::OpenAI),
+        ];
+
+        let launchable = platform_launch_groups(&groups);
+
+        assert_eq!(launchable.len(), 2);
+        assert_eq!(launchable[0].id, 6);
+        assert_eq!(launchable[1].id, 7);
+    }
+
+    #[test]
+    fn platform_launch_groups_skip_inactive_or_claude_only_entries() {
+        let mut inactive = test_group(8, "Inactive", GroupPlatform::OpenAI);
+        inactive.status = "disabled".to_string();
+        let mut claude_only = test_group(9, "ClaudeOnly", GroupPlatform::OpenAI);
+        claude_only.claude_code_only = true;
+
+        let launchable = platform_launch_groups(&[inactive, claude_only]);
+
+        assert!(launchable.is_empty());
+    }
 }
