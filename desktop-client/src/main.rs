@@ -30,13 +30,16 @@ use sub2api_desktop::{
             RedeemHistoryItem,
         },
         subscriptions::{fetch_subscription_summary_blocking, SubscriptionSummary},
+        update::check_desktop_update_blocking,
     },
     app::{
         auth_flow::{build_login_submission, should_restore_session, LoginSubmission},
         launch_errors::describe_platform_launch_error,
         view_models::{
-            billing_vm::BillingViewModel, dashboard_vm::DashboardViewModel,
+            billing_vm::BillingViewModel,
+            dashboard_vm::DashboardViewModel,
             launch_vm::LaunchViewModel,
+            update_vm::{UpdateDialogState, UpdateViewModel},
         },
     },
     config::{app_config, AppConfig},
@@ -132,7 +135,7 @@ fn main() -> anyhow::Result<()> {
         Arc::clone(&redeem_history),
         Arc::clone(&recent_orders),
     );
-    wire_update_callbacks(&app);
+    wire_update_callbacks(&app, Arc::clone(&config));
     restore_saved_session(
         &app,
         Arc::clone(&config),
@@ -1259,18 +1262,17 @@ fn apply_authenticated_state(app: &AppWindow, session: &AuthSession, group_count
     app.set_auth_status_text(SharedString::from("登录成功，可继续进入启动中心。"));
 }
 
-fn wire_update_callbacks(app: &AppWindow) {
+fn wire_update_callbacks(app: &AppWindow, config: Arc<AppConfig>) {
+    start_desktop_update_check(app.as_weak(), Arc::clone(&config), false);
+
     let manual_update_app = app.as_weak();
+    let manual_update_config = Arc::clone(&config);
     app.on_manual_update_check_requested(move || {
-        if let Some(app) = manual_update_app.upgrade() {
-            app.set_update_dialog_visible(true);
-            app.set_update_force(false);
-            app.set_update_current_version(SharedString::from("v0.1.0"));
-            app.set_update_latest_version(SharedString::from("v0.2.0"));
-            app.set_update_summary(SharedString::from(
-                "修复若干问题，并带来更稳定的一键开整体验。",
-            ));
-        }
+        start_desktop_update_check(
+            manual_update_app.clone(),
+            Arc::clone(&manual_update_config),
+            true,
+        );
     });
 
     let secondary_update_app = app.as_weak();
@@ -1286,6 +1288,66 @@ fn wire_update_callbacks(app: &AppWindow) {
             app.set_update_dialog_visible(false);
         }
     });
+}
+
+fn start_desktop_update_check(
+    app_handle: slint::Weak<AppWindow>,
+    config: Arc<AppConfig>,
+    show_dialog_on_no_update: bool,
+) {
+    thread::spawn(move || {
+        let client = ApiClient::new(config.api_base_url.clone());
+        let current_version = env!("CARGO_PKG_VERSION").to_string();
+
+        match check_desktop_update_blocking(&client, &current_version) {
+            Ok(check) if check.has_update => {
+                let summary = if check.release_notes.trim().is_empty() {
+                    check.summary.clone()
+                } else {
+                    check.release_notes.clone()
+                };
+                let vm = UpdateViewModel::available(
+                    check.current_version.clone(),
+                    check.latest_version.clone(),
+                    check.force_update,
+                    check.title.clone(),
+                    summary,
+                );
+                let _ = app_handle.upgrade_in_event_loop(move |app| {
+                    apply_update_view_model(&app, &vm);
+                });
+            }
+            Ok(_) if show_dialog_on_no_update => {
+                let _ = app_handle.upgrade_in_event_loop(move |app| {
+                    app.set_update_dialog_visible(true);
+                    app.set_update_force(false);
+                    app.set_update_current_version(SharedString::from(current_version.clone()));
+                    app.set_update_latest_version(SharedString::from(current_version.clone()));
+                    app.set_update_summary(SharedString::from("当前版本已是最新，可稍后再检查。"));
+                });
+            }
+            Ok(_) => {}
+            Err(error) if show_dialog_on_no_update => {
+                let message = format!("检查更新失败：{error}");
+                let _ = app_handle.upgrade_in_event_loop(move |app| {
+                    app.set_update_dialog_visible(true);
+                    app.set_update_force(false);
+                    app.set_update_current_version(SharedString::from(current_version.clone()));
+                    app.set_update_latest_version(SharedString::from(current_version.clone()));
+                    app.set_update_summary(SharedString::from(message.clone()));
+                });
+            }
+            Err(_) => {}
+        }
+    });
+}
+
+fn apply_update_view_model(app: &AppWindow, vm: &UpdateViewModel) {
+    app.set_update_dialog_visible(!matches!(vm.state, UpdateDialogState::Hidden));
+    app.set_update_force(vm.force_update);
+    app.set_update_current_version(SharedString::from(vm.current_version.clone()));
+    app.set_update_latest_version(SharedString::from(vm.latest_version.clone()));
+    app.set_update_summary(SharedString::from(vm.summary.clone()));
 }
 
 fn apply_available_groups_state(app: &AppWindow, groups: &[GroupSummary]) {

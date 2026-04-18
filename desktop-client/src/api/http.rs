@@ -97,6 +97,27 @@ impl ApiClient {
         decode_envelope_response(response)
     }
 
+    pub fn get_json_with_query_blocking<TResponse, TKey, TValue>(
+        &self,
+        path: &str,
+        query: &[(TKey, TValue)],
+    ) -> Result<TResponse>
+    where
+        TResponse: DeserializeOwned,
+        TKey: AsRef<str>,
+        TValue: AsRef<str>,
+    {
+        let pairs = query
+            .iter()
+            .map(|(key, value)| (key.as_ref(), value.as_ref()))
+            .collect::<Vec<_>>();
+        let response = self
+            .blocking_authorize(self.blocking_client.get(self.endpoint(path)))
+            .query(&pairs)
+            .send()?;
+        decode_envelope_response(response)
+    }
+
     pub fn post_empty_blocking<TResponse>(&self, path: &str) -> Result<TResponse>
     where
         TResponse: DeserializeOwned,

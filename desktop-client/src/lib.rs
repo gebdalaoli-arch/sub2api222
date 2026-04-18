@@ -78,8 +78,7 @@ mod tests {
     #[test]
     fn launch_and_announcement_shells_match_true_light_direction() {
         let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-        let app_window =
-            std::fs::read_to_string(manifest_dir.join("ui/app-window.slint")).unwrap();
+        let app_window = std::fs::read_to_string(manifest_dir.join("ui/app-window.slint")).unwrap();
         let launch =
             std::fs::read_to_string(manifest_dir.join("ui/screens/launch_panel.slint")).unwrap();
         let help_detail =
@@ -101,8 +100,7 @@ mod tests {
         let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
         let dialog =
             std::fs::read_to_string(manifest_dir.join("ui/screens/update_dialog.slint")).unwrap();
-        let app_window =
-            std::fs::read_to_string(manifest_dir.join("ui/app-window.slint")).unwrap();
+        let app_window = std::fs::read_to_string(manifest_dir.join("ui/app-window.slint")).unwrap();
 
         assert!(dialog.contains("发现新版本"));
         assert!(dialog.contains("立即更新"));

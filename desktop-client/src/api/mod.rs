@@ -6,3 +6,4 @@ pub mod http;
 pub mod payment;
 pub mod redeem;
 pub mod subscriptions;
+pub mod update;
