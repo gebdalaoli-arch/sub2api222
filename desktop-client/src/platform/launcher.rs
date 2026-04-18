@@ -12,11 +12,14 @@ pub struct LaunchCommandSpec {
     pub program: OsString,
     pub args: Vec<OsString>,
     pub envs: Vec<(OsString, OsString)>,
+    pub current_dir: Option<PathBuf>,
     pub tracks_child_lifecycle: bool,
 }
 
 pub const WINDOWS_STORE_DESKTOP_PLATFORM_UNSUPPORTED: &str =
     "WINDOWS_STORE_DESKTOP_PLATFORM_UNSUPPORTED";
+pub const WINDOWS_STORE_DESKTOP_ALREADY_RUNNING: &str =
+    "WINDOWS_STORE_DESKTOP_ALREADY_RUNNING";
 
 impl LaunchCommandSpec {
     pub fn direct(executable: PathBuf) -> Self {
@@ -24,14 +27,18 @@ impl LaunchCommandSpec {
             program: executable.into_os_string(),
             args: Vec::new(),
             envs: Vec::new(),
+            current_dir: None,
             tracks_child_lifecycle: true,
         }
     }
 }
 
 pub fn validate_platform_launch_target(target: &InstalledTarget) -> Result<()> {
-    if windows_store_app_id(target).is_some() {
-        anyhow::bail!(WINDOWS_STORE_DESKTOP_PLATFORM_UNSUPPORTED);
+    if is_windows_store_desktop_target(target)
+        && !cfg!(test)
+        && windows_store_desktop_is_running()
+    {
+        anyhow::bail!(WINDOWS_STORE_DESKTOP_ALREADY_RUNNING);
     }
     Ok(())
 }
@@ -42,6 +49,7 @@ pub fn official_launch_command(target: &InstalledTarget) -> LaunchCommandSpec {
             program: OsString::from("explorer.exe"),
             args: vec![OsString::from(format!(r"shell:AppsFolder\{app_id}"))],
             envs: Vec::new(),
+            current_dir: None,
             tracks_child_lifecycle: false,
         };
     }
@@ -62,6 +70,7 @@ pub fn official_launch_command(target: &InstalledTarget) -> LaunchCommandSpec {
                 executable.into_os_string(),
             ],
             envs: Vec::new(),
+            current_dir: None,
             tracks_child_lifecycle: false,
         },
         Some("ps1") => LaunchCommandSpec {
@@ -74,6 +83,7 @@ pub fn official_launch_command(target: &InstalledTarget) -> LaunchCommandSpec {
                 executable.into_os_string(),
             ],
             envs: Vec::new(),
+            current_dir: None,
             tracks_child_lifecycle: false,
         },
         _ => LaunchCommandSpec::direct(executable),
@@ -87,11 +97,18 @@ pub fn launch_official(target: &InstalledTarget) -> Result<()> {
 }
 
 pub fn platform_launch_command(target: &InstalledTarget, codex_home: &Path) -> LaunchCommandSpec {
-    let mut spec = official_launch_command(target);
+    let mut spec = if is_windows_store_desktop_target(target) {
+        LaunchCommandSpec::direct(target.executable.clone())
+    } else {
+        official_launch_command(target)
+    };
     spec.envs.push((
         OsString::from("CODEX_HOME"),
         codex_home.as_os_str().to_os_string(),
     ));
+    if is_windows_store_desktop_target(target) {
+        spec.current_dir = Some(codex_home.to_path_buf());
+    }
     spec
 }
 
@@ -106,6 +123,9 @@ fn spawn_command(spec: LaunchCommandSpec) -> Result<Option<Child>> {
     command.args(&spec.args);
     for (key, value) in spec.envs {
         command.env(key, value);
+    }
+    if let Some(current_dir) = spec.current_dir {
+        command.current_dir(current_dir);
     }
     let child = command.spawn()?;
     if spec.tracks_child_lifecycle {
@@ -140,11 +160,41 @@ fn windows_store_app_id(target: &InstalledTarget) -> Option<String> {
     Some(format!("{app_name}_{publisher_id}!App"))
 }
 
+fn is_windows_store_desktop_target(target: &InstalledTarget) -> bool {
+    windows_store_app_id(target).is_some()
+}
+
+#[cfg(windows)]
+fn windows_store_desktop_is_running() -> bool {
+    let Ok(output) = Command::new("tasklist")
+        .args(["/FI", "IMAGENAME eq Codex.exe", "/FO", "CSV", "/NH"])
+        .output()
+    else {
+        return false;
+    };
+
+    windows_tasklist_reports_codex_running(&String::from_utf8_lossy(&output.stdout))
+}
+
+#[cfg(not(windows))]
+fn windows_store_desktop_is_running() -> bool {
+    false
+}
+
+fn windows_tasklist_reports_codex_running(tasklist_stdout: &str) -> bool {
+    tasklist_stdout.lines().any(|line| {
+        let Some(first_column) = line.split(',').next() else {
+            return false;
+        };
+        first_column.trim().trim_matches('"').eq_ignore_ascii_case("Codex.exe")
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         official_launch_command, platform_launch_command, validate_platform_launch_target,
-        WINDOWS_STORE_DESKTOP_PLATFORM_UNSUPPORTED,
+        windows_tasklist_reports_codex_running,
     };
     use crate::platform::install_detection::{InstalledTarget, LaunchTarget};
     use std::path::PathBuf;
@@ -190,6 +240,32 @@ mod tests {
     }
 
     #[test]
+    fn platform_launch_for_windows_store_desktop_uses_direct_executable_with_isolated_home() {
+        let target = InstalledTarget {
+            kind: LaunchTarget::Desktop,
+            executable: PathBuf::from(
+                r"C:\Program Files\WindowsApps\OpenAI.Codex_1.0.0.0_x64__2p2nqsd0c76g0\app\Codex.exe",
+            ),
+            display_name: "Codex Desktop".to_string(),
+        };
+
+        let runtime_home = PathBuf::from(r"D:\TokenClient\runtime\platform-desktop");
+        let spec = platform_launch_command(&target, runtime_home.as_path());
+
+        assert_eq!(
+            spec.program.to_string_lossy(),
+            r"C:\Program Files\WindowsApps\OpenAI.Codex_1.0.0.0_x64__2p2nqsd0c76g0\app\Codex.exe"
+        );
+        assert!(spec.args.is_empty());
+        assert!(spec.tracks_child_lifecycle);
+        assert_eq!(spec.current_dir, Some(runtime_home.clone()));
+        assert!(spec.envs.iter().any(|(key, value)| {
+            key.to_string_lossy() == "CODEX_HOME"
+                && value.to_string_lossy() == runtime_home.to_string_lossy()
+        }));
+    }
+
+    #[test]
     fn platform_launch_injects_isolated_codex_home() {
         let target = InstalledTarget {
             kind: LaunchTarget::Cli,
@@ -230,7 +306,7 @@ mod tests {
     }
 
     #[test]
-    fn platform_launch_validation_rejects_windows_store_desktop() {
+    fn platform_launch_validation_allows_windows_store_desktop() {
         let target = InstalledTarget {
             kind: LaunchTarget::Desktop,
             executable: PathBuf::from(
@@ -239,11 +315,7 @@ mod tests {
             display_name: "Codex Desktop".to_string(),
         };
 
-        let error = validate_platform_launch_target(&target).unwrap_err();
-
-        assert!(error
-            .to_string()
-            .contains(WINDOWS_STORE_DESKTOP_PLATFORM_UNSUPPORTED));
+        assert!(validate_platform_launch_target(&target).is_ok());
     }
 
     #[test]
@@ -258,20 +330,16 @@ mod tests {
     }
 
     #[test]
-    fn launch_platform_rejects_windows_store_desktop_before_spawn() {
-        let target = InstalledTarget {
-            kind: LaunchTarget::Desktop,
-            executable: PathBuf::from(
-                r"C:\Program Files\WindowsApps\OpenAI.Codex_1.0.0.0_x64__2p2nqsd0c76g0\app\Codex.exe",
-            ),
-            display_name: "Codex Desktop".to_string(),
-        };
+    fn windows_tasklist_reports_codex_running_detects_desktop_process() {
+        let output = "\"Codex.exe\",\"1234\",\"Console\",\"1\",\"120,000 K\"";
 
-        let error = super::launch_platform(&target, PathBuf::from(r"D:\Temp\codex-home").as_path())
-            .unwrap_err();
+        assert!(windows_tasklist_reports_codex_running(output));
+    }
 
-        assert!(error
-            .to_string()
-            .contains(WINDOWS_STORE_DESKTOP_PLATFORM_UNSUPPORTED));
+    #[test]
+    fn windows_tasklist_reports_codex_running_ignores_empty_tasklist() {
+        let output = "INFO: No tasks are running which match the specified criteria.";
+
+        assert!(!windows_tasklist_reports_codex_running(output));
     }
 }

@@ -77,6 +77,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\sign-desktop-installer.ps1
 ## 当前边界
 
 - 已有：亮色桌面应用壳、基础路由枚举、账号认证 JSON 契约、2FA 登录响应契约、`/auth/me`、`/groups/available`、`/redeem`、`/redeem/history`、`/subscriptions/summary`、desktop session create/refresh/revoke 调用层、HTTP 错误保真、系统凭据存储接口、登录/注册/邮箱验证码/忘记密码/CDK 兑换 UI 与主程序接线、Codex Desktop/CLI 安装检测、官方模式启动、平台代理模式启动、受管 home/runtime 元数据、平台会话自动续期与退出回收、Windows 安装包脚本与 SHA256 输出。
-- Windows 边界：Windows Store 安装的 Codex Desktop 当前仅支持官方模式启动；由于 `shell:AppsFolder` 激活链路无法稳定吃到本次启动注入的独立 `CODEX_HOME`，桌面平台代理模式会被显式拦截并提示改用 CLI 的平台代理模式。
+- Windows 边界：Windows Store 安装的 Codex Desktop 官方模式仍使用 `shell:AppsFolder`；平台代理模式会改为直接启动包内 `app\Codex.exe` 并注入独立 `CODEX_HOME`，避免污染用户官方配置。
 - 未接入：订单明细、订阅明细页、真实证书签名执行、生产 API 地址固化后的最终发布包。
 - 安全约束：后续 UI 仍不展示连接密钥、服务地址或 runtime 凭证；refresh token 默认走系统凭据存储，文件实现仅作为测试替身。

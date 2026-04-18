@@ -10,7 +10,10 @@ pub fn describe_platform_launch_error(error_text: &str) -> String {
         return "当前分组需要有效订阅才能启动平台代理模式。".to_string();
     }
     if normalized.contains("windows_store_desktop_platform_unsupported") {
-        return "Windows 商店版 Codex Desktop 当前不支持本次启动隔离注入。请改用 CLI 的平台代理模式，或继续使用官方桌面模式。".to_string();
+        return "当前安装包仍使用旧的 Windows 商店版限制逻辑。请升级到新的桌面客户端安装包后再试。".to_string();
+    }
+    if normalized.contains("windows_store_desktop_already_running") {
+        return "检测到 Codex Desktop 已经在运行。请先完全退出现有 Codex Desktop 窗口，再重新发起平台代理桌面模式。".to_string();
     }
     if normalized.contains("service temporarily unavailable")
         || normalized.contains("no available accounts")
@@ -71,6 +74,13 @@ mod tests {
         let message =
             describe_platform_launch_error("WINDOWS_STORE_DESKTOP_PLATFORM_UNSUPPORTED");
 
-        assert!(message.contains("Windows 商店版 Codex Desktop"));
+        assert!(message.contains("旧的 Windows 商店版限制逻辑"));
+    }
+
+    #[test]
+    fn describe_platform_launch_error_handles_running_windows_store_desktop() {
+        let message = describe_platform_launch_error("WINDOWS_STORE_DESKTOP_ALREADY_RUNNING");
+
+        assert!(message.contains("已经在运行"));
     }
 }

@@ -17,10 +17,10 @@
 - 已完成桌面应用壳、导航、账户流程、启动中心、CDK/订阅工作台。
 - 已完成 Windows 安装包打包链路，可生成可分发的安装包。
 - 已完成对 Sub2API 服务端关键接口的桌面端契约接入。
-- 已完成 Codex 安装检测、官方启动、平台代理 CLI 启动基础链路。
+- 已完成 Codex 安装检测、官方启动、平台代理 Desktop / CLI 启动基础链路。
 - 已完成平台代理受管 `CODEX_HOME`、desktop session 续期与回收。
 - 已为 VMware / 通用虚拟机图形环境补上启动早期软件渲染兜底与本地启动日志。
-- 已明确 Windows Store 版 Codex Desktop 的产品边界：只支持官方模式，不支持本次启动级别的平台代理注入。
+- 已补上 Windows Store 版 Codex Desktop 的平台代理直启注入路径，官方模式与平台代理模式分离处理。
 
 当前不把这版定义为“最终商业正式版”，但已经是“可安装、可演示、可继续灰度测试”的桌面客户端基础版本。
 
@@ -49,7 +49,7 @@
 
 但在 Windows 上需要区分：
 
-- Windows Store 安装的 Codex Desktop：仅支持官方模式
+- Windows Store 安装的 Codex Desktop：官方模式与平台代理模式走不同启动链路
 - Codex CLI：支持平台代理模式
 
 客户端会先做本机安装检测，再按目标类型决定是否允许进入平台代理启动。
@@ -90,14 +90,14 @@
 - CDK 兑换
 - Codex Desktop / CLI 安装检测
 - 官方模式启动
-- 平台代理 CLI 启动
+- 平台代理 Desktop / CLI 启动
 - 受管 `CODEX_HOME` 生成
 - desktop session 创建 / 刷新 / 回收
 - Windows 安装包构建与 SHA256 输出
 
 ### 4.2 已明确但尚未完全闭环的功能
 
-- 平台代理 Desktop：服务端契约和客户端入口存在，但 Windows Store 版桌面端已被产品层面显式拦截
+- 平台代理 Desktop：当前改为直启 Windows Store 包内 `app\Codex.exe`，以注入本次启动的独立 `CODEX_HOME`
 - 订单/订阅详情页：当前只有摘要和列表，没有独立详情路由
 - 充值：当前仍按公告页处理，不做真实支付闭环
 - 代码签名：已有脚本预留，但当前安装包未签名
@@ -130,7 +130,7 @@
 
 - 只展示可用于 Codex 的 active OpenAI 分组
 - 不再默认把 Anthropic 分组当成 Codex 启动目标
-- Windows Store 版 Codex Desktop 不支持平台代理模式
+- Windows Store 版 Codex Desktop 的平台代理模式改为直启包内 `app\Codex.exe`
 - Windows 上的 `.cmd/.bat` wrapper 不再被误当成真实生命周期进程
 
 ## 6. 技术架构
@@ -196,7 +196,7 @@
 - WindowsApps 检测会优先识别真实 Desktop 入口，而不是包内 helper
 - `.cmd/.bat/.ps1` 目标不再错误跟踪 wrapper 生命周期
 - Windows Store Desktop 使用 `explorer.exe shell:AppsFolder\...` 启动官方模式
-- Windows Store Desktop 的平台代理模式直接拦截
+- Windows Store Desktop 的平台代理模式改为直接启动包内 `app\Codex.exe`，并注入本次启动独立的 `CODEX_HOME`
 
 ### 6.5 本地状态与凭据
 
@@ -344,12 +344,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build-desktop-installer.ps
 
 ### 11.1 Windows Store Desktop 边界
 
-Windows Store 版 Codex Desktop 当前只支持官方模式。
+Windows Store 版 Codex Desktop 当前区分两条启动链路：
 
-原因是：
-
-- `shell:AppsFolder` 激活链路无法稳定吃到本次启动注入的独立 `CODEX_HOME`
-- 所以 Windows Store Desktop 的平台代理模式已被产品层面显式拦截
+- 官方模式：继续使用 `shell:AppsFolder` 激活包应用
+- 平台代理模式：改为直接启动包内 `app\Codex.exe`，以便稳定注入独立 `CODEX_HOME`
 
 ### 11.2 平台代理模式边界
 
