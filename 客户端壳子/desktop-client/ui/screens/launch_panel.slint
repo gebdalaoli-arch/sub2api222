@@ -13,159 +13,148 @@ export component LaunchPanel inherits Rectangle {
     callback refresh-requested();
 
     background: #ffffff;
-    border-radius: 28px;
-    border-color: #dce6ef;
-    border-width: 1px;
+    border-radius: 12px;
 
-    property <length> panel-width: self.width - 48px;
-
-    Text {
-        x: 24px;
-        y: 20px;
-        text: "启动 Codex";
-        color: #18324a;
-        font-size: 28px;
-        font-weight: 800;
-    }
-
-    Text {
-        x: 24px;
-        y: 54px;
-        width: parent.width - 48px;
-        text: root.status-text;
-        color: #688097;
-        font-size: 13px;
-        wrap: word-wrap;
-    }
-
+    // ─── 环境状态 ───
     Rectangle {
-        x: parent.width - 152px;
-        y: 18px;
-        width: 128px;
-        height: 30px;
-        background: #edf8ff;
-        border-radius: 14px;
-        border-color: #d5e4f7;
-        border-width: 1px;
-        Text { x: 16px; y: 8px; text: "环境已就绪"; color: #315577; font-size: 11px; font-weight: 700; }
-    }
+        x: 40px; y: 40px;
+        width: parent.width - 80px;
+        height: 52px;
+        background: #f0f4f7; // surface-container-low
+        border-radius: 8px;
 
-    Rectangle {
-        x: 24px;
-        y: 96px;
-        width: root.panel-width;
-        height: 88px;
-        background: #f8fbff;
-        border-radius: 20px;
-        border-color: #d7e4f0;
-        border-width: 1px;
-
-        Text { x: 16px; y: 14px; text: "环境状态"; color: #24415c; font-size: 15px; font-weight: 700; }
-        Text { x: 16px; y: 38px; text: root.desktop-available || root.cli-available ? "Codex 环境已经可用，可以直接进入启动流程。" : "当前未检测到可用的 Codex 环境。"; color: #688097; font-size: 12px; wrap: word-wrap; }
+        // Status dot
         Rectangle {
-            x: parent.width - 86px;
-            y: 28px;
-            width: 62px;
-            height: 24px;
-            background: root.desktop-available || root.cli-available ? #eaf8ef : #f2f5f8;
-            border-radius: 12px;
-            border-color: root.desktop-available || root.cli-available ? #cce6d4 : #d7e4f0;
-            border-width: 1px;
-            Text { x: 14px; y: 6px; text: root.desktop-available || root.cli-available ? "就绪" : "缺失"; color: root.desktop-available || root.cli-available ? #2d6a42 : #6d8398; font-size: 10px; font-weight: 700; }
+            x: 16px; y: 20px;
+            width: 10px; height: 10px;
+            background: root.desktop-available || root.cli-available ? #10b981 : #d4dbdf;
+            border-radius: 5px;
+        }
+
+        Text {
+            x: 34px; y: 16px;
+            text: "环境状态";
+            color: #2c3437;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        Rectangle {
+            x: parent.width - 80px; y: 12px;
+            width: 64px; height: 28px;
+            background: #f7f9fb;
+            border-radius: 4px;
+            Text {
+                width: parent.width; height: parent.height;
+                text: root.desktop-available || root.cli-available ? "已就绪" : "未就绪";
+                color: #51616b;
+                font-size: 11px;
+                font-weight: 600;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
         }
     }
 
+    // ─── 启动方式 ───
+    Text {
+        x: 40px; y: 116px;
+        text: "启动方式";
+        color: #596064;
+        font-size: 11px;
+        font-weight: 600;
+    }
+
     Rectangle {
-        x: 24px;
-        y: 202px;
-        width: root.panel-width;
-        height: 74px;
-        background: #f8fbff;
-        border-radius: 20px;
-        border-color: #d7e4f0;
-        border-width: 1px;
+        x: 40px; y: 140px;
+        width: 300px; height: 44px;
+        background: #f0f4f7;
+        border-radius: 8px;
 
         Rectangle {
-            x: 16px;
-            y: 16px;
-            width: 112px;
-            height: 42px;
-            background: !root.cli-mode ? #dff3ff : #ffffff;
-            border-radius: 16px;
-            border-color: !root.cli-mode ? #b6ddf7 : #d7e4f0;
-            border-width: 1px;
+            x: 4px; y: 4px;
+            width: 168px; height: 36px;
+            background: !root.cli-mode ? #ffffff : transparent;
+            border-radius: 4px;
             TouchArea { clicked => { root.cli-mode = false; } }
-            Text { x: 24px; y: 12px; text: "桌面版"; color: !root.cli-mode ? #1f5f8f : #6d8398; font-size: 13px; font-weight: 700; }
+            Text {
+                width: parent.width; height: parent.height;
+                text: "桌面版";
+                color: !root.cli-mode ? #006499 : #596064;
+                font-size: 14px;
+                font-weight: !root.cli-mode ? 600 : 400;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
         }
+
         Rectangle {
-            x: 136px;
-            y: 16px;
-            width: 112px;
-            height: 42px;
-            background: root.cli-mode ? #dff3ff : #ffffff;
-            border-radius: 16px;
-            border-color: root.cli-mode ? #b6ddf7 : #d7e4f0;
-            border-width: 1px;
+            x: 176px; y: 4px;
+            width: 120px; height: 36px;
+            background: root.cli-mode ? #ffffff : transparent;
+            border-radius: 4px;
             TouchArea { clicked => { root.cli-mode = true; } }
-            Text { x: 42px; y: 12px; text: "CLI"; color: root.cli-mode ? #1f5f8f : #6d8398; font-size: 13px; font-weight: 700; }
+            Text {
+                width: parent.width; height: parent.height;
+                text: "CLI";
+                color: root.cli-mode ? #006499 : #596064;
+                font-size: 14px;
+                font-weight: root.cli-mode ? 600 : 400;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
         }
-        Text { x: 270px; y: 28px; text: root.cli-mode ? "已切换到 CLI 模式" : "默认使用桌面版启动"; color: #688097; font-size: 12px; }
     }
 
+    // ─── 启动分组 ───
     Text {
-        x: 24px;
-        y: 300px;
+        x: 40px; y: 208px;
         text: "启动分组";
-        color: #18324a;
-        font-size: 17px;
-        font-weight: 700;
-    }
-
-    Text {
-        x: 24px;
-        y: 324px;
-        width: root.panel-width;
-        text: "选择这次启动要使用的分组，客户端会按当前分组准备受管环境。";
-        color: #688097;
-        font-size: 12px;
-        wrap: word-wrap;
+        color: #596064;
+        font-size: 11px;
+        font-weight: 600;
     }
 
     ComboBox {
-        x: 24px;
-        y: 356px;
-        width: root.panel-width;
-        height: 40px;
+        x: 40px; y: 232px;
+        width: parent.width - 80px;
+        height: 48px;
         model: root.group-options;
         current-index <=> root.selected-group-index;
     }
 
-    Button {
-        x: 24px;
-        y: parent.height - 116px;
-        width: 120px;
-        height: 40px;
-        text: "检测安装";
-        clicked => { root.refresh-requested(); }
-    }
-
-    Button {
-        x: 158px;
-        y: parent.height - 116px;
-        width: root.panel-width - 134px;
-        height: 40px;
-        text: root.cli-mode ? "立即启动 CLI" : "立即启动桌面版";
-        enabled: root.cli-mode ? root.cli-available : root.desktop-available;
-        clicked => { if (root.cli-mode) { root.launch-platform-cli-requested(); } else { root.launch-platform-desktop-requested(); } }
+    // ─── Primary Action Button ───
+    Rectangle {
+        x: 40px;
+        y: parent.height - 120px;
+        width: parent.width - 80px;
+        height: 52px;
+        background: #006499;
+        border-radius: 8px;
+        TouchArea {
+            clicked => {
+                if (root.cli-mode) { root.launch-platform-cli-requested(); }
+                else { root.launch-platform-desktop-requested(); }
+            }
+        }
+        Text {
+            width: parent.width; height: parent.height;
+            text: root.cli-mode ? "立即启动 CLI" : "立即启动桌面版";
+            color: #f6f9ff;
+            font-size: 18px;
+            font-weight: 700;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
     }
 
     Text {
-        x: 24px;
-        y: parent.height - 62px;
-        width: parent.width - 48px;
-        text: "高级设置中可启用官方模式";
-        color: #8aa0b3;
-        font-size: 12px;
-        horizontal-alignment: right;
+        x: 40px;
+        y: parent.height - 52px;
+        width: parent.width - 80px;
+        text: "官方模式已收纳到高级设置";
+        color: #596064;
+        font-size: 11px;
+        horizontal-alignment: center;
     }
 }

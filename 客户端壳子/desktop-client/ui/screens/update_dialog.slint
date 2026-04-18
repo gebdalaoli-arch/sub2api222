@@ -17,7 +17,7 @@ export component UpdateDialog inherits Rectangle {
         y: 12px;
         width: parent.width - 24px;
         height: parent.height - 24px;
-        background: #6d7685cc;
+        background: #596064cc;
         border-radius: 30px;
 
         Rectangle {
@@ -28,7 +28,7 @@ export component UpdateDialog inherits Rectangle {
             background: #ffffff;
             border-radius: 30px;
             border-color: #d7e4f0;
-            border-width: 1px;
+            border-width: 0px;
 
             Rectangle {
                 x: 0px;
@@ -38,13 +38,13 @@ export component UpdateDialog inherits Rectangle {
                 background: #ffffff;
                 border-radius: 30px;
                 border-color: #d7e4f0;
-                border-width: 1px;
+                border-width: 0px;
 
                 Text {
                     x: 28px;
                     y: 30px;
                     text: "发现新版本";
-                    color: #17324a;
+                    color: #2c3437;
                     font-size: 30px;
                     font-weight: 800;
                 }
@@ -54,7 +54,7 @@ export component UpdateDialog inherits Rectangle {
                 x: 28px;
                 y: 138px;
                 text: root.latest-version;
-                color: #2b59d0;
+                color: #006499;
                 font-size: 22px;
                 font-weight: 700;
             }
@@ -64,7 +64,7 @@ export component UpdateDialog inherits Rectangle {
                 y: 178px;
                 width: parent.width - 56px;
                 text: "当前版本 " + root.current-version + "，新版本已可用。";
-                color: #5f7892;
+                color: #596064;
                 font-size: 14px;
                 wrap: word-wrap;
             }
@@ -83,7 +83,7 @@ export component UpdateDialog inherits Rectangle {
                 y: 264px;
                 width: parent.width - 56px;
                 text: root.summary;
-                color: #17324a;
+                color: #2c3437;
                 font-size: 14px;
                 wrap: word-wrap;
             }
@@ -94,14 +94,14 @@ export component UpdateDialog inherits Rectangle {
                 width: parent.width - 56px;
                 height: parent.height - 452px;
                 background: #fbfcfe;
-                border-radius: 18px;
+                border-radius: 12px;
                 border-color: #d7e4f0;
-                border-width: 1px;
+                border-width: 0px;
                 Text {
                     x: 16px;
                     y: 16px;
                     text: "更新内容与公告";
-                    color: #21435f;
+                    color: #2c3437;
                     font-size: 16px;
                     font-weight: 700;
                 }
@@ -110,7 +110,7 @@ export component UpdateDialog inherits Rectangle {
                     y: 48px;
                     width: parent.width - 32px;
                     text: "1. 新版将带来更稳定的一键开整体验。  2. 更新中心会支持下载进度、校验和安装接力。";
-                    color: #688097;
+                    color: #596064;
                     font-size: 12px;
                     wrap: word-wrap;
                 }

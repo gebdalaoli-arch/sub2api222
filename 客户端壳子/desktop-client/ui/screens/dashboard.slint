@@ -10,16 +10,16 @@ export component DashboardScreen inherits Rectangle {
     callback redeem-requested();
     callback launch-requested();
 
-    background: #f8fbff;
-    border-radius: 24px;
+    background: #eaeff2;
+    border-radius: 12px;
     border-color: #d7e4f0;
-    border-width: 1px;
+    border-width: 0px;
 
     Text {
         x: 24px;
         y: 20px;
         text: "账户总览";
-        color: #18324a;
+        color: #2c3437;
         font-size: 24px;
         font-weight: 800;
     }
@@ -29,7 +29,7 @@ export component DashboardScreen inherits Rectangle {
         y: 54px;
         width: parent.width - 48px;
         text: root.user-label;
-        color: #5b7490;
+        color: #596064;
         font-size: 13px;
     }
 
@@ -39,12 +39,12 @@ export component DashboardScreen inherits Rectangle {
         width: (parent.width - 64px) / 3;
         height: 84px;
         background: #ffffff;
-        border-radius: 18px;
+        border-radius: 12px;
         border-color: #d7e4f0;
-        border-width: 1px;
+        border-width: 0px;
 
-        Text { x: 16px; y: 14px; text: "余额"; color: #6a8299; font-size: 12px; font-weight: 700; }
-        Text { x: 16px; y: 38px; text: root.balance-text; color: #18324a; font-size: 18px; font-weight: 800; }
+        Text { x: 16px; y: 14px; text: "余额"; color: #596064; font-size: 12px; font-weight: 700; }
+        Text { x: 16px; y: 38px; text: root.balance-text; color: #2c3437; font-size: 18px; font-weight: 800; }
     }
 
     Rectangle {
@@ -53,12 +53,12 @@ export component DashboardScreen inherits Rectangle {
         width: (parent.width - 64px) / 3;
         height: 84px;
         background: #ffffff;
-        border-radius: 18px;
+        border-radius: 12px;
         border-color: #d7e4f0;
-        border-width: 1px;
+        border-width: 0px;
 
-        Text { x: 16px; y: 14px; text: "并发"; color: #6a8299; font-size: 12px; font-weight: 700; }
-        Text { x: 16px; y: 38px; text: root.usage-text; color: #18324a; font-size: 18px; font-weight: 800; }
+        Text { x: 16px; y: 14px; text: "并发"; color: #596064; font-size: 12px; font-weight: 700; }
+        Text { x: 16px; y: 38px; text: root.usage-text; color: #2c3437; font-size: 18px; font-weight: 800; }
     }
 
     Rectangle {
@@ -67,12 +67,12 @@ export component DashboardScreen inherits Rectangle {
         width: (parent.width - 64px) / 3;
         height: 84px;
         background: #ffffff;
-        border-radius: 18px;
+        border-radius: 12px;
         border-color: #d7e4f0;
-        border-width: 1px;
+        border-width: 0px;
 
-        Text { x: 16px; y: 14px; text: "状态"; color: #6a8299; font-size: 12px; font-weight: 700; }
-        Text { x: 16px; y: 38px; width: parent.width - 32px; text: root.account-status-text; color: #18324a; font-size: 14px; font-weight: 700; wrap: word-wrap; }
+        Text { x: 16px; y: 14px; text: "状态"; color: #596064; font-size: 12px; font-weight: 700; }
+        Text { x: 16px; y: 38px; width: parent.width - 32px; text: root.account-status-text; color: #2c3437; font-size: 14px; font-weight: 700; wrap: word-wrap; }
     }
 
     Rectangle {
@@ -81,15 +81,15 @@ export component DashboardScreen inherits Rectangle {
         width: parent.width - 48px;
         height: max(74px, parent.height - 284px);
         background: #ffffff;
-        border-radius: 18px;
+        border-radius: 12px;
         border-color: #d7e4f0;
-        border-width: 1px;
+        border-width: 0px;
 
         Text {
             x: 16px;
             y: 16px;
             text: "公告与交付说明";
-            color: #264461;
+            color: #2c3437;
             font-size: 14px;
             font-weight: 700;
         }
@@ -99,7 +99,7 @@ export component DashboardScreen inherits Rectangle {
             y: 42px;
             width: parent.width - 32px;
             text: root.recharge-notice;
-            color: #688097;
+            color: #596064;
             font-size: 12px;
             wrap: word-wrap;
         }

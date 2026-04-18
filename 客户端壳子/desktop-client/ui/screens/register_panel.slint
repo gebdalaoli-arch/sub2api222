@@ -11,15 +11,15 @@ export component RegisterPanel inherits Rectangle {
     callback back-requested();
 
     background: #ffffff;
-    border-radius: 24px;
+    border-radius: 12px;
     border-color: #d7e4f0;
-    border-width: 1px;
+    border-width: 0px;
 
     Text {
         x: 24px;
         y: 20px;
         text: "创建账户";
-        color: #18324a;
+        color: #2c3437;
         font-size: 24px;
         font-weight: 800;
     }
@@ -29,12 +29,12 @@ export component RegisterPanel inherits Rectangle {
         y: 54px;
         width: parent.width - 48px;
         text: "注册是次路径。先拿邮箱验证码，再把账户创建完整。";
-        color: #688097;
+        color: #596064;
         font-size: 13px;
         wrap: word-wrap;
     }
 
-    Text { x: 24px; y: 108px; text: "邮箱"; color: #3a5570; font-size: 12px; font-weight: 700; }
+    Text { x: 24px; y: 108px; text: "邮箱"; color: #596064; font-size: 12px; font-weight: 700; }
     LineEdit {
         x: 24px;
         y: 128px;
@@ -44,7 +44,7 @@ export component RegisterPanel inherits Rectangle {
         placeholder-text: "name@example.com";
     }
 
-    Text { x: 24px; y: 188px; text: "密码"; color: #3a5570; font-size: 12px; font-weight: 700; }
+    Text { x: 24px; y: 188px; text: "密码"; color: #596064; font-size: 12px; font-weight: 700; }
     LineEdit {
         x: 24px;
         y: 208px;
@@ -55,7 +55,7 @@ export component RegisterPanel inherits Rectangle {
         input-type: InputType.password;
     }
 
-    Text { x: 24px; y: 268px; text: "验证码"; color: #3a5570; font-size: 12px; font-weight: 700; }
+    Text { x: 24px; y: 268px; text: "验证码"; color: #596064; font-size: 12px; font-weight: 700; }
     LineEdit {
         x: 24px;
         y: 288px;
@@ -97,17 +97,17 @@ export component RegisterPanel inherits Rectangle {
         y: 418px;
         width: parent.width - 48px;
         height: 70px;
-        background: #f6f9fd;
-        border-radius: 18px;
+        background: #eaeff2;
+        border-radius: 12px;
         border-color: #d7e4f0;
-        border-width: 1px;
+        border-width: 0px;
 
         Text {
             x: 16px;
             y: 14px;
             width: parent.width - 32px;
             text: root.status-text;
-            color: #5b7490;
+            color: #596064;
             font-size: 12px;
             wrap: word-wrap;
         }

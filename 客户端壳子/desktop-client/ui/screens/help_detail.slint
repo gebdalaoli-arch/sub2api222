@@ -3,16 +3,16 @@ import { Button } from "std-widgets.slint";
 export component HelpDetailScreen inherits Rectangle {
     callback manual-update-check-requested();
 
-    background: #f8fbff;
-    border-radius: 24px;
+    background: #eaeff2;
+    border-radius: 12px;
     border-color: #d7e4f0;
-    border-width: 1px;
+    border-width: 0px;
 
     Text {
         x: 24px;
         y: 20px;
         text: "设置与帮助";
-        color: #18324a;
+        color: #2c3437;
         font-size: 24px;
         font-weight: 800;
     }
@@ -22,7 +22,7 @@ export component HelpDetailScreen inherits Rectangle {
         y: 56px;
         width: parent.width - 48px;
         text: "这里统一收纳更新、恢复、安全边界和高级设置，不和主工作流平铺在同一层。";
-        color: #688097;
+        color: #596064;
         font-size: 13px;
         wrap: word-wrap;
     }
@@ -33,12 +33,12 @@ export component HelpDetailScreen inherits Rectangle {
         width: parent.width - 48px;
         height: 92px;
         background: #ffffff;
-        border-radius: 18px;
+        border-radius: 12px;
         border-color: #d7e4f0;
-        border-width: 1px;
+        border-width: 0px;
 
-        Text { x: 16px; y: 16px; text: "软件更新"; color: #21435f; font-size: 16px; font-weight: 700; }
-        Text { x: 16px; y: 40px; width: parent.width - 160px; text: "启动时通常会自动弹出更新提示，这里也可以手动检查并查看新版本说明。"; color: #688097; font-size: 12px; wrap: word-wrap; }
+        Text { x: 16px; y: 16px; text: "软件更新"; color: #2c3437; font-size: 16px; font-weight: 700; }
+        Text { x: 16px; y: 40px; width: parent.width - 160px; text: "启动时通常会自动弹出更新提示，这里也可以手动检查并查看新版本说明。"; color: #596064; font-size: 12px; wrap: word-wrap; }
         Button {
             x: parent.width - 124px;
             y: 26px;
@@ -55,11 +55,11 @@ export component HelpDetailScreen inherits Rectangle {
         width: parent.width - 48px;
         height: 88px;
         background: #ffffff;
-        border-radius: 18px;
+        border-radius: 12px;
         border-color: #d7e4f0;
-        border-width: 1px;
-        Text { x: 16px; y: 16px; text: "恢复与清理"; color: #21435f; font-size: 16px; font-weight: 700; }
-        Text { x: 16px; y: 40px; width: parent.width - 32px; text: "如遇异常退出，下次启动会优先回收临时运行材料，不影响官方环境。"; color: #688097; font-size: 12px; wrap: word-wrap; }
+        border-width: 0px;
+        Text { x: 16px; y: 16px; text: "恢复与清理"; color: #2c3437; font-size: 16px; font-weight: 700; }
+        Text { x: 16px; y: 40px; width: parent.width - 32px; text: "如遇异常退出，下次启动会优先回收临时运行材料，不影响官方环境。"; color: #596064; font-size: 12px; wrap: word-wrap; }
     }
 
     Rectangle {
@@ -68,11 +68,11 @@ export component HelpDetailScreen inherits Rectangle {
         width: parent.width - 48px;
         height: 88px;
         background: #ffffff;
-        border-radius: 18px;
+        border-radius: 12px;
         border-color: #d7e4f0;
-        border-width: 1px;
-        Text { x: 16px; y: 16px; text: "高级设置"; color: #21435f; font-size: 16px; font-weight: 700; }
-        Text { x: 16px; y: 40px; width: parent.width - 32px; text: "官方模式默认不推荐，仅在特定调试或保底场景下启用。"; color: #688097; font-size: 12px; wrap: word-wrap; }
+        border-width: 0px;
+        Text { x: 16px; y: 16px; text: "高级设置"; color: #2c3437; font-size: 16px; font-weight: 700; }
+        Text { x: 16px; y: 40px; width: parent.width - 32px; text: "官方模式默认不推荐，仅在特定调试或保底场景下启用。"; color: #596064; font-size: 12px; wrap: word-wrap; }
     }
 
     Rectangle {
@@ -81,21 +81,21 @@ export component HelpDetailScreen inherits Rectangle {
         width: parent.width - 48px;
         height: max(144px, parent.height - 450px);
         background: #ffffff;
-        border-radius: 18px;
+        border-radius: 12px;
         border-color: #d7e4f0;
-        border-width: 1px;
+        border-width: 0px;
 
         Text {
             x: 16px;
             y: 16px;
             text: "安全边界";
-            color: #21435f;
+            color: #2c3437;
             font-size: 16px;
             font-weight: 700;
         }
 
-        Text { x: 16px; y: 48px; text: "1. 不展示普通 API 凭据，也不要求手动复制网关地址。"; color: #688097; font-size: 12px; }
-        Text { x: 16px; y: 72px; text: "2. 官方模式与平台代理模式严格隔离，减少对原环境的污染。"; color: #688097; font-size: 12px; }
-        Text { x: 16px; y: 96px; text: "3. 更新弹窗属于系统级状态，强制更新时会直接拦住主界面。"; color: #688097; font-size: 12px; }
+        Text { x: 16px; y: 48px; text: "1. 不展示普通 API 凭据，也不要求手动复制网关地址。"; color: #596064; font-size: 12px; }
+        Text { x: 16px; y: 72px; text: "2. 官方模式与平台代理模式严格隔离，减少对原环境的污染。"; color: #596064; font-size: 12px; }
+        Text { x: 16px; y: 96px; text: "3. 更新弹窗属于系统级状态，强制更新时会直接拦住主界面。"; color: #596064; font-size: 12px; }
     }
 }

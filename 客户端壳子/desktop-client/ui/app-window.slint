@@ -15,7 +15,8 @@ export component AppWindow inherits Window {
     width: 1280px;
     height: 860px;
     title: "一键开整";
-    background: #edf3f8;
+    background: #f7f9fb;
+    default-font-family: "Inter, Microsoft YaHei UI";
 
     in-out property <string> email;
     in-out property <string> password;
@@ -70,243 +71,180 @@ export component AppWindow inherits Window {
     callback update-primary-requested();
     callback update-secondary-requested();
 
+    // ═══════════════════════════════════════════
+    // Layout constants from Stitch design:
+    // SideNavBar: w-64 = 256px, bg: surface-container-low (#f0f4f7)
+    // TopAppBar: h-16 = 64px, bg: surface-container-lowest (#ffffff) 80% + blur
+    // Main content: flex-1, p-8/p-12 = 32px/48px padding
+    // ═══════════════════════════════════════════
+
     Rectangle {
         width: parent.width;
         height: parent.height;
-        background: #edf3f8;
+        background: #f7f9fb;
 
+        // ═══ SideNavBar: 256px wide, full height ═══
         Rectangle {
-            x: 24px;
-            y: 24px;
-            width: 228px;
-            height: parent.height - 48px;
-            background: #f7fbff;
-            border-radius: 26px;
-            border-color: #d4e1ee;
-            border-width: 1px;
-        }
+            x: 0px; y: 0px;
+            width: 256px;
+            height: parent.height;
+            background: #f0f4f7; // surface-container-low
 
-        Rectangle {
-            x: 272px;
-            y: 24px;
-            width: parent.width - 296px;
-            height: parent.height - 48px;
-            background: #ffffff;
-            border-radius: 26px;
-            border-color: #d4e1ee;
-            border-width: 1px;
-        }
-
-        Image {
-            x: 46px;
-            y: 44px;
-            width: 58px;
-            height: 58px;
-            source: @image-url("../assets/app-icon.png");
-        }
-
-        Text {
-            x: 116px;
-            y: 52px;
-            text: "一键开整";
-            color: #18324a;
-            font-size: 30px;
-            font-weight: 800;
-        }
-
-        Text {
-            x: 118px;
-            y: 94px;
-            width: 160px;
-            text: "Windows 客户端";
-            color: #587189;
-            font-size: 13px;
-        }
-
-        Rectangle {
-            x: 40px;
-            y: 142px;
-            width: 196px;
-            height: 88px;
-            background: #eef6ff;
-            border-radius: 18px;
-            border-color: #d5e4f7;
-            border-width: 1px;
+            // ── User avatar area + brand ──
+            Rectangle {
+                x: 24px; y: 24px;
+                width: 48px; height: 48px;
+                background: #eaeff2;
+                border-radius: 24px;
+            }
 
             Text {
-                x: 18px;
-                y: 16px;
-                text: "交付模式";
-                color: #22415c;
-                font-size: 14px;
+                x: 80px; y: 28px;
+                text: "一键开整";
+                color: #006499;
+                font-size: 20px;
+                font-weight: 900;
+            }
+
+            Text {
+                x: 80px; y: 52px;
+                text: "Windows 客户端";
+                color: #51616b;
+                font-size: 12px;
+            }
+
+            // ── Nav items ──
+            // Active: bg white, text primary, shadow
+            // Inactive: no bg, text tertiary, hover surface-container
+
+            // Nav 0: 总览
+            Rectangle {
+                x: 24px; y: 96px;
+                width: 208px; height: 44px;
+                background: root.current-section == 0 ? #ffffff : transparent;
+                border-radius: 8px;
+                TouchArea { clicked => { root.current-section = 0; } }
+                Text {
+                    x: 44px; y: 12px;
+                    text: "总览";
+                    color: root.current-section == 0 ? #006499 : #51616b;
+                    font-size: 14px;
+                    font-weight: root.current-section == 0 ? 700 : 400;
+                }
+            }
+
+            // Nav 1: 启动 Codex
+            Rectangle {
+                x: 24px; y: 144px;
+                width: 208px; height: 44px;
+                background: root.current-section == 1 ? #ffffff : transparent;
+                border-radius: 8px;
+                TouchArea { clicked => { root.current-section = 1; } }
+                Text {
+                    x: 44px; y: 12px;
+                    text: "启动 Codex";
+                    color: root.current-section == 1 ? #006499 : #51616b;
+                    font-size: 14px;
+                    font-weight: root.current-section == 1 ? 700 : 400;
+                }
+            }
+
+            // Nav 2: 计费中心
+            Rectangle {
+                x: 24px; y: 192px;
+                width: 208px; height: 44px;
+                background: root.current-section == 2 ? #ffffff : transparent;
+                border-radius: 8px;
+                TouchArea { clicked => { root.current-section = 2; } }
+                Text {
+                    x: 44px; y: 12px;
+                    text: "计费中心";
+                    color: root.current-section == 2 ? #006499 : #51616b;
+                    font-size: 14px;
+                    font-weight: root.current-section == 2 ? 700 : 400;
+                }
+            }
+
+            // Nav 3: 设置与帮助
+            Rectangle {
+                x: 24px; y: 240px;
+                width: 208px; height: 44px;
+                background: root.current-section == 3 ? #ffffff : transparent;
+                border-radius: 8px;
+                TouchArea { clicked => { root.current-section = 3; } }
+                Text {
+                    x: 44px; y: 12px;
+                    text: "设置与帮助";
+                    color: root.current-section == 3 ? #006499 : #51616b;
+                    font-size: 14px;
+                    font-weight: root.current-section == 3 ? 700 : 400;
+                }
+            }
+        }
+
+        // ═══ TopAppBar: h=64px, glass effect ═══
+        Rectangle {
+            x: 256px; y: 0px;
+            width: parent.width - 256px;
+            height: 64px;
+            background: #ffffffcc; // 80% white, glass
+
+            Text {
+                x: 32px; y: 20px;
+                text: "一键开整";
+                color: #006499;
+                font-size: 18px;
                 font-weight: 700;
             }
 
-            Text {
-                x: 18px;
-                y: 38px;
-                width: 160px;
-                text: "一键进入工作台，少折腾配置。账户、启动、计费仍然逐步下钻。";
-                color: #64809a;
-                font-size: 11px;
-                wrap: word-wrap;
-            }
-        }
-
-        Rectangle {
-            x: 36px;
-            y: 252px;
-            width: 204px;
-            height: 54px;
-            background: root.current-section == 0 ? #18324a : #f7fbff;
-            border-radius: 18px;
-            border-color: root.current-section == 0 ? #18324a : #d6e3ef;
-            border-width: 1px;
-            TouchArea { clicked => { root.current-section = 0; } }
-            Text { x: 18px; y: 12px; text: "一级总览"; color: root.current-section == 0 ? #ffffff : #18324a; font-size: 15px; font-weight: 700; }
-            Text { x: 18px; y: 31px; width: 164px; text: root.session-active ? "从这里继续下钻进入详情" : "登录、注册、找回密码"; color: root.current-section == 0 ? #d7e6f6 : #6a8299; font-size: 11px; wrap: word-wrap; }
-        }
-
-        Rectangle {
-            x: 36px;
-            y: 316px;
-            width: 204px;
-            height: 54px;
-            background: root.current-section == 1 ? #18324a : #f7fbff;
-            border-radius: 18px;
-            border-color: root.current-section == 1 ? #18324a : #d6e3ef;
-            border-width: 1px;
-            TouchArea { clicked => { root.current-section = 1; } }
-            Text { x: 18px; y: 12px; text: "启动 Codex"; color: root.current-section == 1 ? #ffffff : #18324a; font-size: 15px; font-weight: 700; }
-            Text { x: 18px; y: 31px; width: 164px; text: "默认桌面版，可切换 CLI"; color: root.current-section == 1 ? #d7e6f6 : #6a8299; font-size: 11px; wrap: word-wrap; }
-        }
-
-        Rectangle {
-            x: 36px;
-            y: 380px;
-            width: 204px;
-            height: 54px;
-            background: root.current-section == 2 ? #18324a : #f7fbff;
-            border-radius: 18px;
-            border-color: root.current-section == 2 ? #18324a : #d6e3ef;
-            border-width: 1px;
-            TouchArea { clicked => { root.current-section = 2; } }
-            Text { x: 18px; y: 12px; text: "计费与公告"; color: root.current-section == 2 ? #ffffff : #18324a; font-size: 15px; font-weight: 700; }
-            Text { x: 18px; y: 31px; width: 164px; text: "CDK、订阅、订单记录"; color: root.current-section == 2 ? #d7e6f6 : #6a8299; font-size: 11px; wrap: word-wrap; }
-        }
-
-        Rectangle {
-            x: 36px;
-            y: 444px;
-            width: 204px;
-            height: 54px;
-            background: root.current-section == 3 ? #18324a : #f7fbff;
-            border-radius: 18px;
-            border-color: root.current-section == 3 ? #18324a : #d6e3ef;
-            border-width: 1px;
-            TouchArea { clicked => { root.current-section = 3; } }
-            Text { x: 18px; y: 12px; text: "设置与帮助"; color: root.current-section == 3 ? #ffffff : #18324a; font-size: 15px; font-weight: 700; }
-            Text { x: 18px; y: 31px; width: 164px; text: "更新、恢复与高级设置"; color: root.current-section == 3 ? #d7e6f6 : #6a8299; font-size: 11px; wrap: word-wrap; }
-        }
-
-        Text {
-            x: 40px;
-            y: parent.height - 194px;
-            width: 184px;
-            text: "不会显示连接密钥、服务地址或临时运行凭据。";
-            color: #567089;
-            font-size: 12px;
-            wrap: word-wrap;
-        }
-
-        Rectangle {
-            x: 40px;
-            y: parent.height - 116px;
-            width: 184px;
-            height: 74px;
-            background: #ffffff;
-            border-radius: 18px;
-            border-color: #d6e3ef;
-            border-width: 1px;
-            Text { x: 16px; y: 14px; text: "v0.1.0"; color: #18324a; font-size: 13px; font-weight: 700; }
-            Text { x: 16px; y: 34px; width: 150px; text: "Windows 安装包、账户闭环和平台代理模式已接通。"; color: #698198; font-size: 11px; wrap: word-wrap; }
-        }
-
-        Rectangle {
-            x: 304px;
-            y: 44px;
-            width: parent.width - 360px;
-            height: 108px;
-            background: #f7fbff;
-            border-radius: 20px;
-            border-color: #d7e4f0;
-            border-width: 1px;
-
-            Text {
-                x: 24px;
-                y: 18px;
-                text: root.current-section == 0 ? (root.session-active ? "一级总览" : "登录入口") : root.current-section == 1 ? "启动 Codex" : root.current-section == 2 ? "计费详情" : root.current-section == 3 ? "设置与帮助" : "公告中心";
-                color: #18324a;
-                font-size: 28px;
-                font-weight: 800;
-            }
-
-            Text {
-                x: 24px;
-                y: 50px;
-                width: parent.width - 280px;
-                text: root.current-section == 0 ? (root.session-active ? "从这里进入启动、计费和帮助的二级详情，不再直接平铺所有信息。" : root.auth-status-text) : root.current-section == 1 ? root.launch-status-text : root.current-section == 2 ? root.dashboard-notice-text : root.current-section == 3 ? "更新、恢复和安全边界统一收在这里。" : "这里展示系统公告、维护通知和版本动态。";
-                color: #698198;
-                font-size: 13px;
-                wrap: word-wrap;
-            }
-
+            // Notification button
             Rectangle {
-                x: parent.width - 224px;
-                y: 20px;
-                width: 88px;
-                height: 30px;
-                background: root.dashboard-user-label == "当前账号：未登录" ? #f2f5f8 : #eaf8ef;
-                border-radius: 14px;
-                border-color: root.dashboard-user-label == "当前账号：未登录" ? #d7e4f0 : #cce6d4;
-                border-width: 1px;
-                Text { x: 14px; y: 8px; text: root.dashboard-user-label == "当前账号：未登录" ? "账户未登录" : "账户已登录"; color: root.dashboard-user-label == "当前账号：未登录" ? #6d8398 : #2d6a42; font-size: 11px; font-weight: 700; }
-            }
-
-            Rectangle {
-                x: parent.width - 124px;
-                y: 20px;
-                width: 116px;
-                height: 30px;
-                background: root.desktop-available || root.cli-available ? #edf5ff : #f2f5f8;
-                border-radius: 14px;
-                border-color: root.desktop-available || root.cli-available ? #cfe0f2 : #d7e4f0;
-                border-width: 1px;
+                x: parent.width - 56px; y: 16px;
+                width: 32px; height: 32px;
+                background: transparent;
+                border-radius: 16px;
                 TouchArea { clicked => { root.current-section = 4; } }
-                Text { x: 14px; y: 8px; text: "🔔 公告中心"; color: root.desktop-available || root.cli-available ? #2b587f : #6d8398; font-size: 11px; font-weight: 700; }
+                Text { x: 6px; y: 6px; text: "🔔"; font-size: 16px; }
             }
         }
+
+        // ═══ Main Content Area: below TopAppBar, right of SideNav ═══
+        // x: 256px, y: 64px, padded 48px
 
         if root.current-section == 0: Rectangle {
-            x: 304px;
-            y: 148px;
-            width: parent.width - 360px;
-            height: parent.height - 196px;
+            x: 256px + 48px;
+            y: 64px + 48px;
+            width: parent.width - 256px - 96px;
+            height: parent.height - 64px - 96px;
             background: transparent;
 
+            if root.session-active: OverviewScreen {
+                x: 0px; y: 0px;
+                width: parent.width;
+                height: parent.height;
+                welcome-text: "准备开整";
+                user-label: root.dashboard-user-label;
+                balance-text: root.dashboard-balance-text;
+                usage-text: root.dashboard-usage-text;
+                account-status-text: root.dashboard-account-status-text;
+                notice-text: root.dashboard-notice-text;
+                open-launch-requested => { root.current-section = 1; }
+                open-billing-requested => { root.current-section = 2; }
+                open-help-requested => { root.current-section = 3; }
+            }
+
+            // ── Login flow (when not session-active, inline) ──
             if !root.session-active: BrandPanel {
-                x: 0px;
-                y: 0px;
-                width: 352px;
+                x: 0px; y: 0px;
+                width: 320px;
                 height: parent.height;
                 product-name: "一键开整";
                 status-copy: root.brand-status-copy;
             }
 
             if !root.session-active: LoginScreen {
-                x: 376px;
-                y: 0px;
-                width: parent.width - 376px;
+                x: 360px; y: 0px;
+                width: parent.width - 360px;
                 email <=> root.email;
                 password <=> root.password;
                 verification-code <=> root.verification-code;
@@ -320,10 +258,9 @@ export component AppWindow inherits Window {
             }
 
             if !root.session-active && root.auth-subview == 1: RegisterPanel {
-                x: 420px;
-                y: 72px;
-                width: parent.width - 444px;
-                height: 500px;
+                x: 400px; y: 60px;
+                width: parent.width - 420px;
+                height: 480px;
                 email <=> root.email;
                 password <=> root.password;
                 verification-code <=> root.verification-code;
@@ -334,10 +271,9 @@ export component AppWindow inherits Window {
             }
 
             if !root.session-active && root.auth-subview == 2: ForgotPasswordScreen {
-                x: 420px;
-                y: 72px;
-                width: parent.width - 444px;
-                height: 500px;
+                x: 400px; y: 60px;
+                width: parent.width - 420px;
+                height: 480px;
                 email <=> root.email;
                 reset-token <=> root.reset-token;
                 new-password <=> root.new-password;
@@ -346,36 +282,21 @@ export component AppWindow inherits Window {
                 reset-password-requested => { root.reset-password-requested(); }
                 back-requested => { root.auth-subview = 0; }
             }
-
-            if root.session-active: OverviewScreen {
-                x: 0px;
-                y: 0px;
-                width: parent.width;
-                height: parent.height;
-                welcome-text: "准备开整";
-                user-label: root.dashboard-user-label;
-                balance-text: root.dashboard-balance-text;
-                usage-text: root.dashboard-usage-text;
-                account-status-text: root.dashboard-account-status-text;
-                notice-text: root.dashboard-notice-text;
-                open-launch-requested => { root.current-section = 1; }
-                open-billing-requested => { root.current-section = 2; }
-                open-help-requested => { root.current-section = 3; }
-            }
         }
 
+        // ═══ Section 1: 启动 Codex (centered card layout) ═══
         if root.current-section == 1: Rectangle {
-            x: 304px;
-            y: 148px;
-            width: parent.width - 360px;
-            height: parent.height - 196px;
-            background: transparent;
+            x: 256px;
+            y: 64px;
+            width: parent.width - 256px;
+            height: parent.height - 64px;
+            background: #f7f9fb;
 
             LaunchPanel {
-                x: 0px;
-                y: 0px;
-                width: 460px;
-                height: 420px;
+                x: (parent.width - 640px) / 2;
+                y: 48px;
+                width: 640px;
+                height: parent.height - 96px;
                 desktop-available: root.desktop-available;
                 cli-available: root.cli-available;
                 status-text: root.launch-status-text;
@@ -386,119 +307,18 @@ export component AppWindow inherits Window {
                 launch-platform-desktop-requested => { root.launch-platform-desktop-requested(); }
                 launch-platform-cli-requested => { root.launch-platform-cli-requested(); }
             }
-
-            Rectangle {
-                x: 484px;
-                y: 0px;
-                width: parent.width - 484px;
-                height: 420px;
-                background: #f8fbff;
-                border-radius: 24px;
-                border-color: #d7e4f0;
-                border-width: 1px;
-
-                Text {
-                    x: 22px;
-                    y: 20px;
-                    text: "模式说明";
-                    color: #18324a;
-                    font-size: 22px;
-                    font-weight: 800;
-                }
-
-                Text {
-                    x: 24px;
-                    y: 58px;
-                    width: parent.width - 48px;
-                    text: "官方模式不改你的官方配置；平台模式会为本次启动生成独立受管 home、独立运行目录和临时会话。";
-                    color: #688097;
-                    font-size: 14px;
-                    wrap: word-wrap;
-                }
-
-                Rectangle {
-                    x: 24px;
-                    y: 120px;
-                    width: parent.width - 48px;
-                    height: 72px;
-                    background: #ffffff;
-                    border-radius: 18px;
-                    border-color: #d7e4f0;
-                    border-width: 1px;
-
-                    Text {
-                        x: 16px;
-                        y: 14px;
-                        text: "高级设置中的官方模式";
-                        color: #21435f;
-                        font-size: 16px;
-                        font-weight: 700;
-                    }
-
-                    Text {
-                        x: 16px;
-                        y: 36px;
-                        width: parent.width - 32px;
-                        text: "默认不主推，仅在高级设置和特定调试场景下启用。";
-                        color: #698198;
-                        font-size: 12px;
-                        wrap: word-wrap;
-                    }
-                }
-
-                Rectangle {
-                    x: 24px;
-                    y: 208px;
-                    width: parent.width - 48px;
-                    height: 180px;
-                    background: #ffffff;
-                    border-radius: 18px;
-                    border-color: #d7e4f0;
-                    border-width: 1px;
-
-                    Text {
-                        x: 16px;
-                        y: 14px;
-                        text: "启动 Codex";
-                        color: #21435f;
-                        font-size: 16px;
-                        font-weight: 700;
-                    }
-
-                    Text {
-                        x: 16px;
-                        y: 36px;
-                        width: parent.width - 32px;
-                        text: "默认从桌面版进入，也可以切换到 CLI。客户端会按所选启动分组准备受管环境。";
-                        color: #698198;
-                        font-size: 12px;
-                        wrap: word-wrap;
-                    }
-
-                    Text {
-                        x: 16px;
-                        y: 98px;
-                        width: parent.width - 32px;
-                        text: "如果当前分组无权限、订阅失效或会话创建失败，客户端应明确显示原因，并允许你直接退回官方模式。";
-                        color: #698198;
-                        font-size: 12px;
-                        wrap: word-wrap;
-                    }
-                }
-            }
-
         }
 
+        // ═══ Section 2: 计费详情 ═══
         if root.current-section == 2: Rectangle {
-            x: 304px;
-            y: 148px;
-            width: parent.width - 360px;
-            height: parent.height - 196px;
+            x: 256px + 48px;
+            y: 64px + 48px;
+            width: parent.width - 256px - 96px;
+            height: parent.height - 64px - 96px;
             background: transparent;
 
             RedeemScreen {
-                x: 0px;
-                y: 0px;
+                x: 0px; y: 0px;
                 width: parent.width;
                 height: parent.height;
                 redeem-code <=> root.redeem-code;
@@ -511,40 +331,40 @@ export component AppWindow inherits Window {
             }
         }
 
+        // ═══ Section 3: 设置与帮助 ═══
         if root.current-section == 3: Rectangle {
-            x: 304px;
-            y: 148px;
-            width: parent.width - 360px;
-            height: parent.height - 196px;
+            x: 256px + 48px;
+            y: 64px + 48px;
+            width: parent.width - 256px - 96px;
+            height: parent.height - 64px - 96px;
             background: transparent;
 
             HelpDetailScreen {
-                x: 0px;
-                y: 0px;
+                x: 0px; y: 0px;
                 width: parent.width;
                 height: parent.height;
                 manual-update-check-requested => { root.manual-update-check-requested(); }
             }
         }
 
+        // ═══ Section 4: 公告中心 ═══
         if root.current-section == 4: Rectangle {
-            x: 304px;
-            y: 148px;
-            width: parent.width - 360px;
-            height: parent.height - 196px;
+            x: 256px + 48px;
+            y: 64px + 48px;
+            width: parent.width - 256px - 96px;
+            height: parent.height - 64px - 96px;
             background: transparent;
 
             AnnouncementCenterScreen {
-                x: 0px;
-                y: 0px;
+                x: 0px; y: 0px;
                 width: parent.width;
                 height: parent.height;
             }
         }
 
+        // ═══ Login Scene overlay (when !session-active, covers everything) ═══
         if !root.session-active: LoginScene {
-            x: 0px;
-            y: 0px;
+            x: 0px; y: 0px;
             width: parent.width;
             height: parent.height;
             email <=> root.email;

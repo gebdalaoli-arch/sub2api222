@@ -28,92 +28,82 @@ export component LoginScene inherits Rectangle {
 
     background: #f7f9fb;
 
-    property <length> content-left: self.width > 1320px ? 56px : 40px;
-    property <length> content-top: self.height > 860px ? 86px : 78px;
-    property <length> content-bottom-gap: 78px;
-    property <length> brand-width: self.width > 1360px ? 760px : self.width > 1180px ? 690px : self.width * 0.54;
-    property <length> card-width: self.width > 1360px ? 500px : self.width > 1180px ? 468px : self.width * 0.34;
-    property <length> card-height: self.height > 900px ? 620px : 566px;
-    property <length> card-x: self.width - root.card-width - (self.width > 1360px ? 88px : 64px);
-    property <length> card-y: self.height > 900px ? 170px : 148px;
-
+    // ─── TopAppBar h=64px ───
     Rectangle {
-        x: 0px;
-        y: 0px;
-        width: parent.width;
-        height: 66px;
-        background: #f7f9fb;
+        x: 0px; y: 0px;
+        width: parent.width; height: 64px;
+        background: #f7f9fbcc;  // 80% opacity glass
 
+        // Brand logo text
         Text {
-            x: 40px;
-            y: 22px;
+            x: 32px; y: 20px;
             text: "一键开整";
-            color: #12639c;
-            font-size: 22px;
-            font-weight: 800;
+            color: #006499;
+            font-size: 18px;
+            font-weight: 900;
         }
 
+        // Window control: notifications
         Rectangle {
-            x: parent.width - 186px;
-            y: 18px;
-            width: 30px;
-            height: 30px;
-            background: #ffffff;
-            border-radius: 15px;
-            border-color: #d7e4f0;
-            border-width: 1px;
+            x: parent.width - 148px; y: 16px;
+            width: 32px; height: 32px;
+            background: transparent;
+            border-radius: 16px;
             TouchArea { clicked => { root.showing-announcements = true; } }
-            Text { x: 8px; y: 6px; text: "🔔"; color: #274e70; font-size: 14px; }
+            Text { x: 6px; y: 6px; text: "🔔"; font-size: 16px; }
         }
 
+        // Divider
         Rectangle {
-            x: parent.width - 142px;
-            y: 18px;
-            width: 30px;
-            height: 30px;
-            background: transparent;
-            border-radius: 15px;
-            Text { x: 10px; y: 5px; text: "—"; color: #50687d; font-size: 16px; }
+            x: parent.width - 108px; y: 24px;
+            width: 1px; height: 16px;
+            background: #acb3b74d; // outline-variant 30%
         }
 
+        // Window: minimize
         Rectangle {
-            x: parent.width - 98px;
-            y: 18px;
-            width: 30px;
-            height: 30px;
-            background: transparent;
-            border-radius: 15px;
-            Text { x: 8px; y: 7px; text: "□"; color: #50687d; font-size: 13px; }
+            x: parent.width - 96px; y: 16px;
+            width: 32px; height: 32px;
+            background: transparent; border-radius: 16px;
+            Text { x: 10px; y: 4px; text: "—"; color: #51616b; font-size: 16px; }
         }
 
+        // Window: close
         Rectangle {
-            x: parent.width - 54px;
-            y: 18px;
-            width: 30px;
-            height: 30px;
-            background: transparent;
-            border-radius: 15px;
-            Text { x: 9px; y: 4px; text: "×"; color: #50687d; font-size: 16px; }
+            x: parent.width - 52px; y: 16px;
+            width: 32px; height: 32px;
+            background: transparent; border-radius: 16px;
+            Text { x: 9px; y: 4px; text: "×"; color: #51616b; font-size: 16px; }
         }
     }
 
-    if !root.showing-announcements: BrandPanel {
-        x: root.content-left;
-        y: root.content-top;
-        width: root.brand-width;
-        height: parent.height - root.content-top - root.content-bottom-gap;
-        product-name: "一键开整";
-        status-copy: root.brand-status-copy;
-        launch-copy: "少折腾，直接开工。";
-        hero-title: "欢迎王者归来";
-        hero-subtitle: "Precision Editorial Engine. 极简，极速，极度专注。";
+    // ─── Main: 50/50 split layout below TopAppBar ───
+    // Left Brand Area: surface-container-low
+    if !root.showing-announcements: Rectangle {
+        x: 0px; y: 64px;
+        width: parent.width / 2;
+        height: parent.height - 64px;
+        background: #f0f4f7;
+
+        BrandPanel {
+            x: 64px;
+            y: parent.height - 280px;
+            width: parent.width - 128px;
+            height: 200px;
+            product-name: "一键开整";
+            status-copy: root.brand-status-copy;
+            launch-copy: "少折腾，直接开工。";
+            hero-title: "欢迎王者归来";
+            hero-subtitle: "精编引擎。极简，极速，极度专注。";
+        }
     }
 
+    // Right Login Area: surface
     if !root.showing-announcements && root.auth-subview == 0: LoginScreen {
-        x: root.card-x;
-        y: root.card-y;
-        width: root.card-width;
-        height: root.card-height;
+        x: parent.width / 2 + (parent.width / 2 - 420px) / 2;
+        y: 64px + (parent.height - 64px - 520px) / 2;
+        width: 420px;
+        height: 520px;
         email <=> root.email;
         password <=> root.password;
         verification-code <=> root.verification-code;
@@ -127,10 +117,10 @@ export component LoginScene inherits Rectangle {
     }
 
     if !root.showing-announcements && root.auth-subview == 1: RegisterPanel {
-        x: root.card-x;
-        y: root.card-y + 18px;
-        width: root.card-width;
-        height: root.card-height - 20px;
+        x: parent.width / 2 + (parent.width / 2 - 420px) / 2;
+        y: 64px + (parent.height - 64px - 500px) / 2;
+        width: 420px;
+        height: 500px;
         email <=> root.email;
         password <=> root.password;
         verification-code <=> root.verification-code;
@@ -141,10 +131,10 @@ export component LoginScene inherits Rectangle {
     }
 
     if !root.showing-announcements && root.auth-subview == 2: ForgotPasswordScreen {
-        x: root.card-x;
-        y: root.card-y + 18px;
-        width: root.card-width;
-        height: root.card-height - 20px;
+        x: parent.width / 2 + (parent.width / 2 - 420px) / 2;
+        y: 64px + (parent.height - 64px - 500px) / 2;
+        width: 420px;
+        height: 500px;
         email <=> root.email;
         reset-token <=> root.reset-token;
         new-password <=> root.new-password;
@@ -154,46 +144,42 @@ export component LoginScene inherits Rectangle {
         back-requested => { root.auth-subview = 0; }
     }
 
+    // ─── Bottom footer ───
     if !root.showing-announcements: Rectangle {
-        x: 32px;
-        y: parent.height - 54px;
-        width: root.width > 1400px ? 560px : 520px;
-        height: 34px;
-        background: #ffffff;
-        border-radius: 17px;
-        border-color: #d7e4f0;
-        border-width: 1px;
+        x: 48px;
+        y: parent.height - 52px;
+        width: 480px;
+        height: 32px;
+        background: #ffffffcc; // glass pill
+        border-radius: 16px;
         Text {
-            x: 16px;
-            y: 8px;
+            x: 14px; y: 8px;
             text: "ⓘ 系统更新：V2.4 版本已发布，带来全新排版引擎";
-            color: #4f667b;
-            font-size: 12px;
+            color: #596064;
+            font-size: 11px;
         }
     }
 
     if !root.showing-announcements: Text {
-        x: parent.width - 560px;
-        y: parent.height - 48px;
-        width: 520px;
-        text: "© 2026 一键开整 · ANNOUNCEMENTS · TERMS · PRIVACY · STATUS";
-        color: #667b8e;
+        x: parent.width - 520px;
+        y: parent.height - 44px;
+        width: 490px;
+        text: "© 2026 一键开整 · 公告 · 服务条款 · 隐私 · 状态";
+        color: #51616b;
         font-size: 11px;
         horizontal-alignment: right;
     }
 
+    // Announcements overlay
     if root.showing-announcements: AnnouncementCenterScreen {
-        x: 40px;
-        y: 96px;
+        x: 40px; y: 96px;
         width: parent.width - 80px;
         height: parent.height - 128px;
     }
 
     if root.showing-announcements: Button {
-        x: 40px;
-        y: 86px;
-        width: 84px;
-        height: 38px;
+        x: 40px; y: 86px;
+        width: 84px; height: 38px;
         text: "返回";
         clicked => { root.showing-announcements = false; }
     }

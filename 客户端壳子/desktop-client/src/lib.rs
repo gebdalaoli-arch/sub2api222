@@ -42,18 +42,23 @@ mod tests {
     fn login_shell_copy_matches_approved_brand_language() {
         let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
         let login = std::fs::read_to_string(manifest_dir.join("ui/screens/login.slint")).unwrap();
+        let login_scene =
+            std::fs::read_to_string(manifest_dir.join("ui/screens/login_scene.slint")).unwrap();
         let app_window = std::fs::read_to_string(manifest_dir.join("ui/app-window.slint")).unwrap();
         let brand_panel =
             std::fs::read_to_string(manifest_dir.join("ui/components/brand_panel.slint")).unwrap();
 
-        assert!(login.contains("欢迎王者归来"));
+        assert!(login.contains("账户登录"));
         assert!(login.contains("记住密码"));
         assert!(login.contains("免登录"));
         assert!(login.contains("text: \"登录\""));
+        assert!(login_scene.contains("欢迎王者归来"));
         assert!(app_window.contains("一键开整"));
-        assert!(brand_panel.contains("少折腾，直接开工。"));
+        assert!(brand_panel.contains("极简，极速，极度专注。"));
         assert!(!login.contains("登录与注册"));
         assert!(!app_window.contains("Sub2API Desktop Client"));
+        assert!(!login_scene.contains("ETHEREAL"));
+        assert!(!app_window.contains("Prism Desktop"));
     }
 
     #[test]
@@ -66,10 +71,12 @@ mod tests {
         let update_dialog =
             std::fs::read_to_string(manifest_dir.join("ui/screens/update_dialog.slint")).unwrap();
 
-        assert!(overview.contains("准备开整"));
-        assert!(overview.contains("启动中心"));
+        assert!(overview.contains("欢迎回来"));
+        assert!(overview.contains("启动 Codex"));
         assert!(overview.contains("计费中心"));
-        assert!(overview.contains("帮助与安全"));
+        assert!(overview.contains("系统公告与日志"));
+        assert!(help_detail.contains("设置与帮助"));
+        assert!(help_detail.contains("安全边界"));
         assert!(help_detail.contains("检查更新"));
         assert!(update_dialog.contains("发现新版本"));
         assert!(update_dialog.contains("立即更新"));
@@ -86,12 +93,17 @@ mod tests {
 
         assert!(app_window.contains("公告中心"));
         assert!(app_window.contains("设置与帮助"));
-        assert!(launch.contains("启动 Codex"));
+        assert!(launch.contains("环境状态"));
+        assert!(launch.contains("启动方式"));
         assert!(launch.contains("桌面版"));
         assert!(launch.contains("CLI"));
+        assert!(launch.contains("启动分组"));
         assert!(help_detail.contains("高级设置"));
         assert!(help_detail.contains("官方模式"));
         assert!(!launch.contains("平台代理模式"));
+        assert!(!launch.contains("Environment Status"));
+        assert!(!launch.contains("INTERFACE MODE"));
+        assert!(!launch.contains("READY"));
     }
 
     #[test]
@@ -106,5 +118,14 @@ mod tests {
         assert!(dialog.contains("立即更新"));
         assert!(dialog.contains("稍后"));
         assert!(app_window.contains("update-dialog-visible"));
+    }
+
+    #[test]
+    fn main_window_does_not_ship_with_dev_preview_shortcuts() {
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let main_rs = std::fs::read_to_string(manifest_dir.join("src/main.rs")).unwrap();
+
+        assert!(!main_rs.contains("DEV PREVIEW"));
+        assert!(!main_rs.contains("preview@ethereal.dev"));
     }
 }

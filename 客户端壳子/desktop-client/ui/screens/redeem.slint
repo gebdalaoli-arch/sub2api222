@@ -11,9 +11,9 @@ export component RedeemScreen inherits Rectangle {
     callback redeem-requested();
 
     background: #ffffff;
-    border-radius: 24px;
+    border-radius: 12px;
     border-color: #dce6ef;
-    border-width: 1px;
+    border-width: 0px;
 
     property <length> content-width: self.width - 48px;
     property <length> summary-tag-width: 164px;
@@ -23,7 +23,7 @@ export component RedeemScreen inherits Rectangle {
         x: 24px;
         y: 20px;
         text: "计费详情";
-        color: #18324a;
+        color: #2c3437;
         font-size: 28px;
         font-weight: 800;
     }
@@ -33,7 +33,7 @@ export component RedeemScreen inherits Rectangle {
         y: 56px;
         width: parent.width - 48px;
         text: "查看当前订阅、消费摘要、历史订单和兑换记录。";
-        color: #688097;
+        color: #596064;
         font-size: 13px;
         wrap: word-wrap;
     }
@@ -44,15 +44,15 @@ export component RedeemScreen inherits Rectangle {
         width: root.content-width;
         height: 138px;
         background: @linear-gradient(135deg, #fafdff 0%, #eef7fc 100%);
-        border-radius: 28px;
+        border-radius: 12px;
         border-color: #dae8f2;
-        border-width: 1px;
+        border-width: 0px;
 
         Text {
             x: 20px;
             y: 18px;
             text: "订阅摘要";
-            color: #21435f;
+            color: #2c3437;
             font-size: 16px;
             font-weight: 700;
         }
@@ -62,7 +62,7 @@ export component RedeemScreen inherits Rectangle {
             y: 46px;
             width: parent.width - 40px;
             text: root.subscription-summary-text;
-            color: #18324a;
+            color: #2c3437;
             font-size: 20px;
             font-weight: 800;
             wrap: word-wrap;
@@ -74,15 +74,15 @@ export component RedeemScreen inherits Rectangle {
             width: 156px;
             height: 42px;
             background: #ffffff;
-            border-radius: 18px;
+            border-radius: 12px;
             border-color: #d7e4f0;
-            border-width: 1px;
+            border-width: 0px;
 
             Text {
                 x: 18px;
                 y: 12px;
                 text: "账户余额概览";
-                color: #2b59d0;
+                color: #006499;
                 font-size: 12px;
                 font-weight: 700;
             }
@@ -96,8 +96,8 @@ export component RedeemScreen inherits Rectangle {
             background: #ffffff;
             border-radius: 14px;
             border-color: #d7e4f0;
-            border-width: 1px;
-            Text { x: 16px; y: 7px; text: "订阅项目 " + root.subscription-lines.length; color: #6a8299; font-size: 11px; font-weight: 700; }
+            border-width: 0px;
+            Text { x: 16px; y: 7px; text: "订阅项目 " + root.subscription-lines.length; color: #596064; font-size: 11px; font-weight: 700; }
         }
 
         Rectangle {
@@ -108,8 +108,8 @@ export component RedeemScreen inherits Rectangle {
             background: #ffffff;
             border-radius: 14px;
             border-color: #d7e4f0;
-            border-width: 1px;
-            Text { x: 16px; y: 7px; text: "历史订单 " + root.order-lines.length; color: #6a8299; font-size: 11px; font-weight: 700; }
+            border-width: 0px;
+            Text { x: 16px; y: 7px; text: "历史订单 " + root.order-lines.length; color: #596064; font-size: 11px; font-weight: 700; }
         }
 
         Rectangle {
@@ -120,8 +120,8 @@ export component RedeemScreen inherits Rectangle {
             background: #ffffff;
             border-radius: 14px;
             border-color: #d7e4f0;
-            border-width: 1px;
-            Text { x: 16px; y: 7px; text: "兑换记录 " + root.history-lines.length; color: #6a8299; font-size: 11px; font-weight: 700; }
+            border-width: 0px;
+            Text { x: 16px; y: 7px; text: "兑换记录 " + root.history-lines.length; color: #596064; font-size: 11px; font-weight: 700; }
         }
     }
 
@@ -130,10 +130,10 @@ export component RedeemScreen inherits Rectangle {
         y: 254px;
         width: root.content-width;
         height: 82px;
-        background: #f8fbff;
+        background: #eaeff2;
         border-radius: 22px;
         border-color: #d7e4f0;
-        border-width: 1px;
+        border-width: 0px;
 
         LineEdit {
             x: 18px;
@@ -160,16 +160,16 @@ export component RedeemScreen inherits Rectangle {
         width: root.content-width;
         height: 54px;
         background: #ffffff;
-        border-radius: 16px;
+        border-radius: 8px;
         border-color: #d7e4f0;
-        border-width: 1px;
+        border-width: 0px;
 
         Text {
             x: 16px;
             y: 18px;
             width: parent.width - 32px;
             text: root.redeem-status-text;
-            color: #5b7490;
+            color: #596064;
             font-size: 12px;
             wrap: word-wrap;
         }
@@ -180,16 +180,16 @@ export component RedeemScreen inherits Rectangle {
         y: 428px;
         width: root.content-width - root.history-column-width - 24px;
         height: parent.height - 452px;
-        background: #f8fbff;
+        background: #eaeff2;
         border-radius: 22px;
         border-color: #d7e4f0;
-        border-width: 1px;
+        border-width: 0px;
 
         Text {
             x: 18px;
             y: 18px;
             text: "历史订单";
-            color: #18324a;
+            color: #2c3437;
             font-size: 20px;
             font-weight: 800;
         }
@@ -200,16 +200,16 @@ export component RedeemScreen inherits Rectangle {
             width: parent.width - 36px;
             height: 58px;
             background: #ffffff;
-            border-radius: 18px;
+            border-radius: 12px;
             border-color: #d7e4f0;
-            border-width: 1px;
+            border-width: 0px;
 
             Text {
                 x: 16px;
                 y: 18px;
                 width: parent.width - 32px;
                 text: line;
-                color: #688097;
+                color: #596064;
                 font-size: 12px;
                 wrap: word-wrap;
             }
@@ -221,16 +221,16 @@ export component RedeemScreen inherits Rectangle {
         y: 428px;
         width: root.history-column-width;
         height: parent.height - 452px;
-        background: #f8fbff;
+        background: #eaeff2;
         border-radius: 22px;
         border-color: #d7e4f0;
-        border-width: 1px;
+        border-width: 0px;
 
         Text {
             x: 18px;
             y: 18px;
             text: "兑换记录";
-            color: #18324a;
+            color: #2c3437;
             font-size: 18px;
             font-weight: 800;
         }
@@ -241,16 +241,16 @@ export component RedeemScreen inherits Rectangle {
             width: parent.width - 36px;
             height: 56px;
             background: #ffffff;
-            border-radius: 18px;
+            border-radius: 12px;
             border-color: #d7e4f0;
-            border-width: 1px;
+            border-width: 0px;
 
             Text {
                 x: 14px;
                 y: 16px;
                 width: parent.width - 28px;
                 text: line;
-                color: #688097;
+                color: #596064;
                 font-size: 12px;
                 wrap: word-wrap;
             }
