@@ -42,7 +42,7 @@ use sub2api_desktop::{
     config::{app_config, AppConfig},
     platform::{
         install_detection::{detect_installed_targets, InstalledTarget, LaunchTarget},
-        launcher::{launch_official, launch_platform},
+        launcher::{launch_official, launch_platform, validate_platform_launch_target},
         managed_home::{
             cleanup_runtime_roots_older_than, write_platform_home, write_runtime_metadata,
             ManagedHomePaths,
@@ -268,6 +268,14 @@ fn start_platform_launch(
             });
             return;
         };
+
+        if let Err(error) = validate_platform_launch_target(&target) {
+            let message = describe_platform_launch_error(&error.to_string());
+            let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                app.set_launch_status_text(SharedString::from(message))
+            });
+            return;
+        }
 
         let api_client = ApiClient::new(config.api_base_url.clone())
             .with_access_token(Some(session.access_token));

@@ -15,6 +15,9 @@ pub struct LaunchCommandSpec {
     pub tracks_child_lifecycle: bool,
 }
 
+pub const WINDOWS_STORE_DESKTOP_PLATFORM_UNSUPPORTED: &str =
+    "WINDOWS_STORE_DESKTOP_PLATFORM_UNSUPPORTED";
+
 impl LaunchCommandSpec {
     pub fn direct(executable: PathBuf) -> Self {
         Self {
@@ -24,6 +27,13 @@ impl LaunchCommandSpec {
             tracks_child_lifecycle: true,
         }
     }
+}
+
+pub fn validate_platform_launch_target(target: &InstalledTarget) -> Result<()> {
+    if windows_store_app_id(target).is_some() {
+        anyhow::bail!(WINDOWS_STORE_DESKTOP_PLATFORM_UNSUPPORTED);
+    }
+    Ok(())
 }
 
 pub fn official_launch_command(target: &InstalledTarget) -> LaunchCommandSpec {
@@ -86,6 +96,7 @@ pub fn platform_launch_command(target: &InstalledTarget, codex_home: &Path) -> L
 }
 
 pub fn launch_platform(target: &InstalledTarget, codex_home: &Path) -> Result<Option<Child>> {
+    validate_platform_launch_target(target)?;
     let spec = platform_launch_command(target, codex_home);
     spawn_command(spec)
 }
@@ -131,7 +142,10 @@ fn windows_store_app_id(target: &InstalledTarget) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{official_launch_command, platform_launch_command};
+    use super::{
+        official_launch_command, platform_launch_command, validate_platform_launch_target,
+        WINDOWS_STORE_DESKTOP_PLATFORM_UNSUPPORTED,
+    };
     use crate::platform::install_detection::{InstalledTarget, LaunchTarget};
     use std::path::PathBuf;
 
@@ -213,5 +227,51 @@ mod tests {
         let spec = official_launch_command(&target);
 
         assert!(spec.tracks_child_lifecycle);
+    }
+
+    #[test]
+    fn platform_launch_validation_rejects_windows_store_desktop() {
+        let target = InstalledTarget {
+            kind: LaunchTarget::Desktop,
+            executable: PathBuf::from(
+                r"C:\Program Files\WindowsApps\OpenAI.Codex_1.0.0.0_x64__2p2nqsd0c76g0\app\Codex.exe",
+            ),
+            display_name: "Codex Desktop".to_string(),
+        };
+
+        let error = validate_platform_launch_target(&target).unwrap_err();
+
+        assert!(error
+            .to_string()
+            .contains(WINDOWS_STORE_DESKTOP_PLATFORM_UNSUPPORTED));
+    }
+
+    #[test]
+    fn platform_launch_validation_allows_cli_targets() {
+        let target = InstalledTarget {
+            kind: LaunchTarget::Cli,
+            executable: PathBuf::from(r"C:\Users\tester\AppData\Roaming\npm\codex.cmd"),
+            display_name: "Codex CLI".to_string(),
+        };
+
+        assert!(validate_platform_launch_target(&target).is_ok());
+    }
+
+    #[test]
+    fn launch_platform_rejects_windows_store_desktop_before_spawn() {
+        let target = InstalledTarget {
+            kind: LaunchTarget::Desktop,
+            executable: PathBuf::from(
+                r"C:\Program Files\WindowsApps\OpenAI.Codex_1.0.0.0_x64__2p2nqsd0c76g0\app\Codex.exe",
+            ),
+            display_name: "Codex Desktop".to_string(),
+        };
+
+        let error = super::launch_platform(&target, PathBuf::from(r"D:\Temp\codex-home").as_path())
+            .unwrap_err();
+
+        assert!(error
+            .to_string()
+            .contains(WINDOWS_STORE_DESKTOP_PLATFORM_UNSUPPORTED));
     }
 }

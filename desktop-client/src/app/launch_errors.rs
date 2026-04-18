@@ -9,6 +9,9 @@ pub fn describe_platform_launch_error(error_text: &str) -> String {
     {
         return "当前分组需要有效订阅才能启动平台代理模式。".to_string();
     }
+    if normalized.contains("windows_store_desktop_platform_unsupported") {
+        return "Windows 商店版 Codex Desktop 当前不支持本次启动隔离注入。请改用 CLI 的平台代理模式，或继续使用官方桌面模式。".to_string();
+    }
     if normalized.contains("service temporarily unavailable")
         || normalized.contains("no available accounts")
     {
@@ -61,5 +64,13 @@ mod tests {
             describe_platform_launch_error("This account only allows Codex official clients");
 
         assert!(message.contains("仅允许 Codex 官方客户端"));
+    }
+
+    #[test]
+    fn describe_platform_launch_error_handles_windows_store_desktop_limit() {
+        let message =
+            describe_platform_launch_error("WINDOWS_STORE_DESKTOP_PLATFORM_UNSUPPORTED");
+
+        assert!(message.contains("Windows 商店版 Codex Desktop"));
     }
 }
