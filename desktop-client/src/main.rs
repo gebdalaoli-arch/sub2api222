@@ -32,7 +32,7 @@ use sub2api_desktop::{
         subscriptions::{fetch_subscription_summary_blocking, SubscriptionSummary},
     },
     app::{
-        auth_flow::{build_login_submission, LoginSubmission},
+        auth_flow::{build_login_submission, should_restore_session, LoginSubmission},
         launch_errors::describe_platform_launch_error,
         view_models::{
             billing_vm::BillingViewModel, dashboard_vm::DashboardViewModel,
@@ -50,7 +50,7 @@ use sub2api_desktop::{
         runtime_bootstrap::StartupDiagnostics,
     },
     storage::{
-        app_state::AppStateStore,
+        app_state::{AppStateStore, AuthPreferences},
         secure_store::{RefreshTokenStore, SystemCredentialStore},
     },
 };
@@ -132,9 +132,11 @@ fn main() -> anyhow::Result<()> {
         Arc::clone(&redeem_history),
         Arc::clone(&recent_orders),
     );
+    wire_update_callbacks(&app);
     restore_saved_session(
         &app,
         Arc::clone(&config),
+        app_state.clone(),
         token_store,
         Arc::clone(&auth_session),
         Arc::clone(&pending_totp_token),
@@ -165,6 +167,13 @@ fn preload_local_state(app: &AppWindow, app_state: &AppStateStore) {
     if let Ok(Some(email)) = app_state.load_last_email() {
         app.set_email(SharedString::from(email));
     }
+    let prefs = app_state
+        .load_auth_preferences()
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+    app.set_remember_password(prefs.remember_password);
+    app.set_auto_login(prefs.auto_login);
 }
 
 fn wire_launch_callbacks(app: &AppWindow, targets: Rc<RefCell<Vec<InstalledTarget>>>) {
@@ -434,6 +443,11 @@ fn wire_auth_callbacks(
         let email = app.get_email().to_string();
         let password = app.get_password().to_string();
         let verification_code = app.get_verification_code().to_string();
+        let auth_preferences = AuthPreferences {
+            remember_password: app.get_remember_password(),
+            auto_login: app.get_auto_login(),
+        }
+        .sanitized();
         let pending_token = login_totp.lock().ok().and_then(|state| state.clone());
 
         let submission = match build_login_submission(
@@ -487,6 +501,7 @@ fn wire_auth_callbacks(
                         &config,
                         &app_state,
                         &token_store,
+                        &auth_preferences,
                         &auth_session,
                         &pending_totp_token,
                         &available_groups,
@@ -524,7 +539,8 @@ fn wire_auth_callbacks(
                         None => "检测到二步验证，请在“验证码 / 2FA”输入框填写 6 位动态码后再次点击登录。".to_string(),
                     };
                     let _ = ui_handle.upgrade_in_event_loop(move |app| {
-                        app.set_auth_status_text(SharedString::from(message))
+                        app.set_auth_status_text(SharedString::from(message));
+                        app.set_show_login_totp(true);
                     });
                 }
                 Err(error) => {
@@ -554,6 +570,11 @@ fn wire_auth_callbacks(
         let email = app.get_email().to_string();
         let password = app.get_password().to_string();
         let verification_code = app.get_verification_code().to_string();
+        let auth_preferences = AuthPreferences {
+            remember_password: app.get_remember_password(),
+            auto_login: app.get_auto_login(),
+        }
+        .sanitized();
         if email.trim().is_empty() || password.is_empty() {
             app.set_auth_status_text(SharedString::from("注册前请填写邮箱、密码和邮箱验证码。"));
             return;
@@ -584,6 +605,7 @@ fn wire_auth_callbacks(
                         &config,
                         &app_state,
                         &token_store,
+                        &auth_preferences,
                         &auth_session,
                         &pending_totp_token,
                         &available_groups,
@@ -607,6 +629,7 @@ fn wire_auth_callbacks(
                             app.set_auth_status_text(SharedString::from(
                                 "注册成功，已自动登录当前账户。",
                             ));
+                            app.set_auth_subview(0);
                         }
                     });
                 }
@@ -832,6 +855,7 @@ fn wire_billing_callbacks(
 fn restore_saved_session(
     app: &AppWindow,
     config: Arc<AppConfig>,
+    app_state: AppStateStore,
     token_store: SystemCredentialStore,
     auth_session: SharedAuthSession,
     pending_totp_token: Arc<Mutex<Option<String>>>,
@@ -845,8 +869,16 @@ fn restore_saved_session(
         app.set_auth_status_text(SharedString::from(message));
         return;
     }
+    let auth_preferences = app_state
+        .load_auth_preferences()
+        .ok()
+        .flatten()
+        .unwrap_or_default();
     match token_store.load_refresh_token() {
         Ok(Some(refresh_token)) => {
+            if !should_restore_session(&auth_preferences, true) {
+                return;
+            }
             app.set_auth_status_text(SharedString::from("正在恢复上次登录状态..."));
             thread::spawn(move || {
                 let client = ApiClient::new(config.api_base_url.clone());
@@ -882,6 +914,10 @@ fn restore_saved_session(
                                     app.set_auth_status_text(SharedString::from(
                                         "已恢复上次登录状态。",
                                     ));
+                                    app.set_session_active(true);
+                                    app.set_auth_subview(0);
+                                    app.set_show_login_totp(false);
+                                    app.set_current_section(0);
                                 });
                             }
                             Err(error) => {
@@ -915,6 +951,7 @@ fn handle_auth_success(
     config: &AppConfig,
     app_state: &AppStateStore,
     token_store: &SystemCredentialStore,
+    auth_preferences: &AuthPreferences,
     auth_session: &SharedAuthSession,
     pending_totp_token: &Arc<Mutex<Option<String>>>,
     available_groups: &SharedGroups,
@@ -925,8 +962,13 @@ fn handle_auth_success(
     auth: AuthResponse,
 ) {
     let _ = app_state.save_last_email(&email);
-    if let Some(refresh_token) = auth.refresh_token.as_deref() {
-        let _ = token_store.save_refresh_token(refresh_token);
+    let _ = app_state.save_auth_preferences(auth_preferences);
+    if auth_preferences.remember_password {
+        if let Some(refresh_token) = auth.refresh_token.as_deref() {
+            let _ = token_store.save_refresh_token(refresh_token);
+        }
+    } else {
+        let _ = token_store.clear_refresh_token();
     }
     if let Ok(mut pending) = pending_totp_token.lock() {
         *pending = None;
@@ -1171,6 +1213,11 @@ fn apply_launch_state(app: &AppWindow, targets: &[InstalledTarget]) {
 }
 
 fn apply_logged_out_state(app: &AppWindow) {
+    app.set_session_active(false);
+    app.set_auth_subview(0);
+    app.set_show_login_totp(false);
+    app.set_current_section(0);
+    app.set_brand_status_copy(SharedString::from("你的电子牛马已就位。"));
     app.set_dashboard_user_label(SharedString::from("当前账号：未登录"));
     app.set_dashboard_balance_text(SharedString::from("余额：--"));
     app.set_dashboard_usage_text(SharedString::from("并发额度：--"));
@@ -1181,6 +1228,11 @@ fn apply_logged_out_state(app: &AppWindow) {
 }
 
 fn apply_authenticated_state(app: &AppWindow, session: &AuthSession, group_count: Option<usize>) {
+    app.set_session_active(true);
+    app.set_auth_subview(0);
+    app.set_show_login_totp(false);
+    app.set_current_section(0);
+    app.set_brand_status_copy(SharedString::from("电子牛马已经把你的工作台准备好了。"));
     let dashboard = DashboardViewModel::from_user(&session.user);
     app.set_dashboard_user_label(SharedString::from(format!(
         "当前账号：{}",
@@ -1205,6 +1257,35 @@ fn apply_authenticated_state(app: &AppWindow, session: &AuthSession, group_count
         None => "已登录，但暂未拉到可用分组列表；可稍后重试或继续使用官方模式。".to_string(),
     }));
     app.set_auth_status_text(SharedString::from("登录成功，可继续进入启动中心。"));
+}
+
+fn wire_update_callbacks(app: &AppWindow) {
+    let manual_update_app = app.as_weak();
+    app.on_manual_update_check_requested(move || {
+        if let Some(app) = manual_update_app.upgrade() {
+            app.set_update_dialog_visible(true);
+            app.set_update_force(false);
+            app.set_update_current_version(SharedString::from("v0.1.0"));
+            app.set_update_latest_version(SharedString::from("v0.2.0"));
+            app.set_update_summary(SharedString::from(
+                "修复若干问题，并带来更稳定的一键开整体验。",
+            ));
+        }
+    });
+
+    let secondary_update_app = app.as_weak();
+    app.on_update_secondary_requested(move || {
+        if let Some(app) = secondary_update_app.upgrade() {
+            app.set_update_dialog_visible(false);
+        }
+    });
+
+    let primary_update_app = app.as_weak();
+    app.on_update_primary_requested(move || {
+        if let Some(app) = primary_update_app.upgrade() {
+            app.set_update_dialog_visible(false);
+        }
+    });
 }
 
 fn apply_available_groups_state(app: &AppWindow, groups: &[GroupSummary]) {

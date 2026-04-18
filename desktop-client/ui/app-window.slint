@@ -1,11 +1,12 @@
-import { Button } from "std-widgets.slint";
 import { BrandPanel } from "components/brand_panel.slint";
-import { AboutScreen } from "screens/about.slint";
-import { DashboardScreen } from "screens/dashboard.slint";
 import { ForgotPasswordScreen } from "screens/forgot_password.slint";
+import { HelpDetailScreen } from "screens/help_detail.slint";
 import { LaunchPanel } from "screens/launch_panel.slint";
 import { RedeemScreen } from "screens/redeem.slint";
 import { LoginScreen } from "screens/login.slint";
+import { OverviewScreen } from "screens/overview.slint";
+import { RegisterPanel } from "screens/register_panel.slint";
+import { UpdateDialog } from "screens/update_dialog.slint";
 
 export component AppWindow inherits Window {
     width: 1280px;
@@ -32,6 +33,8 @@ export component AppWindow inherits Window {
     in-out property <bool> remember-password: true;
     in-out property <bool> auto-login: false;
     in-out property <bool> show-login-totp: false;
+    in-out property <bool> session-active: false;
+    in-out property <int> auth-subview: 0;
     in-out property <string> brand-status-copy: "你的电子牛马已就位。";
     in-out property <string> redeem-code;
     in-out property <string> redeem-status-text: "输入 CDK 后点击兑换。";
@@ -42,6 +45,11 @@ export component AppWindow inherits Window {
     in-out property <int> current-section: 0;
     in-out property <[string]> launch-group-options: ["登录后加载可用分组"];
     in-out property <int> launch-selected-group-index: 0;
+    in-out property <bool> update-dialog-visible: false;
+    in-out property <bool> update-force: false;
+    in-out property <string> update-current-version: "v0.1.0";
+    in-out property <string> update-latest-version: "v0.2.0";
+    in-out property <string> update-summary: "修复若干问题，并带来更稳定的一键开整体验。";
 
     callback refresh-installations-requested();
     callback launch-desktop-requested();
@@ -54,6 +62,9 @@ export component AppWindow inherits Window {
     callback forgot-password-requested();
     callback reset-password-requested();
     callback redeem-requested();
+    callback manual-update-check-requested();
+    callback update-primary-requested();
+    callback update-secondary-requested();
 
     Rectangle {
         width: parent.width;
@@ -148,8 +159,8 @@ export component AppWindow inherits Window {
             border-color: root.current-section == 0 ? #18324a : #d6e3ef;
             border-width: 1px;
             TouchArea { clicked => { root.current-section = 0; } }
-            Text { x: 18px; y: 12px; text: "账户中心"; color: root.current-section == 0 ? #ffffff : #18324a; font-size: 15px; font-weight: 700; }
-            Text { x: 18px; y: 31px; width: 164px; text: "登录、注册、找回密码"; color: root.current-section == 0 ? #d7e6f6 : #6a8299; font-size: 11px; wrap: word-wrap; }
+            Text { x: 18px; y: 12px; text: "一级总览"; color: root.current-section == 0 ? #ffffff : #18324a; font-size: 15px; font-weight: 700; }
+            Text { x: 18px; y: 31px; width: 164px; text: root.session-active ? "从这里继续下钻进入详情" : "登录、注册、找回密码"; color: root.current-section == 0 ? #d7e6f6 : #6a8299; font-size: 11px; wrap: word-wrap; }
         }
 
         Rectangle {
@@ -230,7 +241,7 @@ export component AppWindow inherits Window {
             Text {
                 x: 24px;
                 y: 18px;
-                text: root.current-section == 0 ? "账户中心" : root.current-section == 1 ? "启动中心" : root.current-section == 2 ? "计费与公告" : "帮助与安全";
+                text: root.current-section == 0 ? (root.session-active ? "一级总览" : "登录入口") : root.current-section == 1 ? "启动详情" : root.current-section == 2 ? "计费详情" : "帮助与安全";
                 color: #18324a;
                 font-size: 28px;
                 font-weight: 800;
@@ -240,7 +251,7 @@ export component AppWindow inherits Window {
                 x: 24px;
                 y: 50px;
                 width: parent.width - 280px;
-                text: root.current-section == 0 ? root.auth-status-text : root.current-section == 1 ? root.launch-status-text : root.current-section == 2 ? root.dashboard-notice-text : "平台模式与官方模式相互隔离，帮助信息集中在这里。";
+                text: root.current-section == 0 ? (root.session-active ? "从这里进入启动、计费和帮助的二级详情，不再直接平铺所有信息。" : root.auth-status-text) : root.current-section == 1 ? root.launch-status-text : root.current-section == 2 ? root.dashboard-notice-text : "更新、恢复和安全边界统一收在这里。";
                 color: #698198;
                 font-size: 13px;
                 wrap: word-wrap;
@@ -278,7 +289,7 @@ export component AppWindow inherits Window {
             height: parent.height - 196px;
             background: transparent;
 
-            BrandPanel {
+            if !root.session-active: BrandPanel {
                 x: 0px;
                 y: 0px;
                 width: 352px;
@@ -287,7 +298,7 @@ export component AppWindow inherits Window {
                 status-copy: root.brand-status-copy;
             }
 
-            LoginScreen {
+            if !root.session-active: LoginScreen {
                 x: 376px;
                 y: 0px;
                 width: parent.width - 376px;
@@ -299,8 +310,52 @@ export component AppWindow inherits Window {
                 show-totp-field: root.show-login-totp;
                 status-text: root.auth-status-text;
                 login-requested => { root.login-requested(); }
-                register-requested => { root.register-requested(); }
+                open-register-requested => { root.auth-subview = 1; }
+                open-forgot-password-requested => { root.auth-subview = 2; }
+            }
+
+            if !root.session-active && root.auth-subview == 1: RegisterPanel {
+                x: 420px;
+                y: 72px;
+                width: parent.width - 444px;
+                height: 500px;
+                email <=> root.email;
+                password <=> root.password;
+                verification-code <=> root.verification-code;
+                status-text: root.auth-status-text;
+                register-submit-requested => { root.register-requested(); }
                 verify-code-requested => { root.verify-code-requested(); }
+                back-requested => { root.auth-subview = 0; }
+            }
+
+            if !root.session-active && root.auth-subview == 2: ForgotPasswordScreen {
+                x: 420px;
+                y: 72px;
+                width: parent.width - 444px;
+                height: 500px;
+                email <=> root.email;
+                reset-token <=> root.reset-token;
+                new-password <=> root.new-password;
+                status-text: root.reset-status-text;
+                forgot-password-requested => { root.forgot-password-requested(); }
+                reset-password-requested => { root.reset-password-requested(); }
+                back-requested => { root.auth-subview = 0; }
+            }
+
+            if root.session-active: OverviewScreen {
+                x: 0px;
+                y: 0px;
+                width: parent.width;
+                height: parent.height;
+                welcome-text: "准备开整";
+                user-label: root.dashboard-user-label;
+                balance-text: root.dashboard-balance-text;
+                usage-text: root.dashboard-usage-text;
+                account-status-text: root.dashboard-account-status-text;
+                notice-text: root.dashboard-notice-text;
+                open-launch-requested => { root.current-section = 1; }
+                open-billing-requested => { root.current-section = 2; }
+                open-help-requested => { root.current-section = 3; }
             }
         }
 
@@ -428,12 +483,6 @@ export component AppWindow inherits Window {
                 }
             }
 
-            AboutScreen {
-                x: 0px;
-                y: 444px;
-                width: parent.width;
-                height: 116px;
-            }
         }
 
         if root.current-section == 2: Rectangle {
@@ -465,37 +514,25 @@ export component AppWindow inherits Window {
             height: parent.height - 196px;
             background: transparent;
 
-            AboutScreen {
+            HelpDetailScreen {
                 x: 0px;
                 y: 0px;
                 width: parent.width;
-                height: 112px;
+                height: parent.height;
+                manual-update-check-requested => { root.manual-update-check-requested(); }
             }
+        }
 
-            Rectangle {
-                x: 0px;
-                y: 132px;
-                width: parent.width;
-                height: 214px;
-                background: #f8fbff;
-                border-radius: 24px;
-                border-color: #d7e4f0;
-                border-width: 1px;
-
-                Text {
-                    x: 24px;
-                    y: 20px;
-                    text: "使用建议";
-                    color: #18324a;
-                    font-size: 22px;
-                    font-weight: 800;
-                }
-
-                Text { x: 24px; y: 62px; text: "1. 先登录并确认账户套餐可用，再进入平台模式。"; color: #57708a; font-size: 13px; }
-                Text { x: 24px; y: 88px; text: "2. 如遇启动失败，优先检测安装，再查看模式说明与账户状态。"; color: #57708a; font-size: 13px; }
-                Text { x: 24px; y: 114px; text: "3. 如遇强退，下次启动会优先清理临时运行材料，官方模式不受影响。"; color: #57708a; font-size: 13px; }
-                Text { x: 24px; y: 140px; text: "4. 客户端不会展示普通 API 凭据，也不会要求你手动复制网关地址。"; color: #57708a; font-size: 13px; }
-            }
+        UpdateDialog {
+            width: parent.width;
+            height: parent.height;
+            dialog-visible: root.update-dialog-visible;
+            force-update: root.update-force;
+            current-version: root.update-current-version;
+            latest-version: root.update-latest-version;
+            summary: root.update-summary;
+            primary-requested => { root.update-primary-requested(); }
+            secondary-requested => { root.update-secondary-requested(); }
         }
     }
 }

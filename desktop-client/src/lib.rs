@@ -55,4 +55,23 @@ mod tests {
         assert!(!login.contains("登录与注册"));
         assert!(!app_window.contains("Sub2API Desktop Client"));
     }
+
+    #[test]
+    fn overview_and_update_shell_copy_match_new_information_architecture() {
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let overview =
+            std::fs::read_to_string(manifest_dir.join("ui/screens/overview.slint")).unwrap();
+        let help_detail =
+            std::fs::read_to_string(manifest_dir.join("ui/screens/help_detail.slint")).unwrap();
+        let update_dialog =
+            std::fs::read_to_string(manifest_dir.join("ui/screens/update_dialog.slint")).unwrap();
+
+        assert!(overview.contains("准备开整"));
+        assert!(overview.contains("启动中心"));
+        assert!(overview.contains("计费中心"));
+        assert!(overview.contains("帮助与安全"));
+        assert!(help_detail.contains("检查更新"));
+        assert!(update_dialog.contains("发现新版本"));
+        assert!(update_dialog.contains("立即更新"));
+    }
 }

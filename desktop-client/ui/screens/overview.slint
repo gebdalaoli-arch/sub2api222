@@ -1,0 +1,153 @@
+import { Button } from "std-widgets.slint";
+
+export component OverviewScreen inherits Rectangle {
+    in property <string> welcome-text: "准备开整";
+    in property <string> user-label: "当前账号：未登录";
+    in property <string> balance-text: "余额：--";
+    in property <string> usage-text: "并发额度：--";
+    in property <string> account-status-text: "账户状态：待登录";
+    in property <string> notice-text: "一键开整";
+
+    callback open-launch-requested();
+    callback open-billing-requested();
+    callback open-help-requested();
+
+    background: transparent;
+
+    Text {
+        x: 0px;
+        y: 0px;
+        text: root.welcome-text;
+        color: #17324a;
+        font-size: 30px;
+        font-weight: 800;
+    }
+
+    Text {
+        x: 0px;
+        y: 42px;
+        width: parent.width;
+        text: root.user-label;
+        color: #5b7490;
+        font-size: 13px;
+    }
+
+    Rectangle {
+        x: 0px;
+        y: 86px;
+        width: parent.width;
+        height: 116px;
+        background: #f8fbff;
+        border-radius: 24px;
+        border-color: #d7e4f0;
+        border-width: 1px;
+
+        Rectangle {
+            x: 20px;
+            y: 18px;
+            width: (parent.width - 80px) / 3;
+            height: 80px;
+            background: #ffffff;
+            border-radius: 18px;
+            border-color: #d7e4f0;
+            border-width: 1px;
+            Text { x: 16px; y: 14px; text: "余额"; color: #6a8299; font-size: 12px; font-weight: 700; }
+            Text { x: 16px; y: 40px; text: root.balance-text; color: #18324a; font-size: 18px; font-weight: 800; }
+        }
+
+        Rectangle {
+            x: 30px + (parent.width - 80px) / 3;
+            y: 18px;
+            width: (parent.width - 80px) / 3;
+            height: 80px;
+            background: #ffffff;
+            border-radius: 18px;
+            border-color: #d7e4f0;
+            border-width: 1px;
+            Text { x: 16px; y: 14px; text: "并发"; color: #6a8299; font-size: 12px; font-weight: 700; }
+            Text { x: 16px; y: 40px; text: root.usage-text; color: #18324a; font-size: 18px; font-weight: 800; }
+        }
+
+        Rectangle {
+            x: 40px + ((parent.width - 80px) / 3) * 2;
+            y: 18px;
+            width: (parent.width - 80px) / 3;
+            height: 80px;
+            background: #ffffff;
+            border-radius: 18px;
+            border-color: #d7e4f0;
+            border-width: 1px;
+            Text { x: 16px; y: 14px; text: "状态"; color: #6a8299; font-size: 12px; font-weight: 700; }
+            Text { x: 16px; y: 40px; width: parent.width - 32px; text: root.account-status-text; color: #18324a; font-size: 14px; font-weight: 700; wrap: word-wrap; }
+        }
+    }
+
+    Rectangle {
+        x: 0px;
+        y: 226px;
+        width: 276px;
+        height: 178px;
+        background: #f8fbff;
+        border-radius: 24px;
+        border-color: #d7e4f0;
+        border-width: 1px;
+        TouchArea { clicked => { root.open-launch-requested(); } }
+
+        Text { x: 20px; y: 22px; text: "启动中心"; color: #18324a; font-size: 22px; font-weight: 800; }
+        Text { x: 20px; y: 58px; width: parent.width - 40px; text: "查看官方模式与平台代理模式，进入目标安装状态与 group 详情。"; color: #688097; font-size: 13px; wrap: word-wrap; }
+        Button {
+            x: 20px;
+            y: 120px;
+            width: 132px;
+            height: 40px;
+            text: "查看启动详情";
+            clicked => { root.open-launch-requested(); }
+        }
+    }
+
+    Rectangle {
+        x: 292px;
+        y: 226px;
+        width: 276px;
+        height: 178px;
+        background: #f8fbff;
+        border-radius: 24px;
+        border-color: #d7e4f0;
+        border-width: 1px;
+        TouchArea { clicked => { root.open-billing-requested(); } }
+
+        Text { x: 20px; y: 22px; text: "计费中心"; color: #18324a; font-size: 22px; font-weight: 800; }
+        Text { x: 20px; y: 58px; width: parent.width - 40px; text: "进入订阅、订单和兑换记录详情，不再把所有计费信息直接平铺。"; color: #688097; font-size: 13px; wrap: word-wrap; }
+        Button {
+            x: 20px;
+            y: 120px;
+            width: 132px;
+            height: 40px;
+            text: "查看计费详情";
+            clicked => { root.open-billing-requested(); }
+        }
+    }
+
+    Rectangle {
+        x: 584px;
+        y: 226px;
+        width: parent.width - 584px;
+        height: 178px;
+        background: #f8fbff;
+        border-radius: 24px;
+        border-color: #d7e4f0;
+        border-width: 1px;
+        TouchArea { clicked => { root.open-help-requested(); } }
+
+        Text { x: 20px; y: 22px; text: "帮助与安全"; color: #18324a; font-size: 22px; font-weight: 800; }
+        Text { x: 20px; y: 58px; width: parent.width - 40px; text: root.notice-text; color: #688097; font-size: 13px; wrap: word-wrap; }
+        Button {
+            x: 20px;
+            y: 120px;
+            width: 146px;
+            height: 40px;
+            text: "打开帮助详情";
+            clicked => { root.open-help-requested(); }
+        }
+    }
+}
