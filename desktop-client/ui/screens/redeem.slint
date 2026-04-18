@@ -1,0 +1,134 @@
+import { Button, LineEdit } from "std-widgets.slint";
+
+export component RedeemScreen inherits Rectangle {
+    in-out property <string> redeem-code;
+    in property <string> redeem-status-text: "输入 CDK 后点击兑换。";
+    in property <string> subscription-summary-text: "暂无订阅摘要";
+    in property <[string]> subscription-lines: ["登录后可查看当前订阅额度和到期时间。"];
+    in property <[string]> history-lines: ["最近兑换记录会显示在这里。"];
+
+    callback redeem-requested();
+
+    background: #f8fbff;
+    border-radius: 24px;
+    border-color: #d7e4f0;
+    border-width: 1px;
+
+    Text {
+        x: 24px;
+        y: 20px;
+        text: "CDK 与订阅";
+        color: #18324a;
+        font-size: 24px;
+        font-weight: 800;
+    }
+
+    Text {
+        x: 24px;
+        y: 54px;
+        width: parent.width - 48px;
+        text: root.subscription-summary-text;
+        color: #688097;
+        font-size: 13px;
+        wrap: word-wrap;
+    }
+
+    LineEdit {
+        x: 24px;
+        y: 92px;
+        width: parent.width - 168px;
+        height: 40px;
+        text <=> root.redeem-code;
+        placeholder-text: "输入 CDK";
+    }
+
+    Button {
+        x: parent.width - 128px;
+        y: 92px;
+        width: 104px;
+        height: 40px;
+        text: "立即兑换";
+        clicked => { root.redeem-requested(); }
+    }
+
+    Rectangle {
+        x: 24px;
+        y: 148px;
+        width: parent.width - 48px;
+        height: 50px;
+        background: #ffffff;
+        border-radius: 14px;
+        border-color: #d7e4f0;
+        border-width: 1px;
+
+        Text {
+            x: 14px;
+            y: 16px;
+            width: parent.width - 28px;
+            text: root.redeem-status-text;
+            color: #5b7490;
+            font-size: 12px;
+            wrap: word-wrap;
+        }
+    }
+
+    Rectangle {
+        x: 24px;
+        y: 218px;
+        width: parent.width - 48px;
+        height: 120px;
+        background: #ffffff;
+        border-radius: 18px;
+        border-color: #d7e4f0;
+        border-width: 1px;
+
+        Text {
+            x: 16px;
+            y: 16px;
+            text: "当前订阅摘要";
+            color: #264461;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        for line[index] in root.subscription-lines : Text {
+            x: 16px;
+            y: 44px + index * 18px;
+            width: parent.width - 32px;
+            text: line;
+            color: #688097;
+            font-size: 12px;
+            wrap: word-wrap;
+        }
+    }
+
+    Rectangle {
+        x: 24px;
+        y: 358px;
+        width: parent.width - 48px;
+        height: max(110px, parent.height - 382px);
+        background: #ffffff;
+        border-radius: 18px;
+        border-color: #d7e4f0;
+        border-width: 1px;
+
+        Text {
+            x: 16px;
+            y: 16px;
+            text: "最近兑换记录";
+            color: #264461;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        for line[index] in root.history-lines : Text {
+            x: 16px;
+            y: 44px + index * 18px;
+            width: parent.width - 32px;
+            text: line;
+            color: #688097;
+            font-size: 12px;
+            wrap: word-wrap;
+        }
+    }
+}

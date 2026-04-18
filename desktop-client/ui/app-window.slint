@@ -3,6 +3,7 @@ import { AboutScreen } from "screens/about.slint";
 import { DashboardScreen } from "screens/dashboard.slint";
 import { ForgotPasswordScreen } from "screens/forgot_password.slint";
 import { LaunchPanel } from "screens/launch_panel.slint";
+import { RedeemScreen } from "screens/redeem.slint";
 import { LoginScreen } from "screens/login.slint";
 
 export component AppWindow inherits Window {
@@ -27,6 +28,11 @@ export component AppWindow inherits Window {
     in-out property <string> dashboard-usage-text: "并发额度：--";
     in-out property <string> dashboard-account-status-text: "账户状态：待登录";
     in-out property <string> dashboard-notice-text: "充值页当前作为公告区。首版优先支持 CDK 兑换、订阅状态查看和平台模式启动。";
+    in-out property <string> redeem-code;
+    in-out property <string> redeem-status-text: "输入 CDK 后点击兑换。";
+    in-out property <string> subscription-summary-text: "暂无订阅摘要";
+    in-out property <[string]> subscription-lines: ["登录后可查看当前订阅额度和到期时间。"];
+    in-out property <[string]> redeem-history-lines: ["最近兑换记录会显示在这里。"];
     in-out property <int> current-section: 0;
     in-out property <[string]> launch-group-options: ["登录后加载可用分组"];
     in-out property <int> launch-selected-group-index: 0;
@@ -41,6 +47,7 @@ export component AppWindow inherits Window {
     callback verify-code-requested();
     callback forgot-password-requested();
     callback reset-password-requested();
+    callback redeem-requested();
 
     Rectangle {
         width: parent.width;
@@ -222,6 +229,7 @@ export component AppWindow inherits Window {
                 usage-text: root.dashboard-usage-text;
                 account-status-text: root.dashboard-account-status-text;
                 recharge-notice: root.dashboard-notice-text;
+                redeem-requested => { root.current-section = 2; }
                 launch-requested => { root.current-section = 1; }
             }
 
@@ -377,68 +385,17 @@ export component AppWindow inherits Window {
             height: parent.height - 196px;
             background: transparent;
 
-            Rectangle {
+            RedeemScreen {
                 x: 0px;
                 y: 0px;
                 width: parent.width;
-                height: 184px;
-                background: #f8fbff;
-                border-radius: 24px;
-                border-color: #d7e4f0;
-                border-width: 1px;
-
-                Text {
-                    x: 24px;
-                    y: 20px;
-                    text: "CDK 与充值公告";
-                    color: #18324a;
-                    font-size: 24px;
-                    font-weight: 800;
-                }
-
-                Text {
-                    x: 24px;
-                    y: 58px;
-                    width: parent.width - 48px;
-                    text: "首版先保留公告形态。这里用于展示套餐说明、CDK 兑换入口、订阅限制与维护通知。";
-                    color: #688097;
-                    font-size: 14px;
-                    wrap: word-wrap;
-                }
-
-                Rectangle {
-                    x: 24px;
-                    y: 108px;
-                    width: parent.width - 48px;
-                    height: 54px;
-                    background: #ffffff;
-                    border-radius: 16px;
-                    border-color: #d7e4f0;
-                    border-width: 1px;
-
-                    Text {
-                        x: 16px;
-                        y: 18px;
-                        width: parent.width - 32px;
-                        text: root.dashboard-notice-text;
-                        color: #567089;
-                        font-size: 12px;
-                        wrap: word-wrap;
-                    }
-                }
-            }
-
-            DashboardScreen {
-                x: 0px;
-                y: 204px;
-                width: parent.width;
-                height: 280px;
-                user-label: root.dashboard-user-label;
-                balance-text: root.dashboard-balance-text;
-                usage-text: root.dashboard-usage-text;
-                account-status-text: root.dashboard-account-status-text;
-                recharge-notice: "CDK 兑换和订阅公告将在这个工作区持续展示，后续会补订单明细和最近操作。";
-                launch-requested => { root.current-section = 1; }
+                height: parent.height;
+                redeem-code <=> root.redeem-code;
+                redeem-status-text: root.redeem-status-text;
+                subscription-summary-text: root.subscription-summary-text;
+                subscription-lines: root.subscription-lines;
+                history-lines: root.redeem-history-lines;
+                redeem-requested => { root.redeem-requested(); }
             }
         }
 

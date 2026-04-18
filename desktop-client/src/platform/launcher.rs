@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::{
     ffi::OsString,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Child, Command},
 };
 
 use super::install_detection::InstalledTarget;
@@ -59,7 +59,7 @@ pub fn official_launch_command(target: &InstalledTarget) -> LaunchCommandSpec {
 
 pub fn launch_official(target: &InstalledTarget) -> Result<()> {
     let spec = official_launch_command(target);
-    spawn_command(spec)
+    spawn_command(spec).map(|_| ())
 }
 
 pub fn platform_launch_command(target: &InstalledTarget, codex_home: &Path) -> LaunchCommandSpec {
@@ -71,19 +71,18 @@ pub fn platform_launch_command(target: &InstalledTarget, codex_home: &Path) -> L
     spec
 }
 
-pub fn launch_platform(target: &InstalledTarget, codex_home: &Path) -> Result<()> {
+pub fn launch_platform(target: &InstalledTarget, codex_home: &Path) -> Result<Child> {
     let spec = platform_launch_command(target, codex_home);
     spawn_command(spec)
 }
 
-fn spawn_command(spec: LaunchCommandSpec) -> Result<()> {
+fn spawn_command(spec: LaunchCommandSpec) -> Result<Child> {
     let mut command = Command::new(&spec.program);
     command.args(&spec.args);
     for (key, value) in spec.envs {
         command.env(key, value);
     }
-    command.spawn()?;
-    Ok(())
+    Ok(command.spawn()?)
 }
 
 #[cfg(test)]
