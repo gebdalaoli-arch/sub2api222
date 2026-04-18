@@ -47,6 +47,7 @@ use sub2api_desktop::{
             cleanup_runtime_roots_older_than, write_platform_home, write_runtime_metadata,
             ManagedHomePaths,
         },
+        runtime_bootstrap::StartupDiagnostics,
     },
     storage::{
         app_state::AppStateStore,
@@ -67,7 +68,18 @@ type SharedRedeemHistory = Arc<Mutex<Vec<RedeemHistoryItem>>>;
 type SharedOrders = Arc<Mutex<Vec<PaymentOrder>>>;
 
 fn main() -> anyhow::Result<()> {
-    let app = AppWindow::new()?;
+    let startup_diagnostics = StartupDiagnostics::initialize();
+    startup_diagnostics.log("creating main window");
+    let app = match AppWindow::new() {
+        Ok(app) => {
+            startup_diagnostics.log("main window created");
+            app
+        }
+        Err(error) => {
+            startup_diagnostics.log(format!("AppWindow::new failed: {error}"));
+            return Err(error.into());
+        }
+    };
     let config = Arc::new(app_config());
     let app_state = AppStateStore::default_for_app().unwrap_or_else(|_| {
         AppStateStore::new(std::env::temp_dir().join("sub2api-desktop-client"))
@@ -132,8 +144,21 @@ fn main() -> anyhow::Result<()> {
         Arc::clone(&recent_orders),
     );
 
-    app.run()?;
-    Ok(())
+    startup_diagnostics.log(format!(
+        "startup diagnostics log path: {}",
+        startup_diagnostics.log_path().display()
+    ));
+    startup_diagnostics.log("entering Slint event loop");
+    match app.run() {
+        Ok(()) => {
+            startup_diagnostics.log("Slint event loop exited normally");
+            Ok(())
+        }
+        Err(error) => {
+            startup_diagnostics.log(format!("app.run failed: {error}"));
+            Err(error.into())
+        }
+    }
 }
 
 fn preload_local_state(app: &AppWindow, app_state: &AppStateStore) {

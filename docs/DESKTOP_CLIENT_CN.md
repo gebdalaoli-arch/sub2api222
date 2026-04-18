@@ -19,6 +19,7 @@
 - 已完成对 Sub2API 服务端关键接口的桌面端契约接入。
 - 已完成 Codex 安装检测、官方启动、平台代理 CLI 启动基础链路。
 - 已完成平台代理受管 `CODEX_HOME`、desktop session 续期与回收。
+- 已为 VMware / 通用虚拟机图形环境补上启动早期软件渲染兜底与本地启动日志。
 - 已明确 Windows Store 版 Codex Desktop 的产品边界：只支持官方模式，不支持本次启动级别的平台代理注入。
 
 当前不把这版定义为“最终商业正式版”，但已经是“可安装、可演示、可继续灰度测试”的桌面客户端基础版本。
@@ -215,6 +216,7 @@
 在 Windows 上，客户端主要使用以下路径：
 
 - 应用状态目录：通常位于 `%LOCALAPPDATA%\\sub2api\\TokenClient`
+- 启动日志：`%LOCALAPPDATA%\\sub2api\\TokenClient\\data\\logs\\startup.log`
 - 运行时目录：`<state-root>\\runtime\\<session_id>\\<profile_key>`
 - 受管 home 内容：
   - `config.toml`
@@ -253,6 +255,8 @@
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\start-desktop-client.ps1
 ```
+
+如果是在 VMware / Hyper-V 之类的虚拟机图形环境里启动，客户端会在检测到虚拟机 BIOS 指纹后优先强制 `SLINT_BACKEND=winit-software`，尽量避开虚拟显卡导致的窗口初始化闪退。
 
 停止：
 
@@ -331,6 +335,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build-desktop-installer.ps
 - “安装成功”有证据
 - “客户端可被拉起”有证据
 - “后续可远程自动化接管”仍未最终闭环
+
+另外，自当前版本起，客户端在检测到 `VMware` / `Virtual Machine` 一类 BIOS 指纹时，会在创建主窗口前自动切到 `Slint software renderer`，并把启动诊断写入 `%LOCALAPPDATA%\\sub2api\\TokenClient\\data\\logs\\startup.log`，用于排查“打开即闪退”的早期崩溃。
 
 ## 11. 当前已知边界
 

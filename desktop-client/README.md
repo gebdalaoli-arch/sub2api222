@@ -16,6 +16,8 @@
 powershell -NoProfile -ExecutionPolicy Bypass -File .\start-desktop-client.ps1
 ```
 
+如果是在 VMware / Hyper-V 一类虚拟机里调试，客户端会在检测到虚拟机 BIOS 指纹时自动切到 `SLINT_BACKEND=winit-software`，尽量避开虚拟显卡导致的窗口初始化闪退。安装包直启时的启动诊断会写到 `%LOCALAPPDATA%\sub2api\TokenClient\data\logs\startup.log`。
+
 停止正在运行的客户端：
 
 ```powershell
