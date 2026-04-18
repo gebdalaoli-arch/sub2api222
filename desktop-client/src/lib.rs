@@ -74,4 +74,22 @@ mod tests {
         assert!(update_dialog.contains("发现新版本"));
         assert!(update_dialog.contains("立即更新"));
     }
+
+    #[test]
+    fn launch_and_announcement_shells_match_true_light_direction() {
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let app_window = std::fs::read_to_string(manifest_dir.join("ui/app-window.slint")).unwrap();
+        let launch = std::fs::read_to_string(manifest_dir.join("ui/screens/launch_panel.slint")).unwrap();
+        let help_detail =
+            std::fs::read_to_string(manifest_dir.join("ui/screens/help_detail.slint")).unwrap();
+
+        assert!(app_window.contains("公告中心"));
+        assert!(app_window.contains("设置与帮助"));
+        assert!(launch.contains("启动 Codex"));
+        assert!(launch.contains("桌面版"));
+        assert!(launch.contains("CLI"));
+        assert!(help_detail.contains("高级设置"));
+        assert!(help_detail.contains("官方模式"));
+        assert!(!launch.contains("平台代理模式"));
+    }
 }

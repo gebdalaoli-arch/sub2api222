@@ -1,4 +1,5 @@
 import { BrandPanel } from "components/brand_panel.slint";
+import { AnnouncementCenterScreen } from "screens/announcements.slint";
 import { ForgotPasswordScreen } from "screens/forgot_password.slint";
 import { HelpDetailScreen } from "screens/help_detail.slint";
 import { LaunchPanel } from "screens/launch_panel.slint";
@@ -45,6 +46,7 @@ export component AppWindow inherits Window {
     in-out property <int> current-section: 0;
     in-out property <[string]> launch-group-options: ["登录后加载可用分组"];
     in-out property <int> launch-selected-group-index: 0;
+    in-out property <bool> launch-cli-mode: false;
     in-out property <bool> update-dialog-visible: false;
     in-out property <bool> update-force: false;
     in-out property <string> update-current-version: "v0.1.0";
@@ -173,8 +175,8 @@ export component AppWindow inherits Window {
             border-color: root.current-section == 1 ? #18324a : #d6e3ef;
             border-width: 1px;
             TouchArea { clicked => { root.current-section = 1; } }
-            Text { x: 18px; y: 12px; text: "启动中心"; color: root.current-section == 1 ? #ffffff : #18324a; font-size: 15px; font-weight: 700; }
-            Text { x: 18px; y: 31px; width: 164px; text: "官方模式 / 平台代理"; color: root.current-section == 1 ? #d7e6f6 : #6a8299; font-size: 11px; wrap: word-wrap; }
+            Text { x: 18px; y: 12px; text: "启动 Codex"; color: root.current-section == 1 ? #ffffff : #18324a; font-size: 15px; font-weight: 700; }
+            Text { x: 18px; y: 31px; width: 164px; text: "默认桌面版，可切换 CLI"; color: root.current-section == 1 ? #d7e6f6 : #6a8299; font-size: 11px; wrap: word-wrap; }
         }
 
         Rectangle {
@@ -201,8 +203,8 @@ export component AppWindow inherits Window {
             border-color: root.current-section == 3 ? #18324a : #d6e3ef;
             border-width: 1px;
             TouchArea { clicked => { root.current-section = 3; } }
-            Text { x: 18px; y: 12px; text: "帮助与安全"; color: root.current-section == 3 ? #ffffff : #18324a; font-size: 15px; font-weight: 700; }
-            Text { x: 18px; y: 31px; width: 164px; text: "隐私、恢复、使用建议"; color: root.current-section == 3 ? #d7e6f6 : #6a8299; font-size: 11px; wrap: word-wrap; }
+            Text { x: 18px; y: 12px; text: "设置与帮助"; color: root.current-section == 3 ? #ffffff : #18324a; font-size: 15px; font-weight: 700; }
+            Text { x: 18px; y: 31px; width: 164px; text: "更新、恢复与高级设置"; color: root.current-section == 3 ? #d7e6f6 : #6a8299; font-size: 11px; wrap: word-wrap; }
         }
 
         Text {
@@ -241,7 +243,7 @@ export component AppWindow inherits Window {
             Text {
                 x: 24px;
                 y: 18px;
-                text: root.current-section == 0 ? (root.session-active ? "一级总览" : "登录入口") : root.current-section == 1 ? "启动详情" : root.current-section == 2 ? "计费详情" : "帮助与安全";
+                text: root.current-section == 0 ? (root.session-active ? "一级总览" : "登录入口") : root.current-section == 1 ? "启动 Codex" : root.current-section == 2 ? "计费详情" : root.current-section == 3 ? "设置与帮助" : "公告中心";
                 color: #18324a;
                 font-size: 28px;
                 font-weight: 800;
@@ -251,7 +253,7 @@ export component AppWindow inherits Window {
                 x: 24px;
                 y: 50px;
                 width: parent.width - 280px;
-                text: root.current-section == 0 ? (root.session-active ? "从这里进入启动、计费和帮助的二级详情，不再直接平铺所有信息。" : root.auth-status-text) : root.current-section == 1 ? root.launch-status-text : root.current-section == 2 ? root.dashboard-notice-text : "更新、恢复和安全边界统一收在这里。";
+                text: root.current-section == 0 ? (root.session-active ? "从这里进入启动、计费和帮助的二级详情，不再直接平铺所有信息。" : root.auth-status-text) : root.current-section == 1 ? root.launch-status-text : root.current-section == 2 ? root.dashboard-notice-text : root.current-section == 3 ? "更新、恢复和安全边界统一收在这里。" : "这里展示系统公告、维护通知和版本动态。";
                 color: #698198;
                 font-size: 13px;
                 wrap: word-wrap;
@@ -272,13 +274,14 @@ export component AppWindow inherits Window {
             Rectangle {
                 x: parent.width - 124px;
                 y: 20px;
-                width: 88px;
+                width: 116px;
                 height: 30px;
                 background: root.desktop-available || root.cli-available ? #edf5ff : #f2f5f8;
                 border-radius: 14px;
                 border-color: root.desktop-available || root.cli-available ? #cfe0f2 : #d7e4f0;
                 border-width: 1px;
-                Text { x: 14px; y: 8px; text: root.desktop-available || root.cli-available ? "启动已就绪" : "等待检测"; color: root.desktop-available || root.cli-available ? #2b587f : #6d8398; font-size: 11px; font-weight: 700; }
+                TouchArea { clicked => { root.current-section = 4; } }
+                Text { x: 14px; y: 8px; text: "🔔 公告中心"; color: root.desktop-available || root.cli-available ? #2b587f : #6d8398; font-size: 11px; font-weight: 700; }
             }
         }
 
@@ -376,9 +379,8 @@ export component AppWindow inherits Window {
                 status-text: root.launch-status-text;
                 group-options: root.launch-group-options;
                 selected-group-index <=> root.launch-selected-group-index;
+                cli-mode <=> root.launch-cli-mode;
                 refresh-requested => { root.refresh-installations-requested(); }
-                launch-desktop-requested => { root.launch-desktop-requested(); }
-                launch-cli-requested => { root.launch-cli-requested(); }
                 launch-platform-desktop-requested => { root.launch-platform-desktop-requested(); }
                 launch-platform-cli-requested => { root.launch-platform-cli-requested(); }
             }
@@ -425,7 +427,7 @@ export component AppWindow inherits Window {
                     Text {
                         x: 16px;
                         y: 14px;
-                        text: "官方模式";
+                        text: "高级设置中的官方模式";
                         color: #21435f;
                         font-size: 16px;
                         font-weight: 700;
@@ -435,7 +437,7 @@ export component AppWindow inherits Window {
                         x: 16px;
                         y: 36px;
                         width: parent.width - 32px;
-                        text: "用于平台异常时保底启动。不会写 CODEX_HOME，不会注入平台连接。";
+                        text: "默认不主推，仅在高级设置和特定调试场景下启用。";
                         color: #698198;
                         font-size: 12px;
                         wrap: word-wrap;
@@ -455,7 +457,7 @@ export component AppWindow inherits Window {
                     Text {
                         x: 16px;
                         y: 14px;
-                        text: "平台代理模式";
+                        text: "启动 Codex";
                         color: #21435f;
                         font-size: 16px;
                         font-weight: 700;
@@ -465,7 +467,7 @@ export component AppWindow inherits Window {
                         x: 16px;
                         y: 36px;
                         width: parent.width - 32px;
-                        text: "登录后会按所选 group_id 创建 desktop session，写入本次启动专属的受管 home，再启动本次 Codex 进程。";
+                        text: "默认从桌面版进入，也可以切换到 CLI。客户端会按所选启动分组准备受管环境。";
                         color: #698198;
                         font-size: 12px;
                         wrap: word-wrap;
@@ -520,6 +522,21 @@ export component AppWindow inherits Window {
                 width: parent.width;
                 height: parent.height;
                 manual-update-check-requested => { root.manual-update-check-requested(); }
+            }
+        }
+
+        if root.current-section == 4: Rectangle {
+            x: 304px;
+            y: 148px;
+            width: parent.width - 360px;
+            height: parent.height - 196px;
+            background: transparent;
+
+            AnnouncementCenterScreen {
+                x: 0px;
+                y: 0px;
+                width: parent.width;
+                height: parent.height;
             }
         }
 

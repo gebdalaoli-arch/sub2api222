@@ -1,0 +1,133 @@
+import { Button } from "std-widgets.slint";
+
+export component AnnouncementCenterScreen inherits Rectangle {
+    background: #ffffff;
+    border-radius: 24px;
+    border-color: #d7e4f0;
+    border-width: 1px;
+
+    Text {
+        x: 24px;
+        y: 20px;
+        text: "公告中心";
+        color: #18324a;
+        font-size: 28px;
+        font-weight: 800;
+    }
+
+    Text {
+        x: 24px;
+        y: 58px;
+        width: parent.width - 48px;
+        text: "系统更新、维护通知和使用提醒都收在这里。";
+        color: #688097;
+        font-size: 13px;
+        wrap: word-wrap;
+    }
+
+    Rectangle {
+        x: 24px;
+        y: 102px;
+        width: 92px;
+        height: 34px;
+        background: #e7f5ff;
+        border-radius: 17px;
+        Text { x: 18px; y: 9px; text: "系统更新"; color: #21608d; font-size: 12px; font-weight: 700; }
+    }
+
+    Rectangle {
+        x: 126px;
+        y: 102px;
+        width: 92px;
+        height: 34px;
+        background: #f5f7fa;
+        border-radius: 17px;
+        Text { x: 18px; y: 9px; text: "维护通知"; color: #6a8299; font-size: 12px; font-weight: 700; }
+    }
+
+    Rectangle {
+        x: 228px;
+        y: 102px;
+        width: 92px;
+        height: 34px;
+        background: #f5f7fa;
+        border-radius: 17px;
+        Text { x: 18px; y: 9px; text: "使用提醒"; color: #6a8299; font-size: 12px; font-weight: 700; }
+    }
+
+    Rectangle {
+        x: 24px;
+        y: 158px;
+        width: parent.width - 336px;
+        height: 126px;
+        background: @linear-gradient(90deg, #eef8ff 0%, #f8fcff 100%);
+        border-radius: 22px;
+        border-color: #d7e4f0;
+        border-width: 1px;
+        Text { x: 20px; y: 18px; text: "置顶公告"; color: #2b59d0; font-size: 12px; font-weight: 700; }
+        Text { x: 20px; y: 42px; text: "V2.4.1 版本已发布"; color: #18324a; font-size: 22px; font-weight: 800; }
+        Text { x: 20px; y: 74px; width: parent.width - 160px; text: "现在支持更稳定的启动链路和新的亮色客户端骨架。"; color: #688097; font-size: 12px; wrap: word-wrap; }
+        Button {
+            x: parent.width - 118px;
+            y: 42px;
+            width: 94px;
+            height: 40px;
+            text: "查看详情";
+        }
+    }
+
+    Rectangle {
+        x: parent.width - 288px;
+        y: 158px;
+        width: 264px;
+        height: parent.height - 182px;
+        background: #f8fbff;
+        border-radius: 22px;
+        border-color: #d7e4f0;
+        border-width: 1px;
+        Text { x: 18px; y: 18px; text: "版本动态"; color: #18324a; font-size: 18px; font-weight: 800; }
+        Text { x: 18px; y: 52px; text: "v2.4.1"; color: #2b59d0; font-size: 14px; font-weight: 700; }
+        Text { x: 18px; y: 72px; width: parent.width - 36px; text: "亮色客户端骨架已上线"; color: #688097; font-size: 12px; wrap: word-wrap; }
+        Text { x: 18px; y: 128px; text: "v2.4.0"; color: #2b59d0; font-size: 14px; font-weight: 700; }
+        Text { x: 18px; y: 148px; width: parent.width - 36px; text: "启动 Codex 主链路优化"; color: #688097; font-size: 12px; wrap: word-wrap; }
+    }
+
+    Rectangle {
+        x: 24px;
+        y: 302px;
+        width: parent.width - 336px;
+        height: parent.height - 326px;
+        background: #f8fbff;
+        border-radius: 22px;
+        border-color: #d7e4f0;
+        border-width: 1px;
+
+        Rectangle {
+            x: 16px;
+            y: 16px;
+            width: parent.width - 32px;
+            height: 84px;
+            background: #ffffff;
+            border-radius: 18px;
+            border-color: #d7e4f0;
+            border-width: 1px;
+            Text { x: 16px; y: 16px; text: "关于 11 月 5 日凌晨系统维护的通知"; color: #18324a; font-size: 16px; font-weight: 700; }
+            Text { x: 16px; y: 40px; text: "2026-04-19"; color: #688097; font-size: 11px; }
+            Text { x: 16px; y: 56px; width: parent.width - 124px; text: "届时将进行短时维护，客户端更新与启动功能会有间歇性影响。"; color: #688097; font-size: 12px; wrap: word-wrap; }
+        }
+
+        Rectangle {
+            x: 16px;
+            y: 112px;
+            width: parent.width - 32px;
+            height: 84px;
+            background: #ffffff;
+            border-radius: 18px;
+            border-color: #d7e4f0;
+            border-width: 1px;
+            Text { x: 16px; y: 16px; text: "使用提醒：推荐默认使用桌面版启动"; color: #18324a; font-size: 16px; font-weight: 700; }
+            Text { x: 16px; y: 40px; text: "2026-04-18"; color: #688097; font-size: 11px; }
+            Text { x: 16px; y: 56px; width: parent.width - 124px; text: "CLI 模式适合高级场景，普通用户建议直接从桌面版进入。"; color: #688097; font-size: 12px; wrap: word-wrap; }
+        }
+    }
+}
