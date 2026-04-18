@@ -36,7 +36,7 @@ cargo --config 'source.crates-io.replace-with="rsproxy-sparse"' --config 'source
 在仓库根目录运行：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\build-desktop-installer.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build-desktop-installer.ps1 -ApiBaseUrl "https://your-sub2api.example.com"
 ```
 
 如果要在打包时写入固定后端地址：
@@ -71,6 +71,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\sign-desktop-installer.ps1
 ```
 
 这里临时使用 `rsproxy.cn` 是因为当前机器访问 crates.io 出现 TLS 握手失败；如果你的网络能直连 crates.io，可以去掉两个 `--config` 参数。
+
+注意：安装包打包时现在必须显式传入 `-ApiBaseUrl`。这样可以避免把默认的本机调试地址 `127.0.0.1:8080` 意外写进面向用户的安装包。
 
 ## 当前边界
 

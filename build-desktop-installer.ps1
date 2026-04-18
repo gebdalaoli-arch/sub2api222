@@ -1,5 +1,5 @@
 param(
-    [string]$ApiBaseUrl = "http://127.0.0.1:8080/api/v1"
+    [string]$ApiBaseUrl
 )
 
 Set-StrictMode -Version Latest
@@ -40,6 +40,10 @@ function Normalize-ApiBaseUrl([string]$InputUrl) {
 
 if (-not (Test-Path $iscc)) {
     throw "未找到 Inno Setup 编译器：$iscc"
+}
+
+if ([string]::IsNullOrWhiteSpace($ApiBaseUrl)) {
+    throw "打包安装包时必须显式传入 -ApiBaseUrl，例如：powershell -NoProfile -ExecutionPolicy Bypass -File .\\build-desktop-installer.ps1 -ApiBaseUrl `"https://your-sub2api.example.com`""
 }
 
 New-Item -ItemType Directory -Force $outputDir | Out-Null

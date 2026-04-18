@@ -277,6 +277,8 @@ cargo --config 'source.crates-io.replace-with="rsproxy-sparse"' --config 'source
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build-desktop-installer.ps1 -ApiBaseUrl "http://43.173.88.95:8080/"
 ```
 
+安装包打包时必须显式传入 `-ApiBaseUrl`，避免把默认的本机调试地址 `127.0.0.1:8080` 写进给用户分发的安装包。
+
 当前安装包输出为：
 
 - `dist\desktop-client\Sub2API-Desktop-Setup-0.1.0.exe`

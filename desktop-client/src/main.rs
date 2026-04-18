@@ -448,6 +448,10 @@ fn wire_auth_callbacks(
                 return;
             }
         };
+        if let Some(message) = login_config.packaged_local_debug_api_message() {
+            app.set_auth_status_text(SharedString::from(message));
+            return;
+        }
 
         app.set_auth_status_text(SharedString::from("正在处理登录请求..."));
         let ui_handle = login_app.clone();
@@ -554,6 +558,10 @@ fn wire_auth_callbacks(
             app.set_auth_status_text(SharedString::from("注册前请填写邮箱、密码和邮箱验证码。"));
             return;
         }
+        if let Some(message) = register_config.packaged_local_debug_api_message() {
+            app.set_auth_status_text(SharedString::from(message));
+            return;
+        }
         app.set_auth_status_text(SharedString::from("正在提交注册请求..."));
 
         let ui_handle = register_app.clone();
@@ -622,6 +630,10 @@ fn wire_auth_callbacks(
             app.set_auth_status_text(SharedString::from("发送验证码前请先填写邮箱。"));
             return;
         }
+        if let Some(message) = verify_config.packaged_local_debug_api_message() {
+            app.set_auth_status_text(SharedString::from(message));
+            return;
+        }
         app.set_auth_status_text(SharedString::from("正在发送验证码..."));
 
         let ui_handle = verify_app.clone();
@@ -655,6 +667,10 @@ fn wire_auth_callbacks(
         let email = app.get_email().to_string();
         if email.trim().is_empty() {
             app.set_reset_status_text(SharedString::from("请先填写重置邮箱。"));
+            return;
+        }
+        if let Some(message) = forgot_config.packaged_local_debug_api_message() {
+            app.set_reset_status_text(SharedString::from(message));
             return;
         }
         app.set_reset_status_text(SharedString::from("正在发送重置邮件..."));
@@ -694,6 +710,10 @@ fn wire_auth_callbacks(
         let new_password = app.get_new_password().to_string();
         if email.trim().is_empty() || reset_token.trim().is_empty() || new_password.is_empty() {
             app.set_reset_status_text(SharedString::from("请填写邮箱、邮件重置码和新密码。"));
+            return;
+        }
+        if let Some(message) = reset_config.packaged_local_debug_api_message() {
+            app.set_reset_status_text(SharedString::from(message));
             return;
         }
         app.set_reset_status_text(SharedString::from("正在重置密码..."));
@@ -821,6 +841,10 @@ fn restore_saved_session(
     recent_orders: SharedOrders,
 ) {
     let app_handle = app.as_weak();
+    if let Some(message) = config.packaged_local_debug_api_message() {
+        app.set_auth_status_text(SharedString::from(message));
+        return;
+    }
     match token_store.load_refresh_token() {
         Ok(Some(refresh_token)) => {
             app.set_auth_status_text(SharedString::from("正在恢复上次登录状态..."));
