@@ -185,7 +185,18 @@ where
 
     match serde_json::from_str::<ApiEnvelope<T>>(&body) {
         Ok(envelope) => envelope.into_data(),
-        Err(_) if !status.is_success() => Err(anyhow!("request failed with status {}", status)),
+        Err(_) if !status.is_success() => {
+            let trimmed = body.trim();
+            if trimmed.is_empty() {
+                Err(anyhow!("request failed with status {}", status))
+            } else {
+                Err(anyhow!(
+                    "request failed with status {}: {}",
+                    status,
+                    trimmed
+                ))
+            }
+        }
         Err(error) => Err(error.into()),
     }
 }
@@ -321,6 +332,21 @@ mod tests {
                 .map(String::as_str),
             Some("9")
         );
+    }
+
+    #[test]
+    fn post_json_blocking_keeps_plaintext_error_body_for_non_json_failures() {
+        let base_url = spawn_test_server("HTTP/1.1 404 Not Found", "404 page not found");
+        let client = ApiClient::new(base_url);
+
+        let error = client
+            .post_json_blocking::<_, crate::api::auth::AuthResponse>(
+                "/desktop/sessions",
+                &json!({ "group_id": 9 }),
+            )
+            .unwrap_err();
+
+        assert!(error.to_string().contains("404 page not found"));
     }
 
     fn spawn_test_server(status_line: &'static str, body: &'static str) -> String {

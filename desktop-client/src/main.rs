@@ -33,6 +33,7 @@ use sub2api_desktop::{
     },
     app::{
         auth_flow::{build_login_submission, LoginSubmission},
+        launch_errors::describe_platform_launch_error,
         view_models::{
             billing_vm::BillingViewModel, dashboard_vm::DashboardViewModel,
             launch_vm::LaunchViewModel,
@@ -344,19 +345,17 @@ fn start_platform_launch(
                         });
                     }
                     Err(error) => {
+                        let message = describe_platform_launch_error(&error.to_string());
                         let _ = ui_handle.upgrade_in_event_loop(move |app| {
-                            app.set_launch_status_text(SharedString::from(format!(
-                                "平台代理模式启动失败：{error}"
-                            )))
+                            app.set_launch_status_text(SharedString::from(message))
                         });
                     }
                 }
             }
             Err(error) => {
+                let message = describe_platform_launch_error(&error.to_string());
                 let _ = ui_handle.upgrade_in_event_loop(move |app| {
-                    app.set_launch_status_text(SharedString::from(format!(
-                        "创建平台代理会话失败：{error}"
-                    )))
+                    app.set_launch_status_text(SharedString::from(message))
                 });
             }
         }
