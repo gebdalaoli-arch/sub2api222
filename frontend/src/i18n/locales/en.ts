@@ -343,6 +343,7 @@ export default {
     channels: 'Channels',
     subscriptions: 'Subscriptions',
     accounts: 'Accounts',
+    desktopUpdates: 'Desktop Updates',
     proxies: 'Proxies',
     redeemCodes: 'Redeem Codes',
     ops: 'Ops',
@@ -3340,6 +3341,29 @@ export default {
       failedToDelete: 'Failed to delete announcement',
       failedToLoadReadStatus: 'Failed to load read status',
       deleteConfirm: 'Are you sure you want to delete this announcement? This action cannot be undone.'
+    },
+
+    desktopUpdates: {
+      title: 'Desktop Update Center',
+      description: 'Manage Windows installers, release notes, and announcement waterfalls.',
+      createRelease: 'Create Release',
+      announcementWaterfall: 'Announcement Waterfall',
+      announcementHint: 'Each release can carry client-facing announcements and update notes.',
+      dialogTitle: 'Release Publish',
+      version: 'Version',
+      minimumSupportedVersion: 'Minimum Supported Version',
+      titleField: 'Title',
+      summary: 'Summary',
+      releaseNotes: 'Release Notes',
+      package: 'Installer',
+      packageRequired: 'Please choose a Windows installer first',
+      failedToLoad: 'Failed to load desktop updates',
+      failedToSave: 'Failed to save desktop update',
+      columns: {
+        title: 'Title',
+        summary: 'Summary',
+        fileSize: 'Installer'
+      }
     },
 
     // Promo Codes

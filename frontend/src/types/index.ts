@@ -255,6 +255,50 @@ export interface AnnouncementUserReadStatus {
   read_at?: string
 }
 
+export interface DesktopAnnouncementItem {
+  title: string
+  content: string
+  kind: string
+  pinned?: boolean
+  starts_at?: string
+  ends_at?: string
+}
+
+export interface DesktopRelease {
+  id: number
+  release_slug: string
+  version: string
+  platform: string
+  arch: string
+  title: string
+  summary: string
+  release_notes_markdown: string
+  announcement_items: DesktopAnnouncementItem[]
+  file_name: string
+  file_size: number
+  sha256: string
+  published: boolean
+  force_update: boolean
+  minimum_supported_version: string
+  published_at?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateDesktopReleasePayload {
+  version: string
+  platform: string
+  arch: string
+  title: string
+  summary: string
+  release_notes_markdown: string
+  announcement_items: DesktopAnnouncementItem[]
+  published: boolean
+  force_update: boolean
+  minimum_supported_version: string
+  package: File
+}
+
 // ==================== Proxy Node Types ====================
 
 export interface ProxyNode {

@@ -300,6 +300,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/desktop-updates',
+    name: 'AdminDesktopUpdates',
+    component: () => import('@/views/admin/DesktopUpdatesView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Desktop Updates',
+      titleKey: 'admin.desktopUpdates.title',
+      descriptionKey: 'admin.desktopUpdates.description'
+    }
+  },
+  {
     path: '/admin/ops',
     name: 'AdminOps',
     component: () => import('@/views/admin/ops/OpsDashboard.vue'),

@@ -343,6 +343,7 @@ export default {
     channels: '渠道管理',
     subscriptions: '订阅管理',
     accounts: '账号管理',
+    desktopUpdates: '桌面更新',
     proxies: 'IP管理',
     redeemCodes: '兑换码',
     ops: '运维监控',
@@ -3498,6 +3499,29 @@ export default {
       failedToDelete: '删除公告失败',
       failedToLoadReadStatus: '加载已读情况失败',
       deleteConfirm: '确定要删除该公告吗？此操作无法撤销。'
+    },
+
+    desktopUpdates: {
+      title: '桌面更新中心',
+      description: '管理 Windows 安装包、更新说明和公告瀑布。',
+      createRelease: '创建版本',
+      announcementWaterfall: '公告瀑布',
+      announcementHint: '每个版本可以附带面向客户端展示的公告与更新说明。',
+      dialogTitle: '版本发布',
+      version: '版本号',
+      minimumSupportedVersion: '最低支持版本',
+      titleField: '标题',
+      summary: '摘要',
+      releaseNotes: '更新说明',
+      package: '安装包',
+      packageRequired: '请先选择 Windows 安装包',
+      failedToLoad: '加载桌面更新失败',
+      failedToSave: '保存桌面更新失败',
+      columns: {
+        title: '标题',
+        summary: '摘要',
+        fileSize: '安装包'
+      }
     },
 
     // Promo Codes
