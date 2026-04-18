@@ -146,3 +146,14 @@ output/
 客户端壳子/desktop-client/target/
 客户端壳子/dist/
 客户端壳子/.cargo/
+
+# VMware / guest-session temporary automation artifacts
+tmp_vm_*
+
+# 客户端壳子 local design/scratch artifacts
+客户端壳子/desktop-client/analyze_layout.py
+客户端壳子/desktop-client/refactor.py
+客户端壳子/desktop-client/scratch_screen*.html
+客户端壳子/desktop-client/stitch_designs/
+客户端壳子/desktop-client/备份/
+客户端壳子/desktop-client/doc/

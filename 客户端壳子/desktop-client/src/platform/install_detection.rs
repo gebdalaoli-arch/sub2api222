@@ -88,6 +88,40 @@ fn windows_codex_desktop_candidates() -> Vec<PathBuf> {
             }
         }
     }
+
+    if paths.is_empty() {
+        paths.extend(windows_codex_desktop_shell_candidates());
+    }
+    paths
+}
+
+fn windows_codex_desktop_shell_candidates() -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    let Some(local_app_data) = env::var_os("LOCALAPPDATA") else {
+        return paths;
+    };
+
+    let packages_root = PathBuf::from(local_app_data).join("Packages");
+    let Ok(entries) = fs::read_dir(packages_root) else {
+        return paths;
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Some(package_family_name) = path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        if !package_family_name
+            .to_ascii_lowercase()
+            .starts_with("openai.codex_")
+        {
+            continue;
+        }
+        paths.push(PathBuf::from(format!(
+            r"shell:AppsFolder\{package_family_name}!App"
+        )));
+    }
+
     paths
 }
 
@@ -95,6 +129,9 @@ fn classify_codex_path(path: &Path) -> Option<LaunchTarget> {
     let file_name = path.file_name()?.to_string_lossy().to_ascii_lowercase();
     let text = normalize_path_key(path);
 
+    if text.starts_with(r"shell:appsfolder\openai.codex_") {
+        return Some(LaunchTarget::Desktop);
+    }
     if matches!(file_name.as_str(), "codex.cmd" | "codex.ps1" | "codex") {
         if text.contains("windowsapps") && text.contains("openai.codex") {
             return None;
@@ -184,5 +221,14 @@ mod tests {
 
         assert_eq!(targets.len(), 1);
         assert_eq!(targets[0].kind, LaunchTarget::Desktop);
+    }
+
+    #[test]
+    fn classifies_shell_appsfolder_store_target_as_desktop() {
+        let kind = classify_codex_path(Path::new(
+            r"shell:AppsFolder\OpenAI.Codex_2p2nqsd0c76g0!App",
+        ));
+
+        assert_eq!(kind, Some(LaunchTarget::Desktop));
     }
 }

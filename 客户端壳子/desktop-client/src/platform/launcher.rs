@@ -146,10 +146,17 @@ fn windows_store_app_id(target: &InstalledTarget) -> Option<String> {
     }
 
     let normalized = target.executable.to_string_lossy().replace('/', "\\");
-    if !normalized
-        .to_ascii_lowercase()
-        .contains("windowsapps\\openai.codex_")
-    {
+    let normalized_lower = normalized.to_ascii_lowercase();
+    let shell_prefix = r"shell:AppsFolder\";
+    let shell_prefix_lower = shell_prefix.to_ascii_lowercase();
+    if normalized_lower.starts_with(&shell_prefix_lower) {
+        let app_id = normalized[shell_prefix.len()..].trim();
+        if app_id.is_empty() {
+            return None;
+        }
+        return Some(app_id.to_string());
+    }
+    if !normalized_lower.contains("windowsapps\\openai.codex_") {
         return None;
     }
 
@@ -254,9 +261,7 @@ mod tests {
     fn platform_launch_for_windows_store_desktop_uses_shell_launcher_with_isolated_home() {
         let target = InstalledTarget {
             kind: LaunchTarget::Desktop,
-            executable: PathBuf::from(
-                r"C:\Program Files\WindowsApps\OpenAI.Codex_1.0.0.0_x64__2p2nqsd0c76g0\app\Codex.exe",
-            ),
+            executable: PathBuf::from(r"shell:AppsFolder\OpenAI.Codex_2p2nqsd0c76g0!App"),
             display_name: "Codex Desktop".to_string(),
         };
 
@@ -322,9 +327,7 @@ mod tests {
     fn platform_launch_validation_allows_windows_store_desktop() {
         let target = InstalledTarget {
             kind: LaunchTarget::Desktop,
-            executable: PathBuf::from(
-                r"C:\Program Files\WindowsApps\OpenAI.Codex_1.0.0.0_x64__2p2nqsd0c76g0\app\Codex.exe",
-            ),
+            executable: PathBuf::from(r"shell:AppsFolder\OpenAI.Codex_2p2nqsd0c76g0!App"),
             display_name: "Codex Desktop".to_string(),
         };
 
