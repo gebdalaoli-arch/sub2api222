@@ -78,8 +78,10 @@ mod tests {
     #[test]
     fn launch_and_announcement_shells_match_true_light_direction() {
         let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-        let app_window = std::fs::read_to_string(manifest_dir.join("ui/app-window.slint")).unwrap();
-        let launch = std::fs::read_to_string(manifest_dir.join("ui/screens/launch_panel.slint")).unwrap();
+        let app_window =
+            std::fs::read_to_string(manifest_dir.join("ui/app-window.slint")).unwrap();
+        let launch =
+            std::fs::read_to_string(manifest_dir.join("ui/screens/launch_panel.slint")).unwrap();
         let help_detail =
             std::fs::read_to_string(manifest_dir.join("ui/screens/help_detail.slint")).unwrap();
 
@@ -91,5 +93,20 @@ mod tests {
         assert!(help_detail.contains("高级设置"));
         assert!(help_detail.contains("官方模式"));
         assert!(!launch.contains("平台代理模式"));
+    }
+
+    #[test]
+    fn desktop_update_copy_guard_uses_new_dialog_labels() {
+        let _type_guard = std::any::type_name::<crate::api::update::DesktopUpdateCheckResponse>();
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let dialog =
+            std::fs::read_to_string(manifest_dir.join("ui/screens/update_dialog.slint")).unwrap();
+        let app_window =
+            std::fs::read_to_string(manifest_dir.join("ui/app-window.slint")).unwrap();
+
+        assert!(dialog.contains("发现新版本"));
+        assert!(dialog.contains("立即更新"));
+        assert!(dialog.contains("稍后"));
+        assert!(app_window.contains("update-dialog-visible"));
     }
 }

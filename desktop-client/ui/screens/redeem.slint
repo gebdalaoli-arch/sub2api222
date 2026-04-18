@@ -10,113 +10,160 @@ export component RedeemScreen inherits Rectangle {
 
     callback redeem-requested();
 
-    background: #f8fbff;
+    background: #ffffff;
     border-radius: 24px;
-    border-color: #d7e4f0;
+    border-color: #dce6ef;
     border-width: 1px;
 
     Text {
         x: 24px;
         y: 20px;
-        text: "CDK 与订阅";
+        text: "计费详情";
         color: #18324a;
-        font-size: 24px;
+        font-size: 28px;
         font-weight: 800;
     }
 
     Text {
         x: 24px;
-        y: 54px;
-        width: parent.width - 224px;
-        text: root.subscription-summary-text;
+        y: 56px;
+        width: parent.width - 48px;
+        text: "查看当前订阅、消费摘要、历史订单和兑换记录。";
         color: #688097;
         font-size: 13px;
         wrap: word-wrap;
     }
 
     Rectangle {
-        x: parent.width - 176px;
-        y: 20px;
-        width: 152px;
-        height: 30px;
-        background: #eef6ff;
-        border-radius: 14px;
-        border-color: #d5e4f7;
+        x: 24px;
+        y: 96px;
+        width: parent.width;
+        height: 138px;
+        background: @linear-gradient(135deg, #fafdff 0%, #eef7fc 100%);
+        border-radius: 28px;
+        border-color: #dae8f2;
         border-width: 1px;
-        Text { x: 16px; y: 8px; text: "计费工作台"; color: #315577; font-size: 11px; font-weight: 700; }
+
+        Text {
+            x: 20px;
+            y: 18px;
+            text: "订阅摘要";
+            color: #21435f;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        Text {
+            x: 20px;
+            y: 46px;
+            width: parent.width - 40px;
+            text: root.subscription-summary-text;
+            color: #18324a;
+            font-size: 20px;
+            font-weight: 800;
+            wrap: word-wrap;
+        }
+
+        Rectangle {
+            x: parent.width - 188px;
+            y: 22px;
+            width: 156px;
+            height: 42px;
+            background: #ffffff;
+            border-radius: 18px;
+            border-color: #d7e4f0;
+            border-width: 1px;
+
+            Text {
+                x: 18px;
+                y: 12px;
+                text: "账户余额概览";
+                color: #2b59d0;
+                font-size: 12px;
+                font-weight: 700;
+            }
+        }
+
+        Rectangle {
+            x: 20px;
+            y: 92px;
+            width: 164px;
+            height: 28px;
+            background: #ffffff;
+            border-radius: 14px;
+            border-color: #d7e4f0;
+            border-width: 1px;
+            Text { x: 16px; y: 7px; text: "订阅项目 " + root.subscription-lines.length; color: #6a8299; font-size: 11px; font-weight: 700; }
+        }
+
+        Rectangle {
+            x: 196px;
+            y: 92px;
+            width: 164px;
+            height: 28px;
+            background: #ffffff;
+            border-radius: 14px;
+            border-color: #d7e4f0;
+            border-width: 1px;
+            Text { x: 16px; y: 7px; text: "历史订单 " + root.order-lines.length; color: #6a8299; font-size: 11px; font-weight: 700; }
+        }
+
+        Rectangle {
+            x: 372px;
+            y: 92px;
+            width: 164px;
+            height: 28px;
+            background: #ffffff;
+            border-radius: 14px;
+            border-color: #d7e4f0;
+            border-width: 1px;
+            Text { x: 16px; y: 7px; text: "兑换记录 " + root.history-lines.length; color: #6a8299; font-size: 11px; font-weight: 700; }
+        }
     }
 
     Rectangle {
         x: 24px;
-        y: 92px;
-        width: 122px;
-        height: 42px;
-        background: #ffffff;
-        border-radius: 16px;
+        y: 254px;
+        width: parent.width;
+        height: 82px;
+        background: #f8fbff;
+        border-radius: 22px;
         border-color: #d7e4f0;
         border-width: 1px;
-        Text { x: 14px; y: 8px; text: "订阅项目"; color: #6a8299; font-size: 11px; font-weight: 700; }
-        Text { x: 14px; y: 21px; text: root.subscription-lines.length; color: #18324a; font-size: 16px; font-weight: 800; }
-    }
 
-    Rectangle {
-        x: 158px;
-        y: 92px;
-        width: 122px;
-        height: 42px;
-        background: #ffffff;
-        border-radius: 16px;
-        border-color: #d7e4f0;
-        border-width: 1px;
-        Text { x: 14px; y: 8px; text: "最近订单"; color: #6a8299; font-size: 11px; font-weight: 700; }
-        Text { x: 14px; y: 21px; text: root.order-lines.length; color: #18324a; font-size: 16px; font-weight: 800; }
-    }
+        LineEdit {
+            x: 18px;
+            y: 20px;
+            width: parent.width - 160px;
+            height: 42px;
+            text <=> root.redeem-code;
+            placeholder-text: "输入 CDK";
+        }
 
-    Rectangle {
-        x: 292px;
-        y: 92px;
-        width: 122px;
-        height: 42px;
-        background: #ffffff;
-        border-radius: 16px;
-        border-color: #d7e4f0;
-        border-width: 1px;
-        Text { x: 14px; y: 8px; text: "兑换记录"; color: #6a8299; font-size: 11px; font-weight: 700; }
-        Text { x: 14px; y: 21px; text: root.history-lines.length; color: #18324a; font-size: 16px; font-weight: 800; }
-    }
-
-    LineEdit {
-        x: 430px;
-        y: 92px;
-        width: parent.width - 168px;
-        height: 40px;
-        text <=> root.redeem-code;
-        placeholder-text: "输入 CDK";
-    }
-
-    Button {
-        x: parent.width - 128px;
-        y: 92px;
-        width: 104px;
-        height: 40px;
-        text: "立即兑换";
-        clicked => { root.redeem-requested(); }
+        Button {
+            x: parent.width - 118px;
+            y: 20px;
+            width: 96px;
+            height: 42px;
+            text: "兑换 CDK";
+            clicked => { root.redeem-requested(); }
+        }
     }
 
     Rectangle {
         x: 24px;
-        y: 148px;
-        width: parent.width - 48px;
-        height: 50px;
+        y: 354px;
+        width: parent.width;
+        height: 54px;
         background: #ffffff;
-        border-radius: 14px;
+        border-radius: 16px;
         border-color: #d7e4f0;
         border-width: 1px;
 
         Text {
-            x: 14px;
-            y: 16px;
-            width: parent.width - 28px;
+            x: 16px;
+            y: 18px;
+            width: parent.width - 32px;
             text: root.redeem-status-text;
             color: #5b7490;
             font-size: 12px;
@@ -126,91 +173,83 @@ export component RedeemScreen inherits Rectangle {
 
     Rectangle {
         x: 24px;
-        y: 218px;
-        width: parent.width - 48px;
-        height: 120px;
-        background: #ffffff;
-        border-radius: 18px;
+        y: 428px;
+        width: parent.width - 300px;
+        height: parent.height - 452px;
+        background: #f8fbff;
+        border-radius: 22px;
         border-color: #d7e4f0;
         border-width: 1px;
 
         Text {
-            x: 16px;
-            y: 16px;
-            text: "当前订阅摘要";
-            color: #264461;
-            font-size: 14px;
-            font-weight: 700;
+            x: 18px;
+            y: 18px;
+            text: "历史订单";
+            color: #18324a;
+            font-size: 20px;
+            font-weight: 800;
         }
 
-        for line[index] in root.subscription-lines : Text {
-            x: 16px;
-            y: 44px + index * 18px;
-            width: parent.width - 32px;
-            text: line;
-            color: #688097;
-            font-size: 12px;
-            wrap: word-wrap;
+        for line[index] in root.order-lines : Rectangle {
+            x: 18px;
+            y: 56px + index * 72px;
+            width: parent.width - 36px;
+            height: 58px;
+            background: #ffffff;
+            border-radius: 18px;
+            border-color: #d7e4f0;
+            border-width: 1px;
+
+            Text {
+                x: 16px;
+                y: 18px;
+                width: parent.width - 32px;
+                text: line;
+                color: #688097;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
         }
     }
 
     Rectangle {
-        x: 24px;
-        y: 358px;
-        width: parent.width - 48px;
-        height: 110px;
-        background: #ffffff;
-        border-radius: 18px;
+        x: parent.width - 260px;
+        y: 428px;
+        width: 236px;
+        height: parent.height - 452px;
+        background: #f8fbff;
+        border-radius: 22px;
         border-color: #d7e4f0;
         border-width: 1px;
 
         Text {
-            x: 16px;
-            y: 16px;
-            text: "最近订单";
-            color: #264461;
-            font-size: 14px;
-            font-weight: 700;
+            x: 18px;
+            y: 18px;
+            text: "兑换记录";
+            color: #18324a;
+            font-size: 18px;
+            font-weight: 800;
         }
 
-        for line[index] in root.order-lines : Text {
-            x: 16px;
-            y: 44px + index * 18px;
-            width: parent.width - 32px;
-            text: line;
-            color: #688097;
-            font-size: 12px;
-            wrap: word-wrap;
-        }
-    }
+        for line[index] in root.history-lines : Rectangle {
+            x: 18px;
+            y: 52px + index * 70px;
+            width: parent.width - 36px;
+            height: 56px;
+            background: #ffffff;
+            border-radius: 18px;
+            border-color: #d7e4f0;
+            border-width: 1px;
 
-    Rectangle {
-        x: 24px;
-        y: 488px;
-        width: parent.width - 48px;
-        height: max(110px, parent.height - 382px);
-        background: #ffffff;
-        border-radius: 18px;
-        border-color: #d7e4f0;
-        border-width: 1px;
-
-        Text {
-            x: 16px;
-            y: 16px;
-            text: "最近兑换记录";
-            color: #264461;
-            font-size: 14px;
-            font-weight: 700;
-        }
-
-        for line[index] in root.history-lines : Text {
-            x: 16px;
-            y: 44px + index * 18px;
-            width: parent.width - 32px;
-            text: line;
-            color: #688097;
-            font-size: 12px;
-            wrap: word-wrap;
+            Text {
+                x: 14px;
+                y: 16px;
+                width: parent.width - 28px;
+                text: line;
+                color: #688097;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
         }
     }
 }
