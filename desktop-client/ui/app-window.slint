@@ -60,7 +60,7 @@ export component AppWindow inherits Window {
             y: 24px;
             width: 228px;
             height: parent.height - 48px;
-            background: #f8fbfe;
+            background: #f7fbff;
             border-radius: 26px;
             border-color: #d4e1ee;
             border-width: 1px;
@@ -77,9 +77,17 @@ export component AppWindow inherits Window {
             border-width: 1px;
         }
 
+        Image {
+            x: 46px;
+            y: 44px;
+            width: 58px;
+            height: 58px;
+            source: @image-url("../assets/app-icon.png");
+        }
+
         Text {
-            x: 52px;
-            y: 54px;
+            x: 116px;
+            y: 52px;
             text: "Sub2API";
             color: #18324a;
             font-size: 30px;
@@ -87,26 +95,26 @@ export component AppWindow inherits Window {
         }
 
         Text {
-            x: 52px;
+            x: 118px;
             y: 94px;
             width: 160px;
-            text: "Desktop Client";
-            color: #5c7388;
-            font-size: 14px;
+            text: "Desktop Client · Bright Edition";
+            color: #587189;
+            font-size: 13px;
         }
 
         Rectangle {
-            x: 52px;
-            y: 138px;
-            width: 168px;
-            height: 76px;
+            x: 40px;
+            y: 142px;
+            width: 196px;
+            height: 88px;
             background: #eef6ff;
             border-radius: 18px;
             border-color: #d5e4f7;
             border-width: 1px;
 
             Text {
-                x: 16px;
+                x: 18px;
                 y: 16px;
                 text: "交付模式";
                 color: #22415c;
@@ -115,56 +123,76 @@ export component AppWindow inherits Window {
             }
 
             Text {
-                x: 16px;
+                x: 18px;
                 y: 38px;
-                width: 136px;
-                text: "亮色原生桌面壳。默认优先官方模式，平台模式独立隔离。";
+                width: 160px;
+                text: "亮色原生桌面壳。账户、启动、计费三块分区，官方模式优先保底。";
                 color: #64809a;
                 font-size: 11px;
                 wrap: word-wrap;
             }
         }
 
-        Button {
-            x: 44px;
-            y: 246px;
-            width: 188px;
-            height: 42px;
-            text: "账户中心";
-            clicked => { root.current-section = 0; }
+        Rectangle {
+            x: 36px;
+            y: 252px;
+            width: 204px;
+            height: 54px;
+            background: root.current-section == 0 ? #18324a : #f7fbff;
+            border-radius: 18px;
+            border-color: root.current-section == 0 ? #18324a : #d6e3ef;
+            border-width: 1px;
+            TouchArea { clicked => { root.current-section = 0; } }
+            Text { x: 18px; y: 12px; text: "账户中心"; color: root.current-section == 0 ? #ffffff : #18324a; font-size: 15px; font-weight: 700; }
+            Text { x: 18px; y: 31px; width: 164px; text: "登录、注册、找回密码"; color: root.current-section == 0 ? #d7e6f6 : #6a8299; font-size: 11px; wrap: word-wrap; }
         }
 
-        Button {
-            x: 44px;
-            y: 298px;
-            width: 188px;
-            height: 42px;
-            text: "启动中心";
-            clicked => { root.current-section = 1; }
+        Rectangle {
+            x: 36px;
+            y: 316px;
+            width: 204px;
+            height: 54px;
+            background: root.current-section == 1 ? #18324a : #f7fbff;
+            border-radius: 18px;
+            border-color: root.current-section == 1 ? #18324a : #d6e3ef;
+            border-width: 1px;
+            TouchArea { clicked => { root.current-section = 1; } }
+            Text { x: 18px; y: 12px; text: "启动中心"; color: root.current-section == 1 ? #ffffff : #18324a; font-size: 15px; font-weight: 700; }
+            Text { x: 18px; y: 31px; width: 164px; text: "官方模式 / 平台代理"; color: root.current-section == 1 ? #d7e6f6 : #6a8299; font-size: 11px; wrap: word-wrap; }
         }
 
-        Button {
-            x: 44px;
-            y: 350px;
-            width: 188px;
-            height: 42px;
-            text: "计费与公告";
-            clicked => { root.current-section = 2; }
+        Rectangle {
+            x: 36px;
+            y: 380px;
+            width: 204px;
+            height: 54px;
+            background: root.current-section == 2 ? #18324a : #f7fbff;
+            border-radius: 18px;
+            border-color: root.current-section == 2 ? #18324a : #d6e3ef;
+            border-width: 1px;
+            TouchArea { clicked => { root.current-section = 2; } }
+            Text { x: 18px; y: 12px; text: "计费与公告"; color: root.current-section == 2 ? #ffffff : #18324a; font-size: 15px; font-weight: 700; }
+            Text { x: 18px; y: 31px; width: 164px; text: "CDK、订阅、订单记录"; color: root.current-section == 2 ? #d7e6f6 : #6a8299; font-size: 11px; wrap: word-wrap; }
         }
 
-        Button {
-            x: 44px;
-            y: 402px;
-            width: 188px;
-            height: 42px;
-            text: "帮助与安全";
-            clicked => { root.current-section = 3; }
+        Rectangle {
+            x: 36px;
+            y: 444px;
+            width: 204px;
+            height: 54px;
+            background: root.current-section == 3 ? #18324a : #f7fbff;
+            border-radius: 18px;
+            border-color: root.current-section == 3 ? #18324a : #d6e3ef;
+            border-width: 1px;
+            TouchArea { clicked => { root.current-section = 3; } }
+            Text { x: 18px; y: 12px; text: "帮助与安全"; color: root.current-section == 3 ? #ffffff : #18324a; font-size: 15px; font-weight: 700; }
+            Text { x: 18px; y: 31px; width: 164px; text: "隐私、恢复、使用建议"; color: root.current-section == 3 ? #d7e6f6 : #6a8299; font-size: 11px; wrap: word-wrap; }
         }
 
         Text {
-            x: 52px;
-            y: parent.height - 176px;
-            width: 168px;
+            x: 40px;
+            y: parent.height - 194px;
+            width: 184px;
             text: "不会显示连接密钥、服务地址或临时运行凭据。";
             color: #567089;
             font-size: 12px;
@@ -172,11 +200,24 @@ export component AppWindow inherits Window {
         }
 
         Rectangle {
+            x: 40px;
+            y: parent.height - 116px;
+            width: 184px;
+            height: 74px;
+            background: #ffffff;
+            border-radius: 18px;
+            border-color: #d6e3ef;
+            border-width: 1px;
+            Text { x: 16px; y: 14px; text: "v0.1.0"; color: #18324a; font-size: 13px; font-weight: 700; }
+            Text { x: 16px; y: 34px; width: 150px; text: "Windows 安装包、账户闭环和平台代理模式已接通。"; color: #698198; font-size: 11px; wrap: word-wrap; }
+        }
+
+        Rectangle {
             x: 304px;
             y: 44px;
             width: parent.width - 360px;
-            height: 84px;
-            background: #f8fbff;
+            height: 108px;
+            background: #f7fbff;
             border-radius: 20px;
             border-color: #d7e4f0;
             border-width: 1px;
@@ -193,11 +234,35 @@ export component AppWindow inherits Window {
             Text {
                 x: 24px;
                 y: 50px;
-                width: parent.width - 48px;
+                width: parent.width - 280px;
                 text: root.current-section == 0 ? root.auth-status-text : root.current-section == 1 ? root.launch-status-text : root.current-section == 2 ? root.dashboard-notice-text : "平台模式与官方模式相互隔离，帮助信息集中在这里。";
                 color: #698198;
                 font-size: 13px;
                 wrap: word-wrap;
+            }
+
+            Rectangle {
+                x: parent.width - 224px;
+                y: 20px;
+                width: 88px;
+                height: 30px;
+                background: root.dashboard-user-label == "当前账号：未登录" ? #f2f5f8 : #eaf8ef;
+                border-radius: 14px;
+                border-color: root.dashboard-user-label == "当前账号：未登录" ? #d7e4f0 : #cce6d4;
+                border-width: 1px;
+                Text { x: 14px; y: 8px; text: root.dashboard-user-label == "当前账号：未登录" ? "账户未登录" : "账户已登录"; color: root.dashboard-user-label == "当前账号：未登录" ? #6d8398 : #2d6a42; font-size: 11px; font-weight: 700; }
+            }
+
+            Rectangle {
+                x: parent.width - 124px;
+                y: 20px;
+                width: 88px;
+                height: 30px;
+                background: root.desktop-available || root.cli-available ? #edf5ff : #f2f5f8;
+                border-radius: 14px;
+                border-color: root.desktop-available || root.cli-available ? #cfe0f2 : #d7e4f0;
+                border-width: 1px;
+                Text { x: 14px; y: 8px; text: root.desktop-available || root.cli-available ? "启动已就绪" : "等待检测"; color: root.desktop-available || root.cli-available ? #2b587f : #6d8398; font-size: 11px; font-weight: 700; }
             }
         }
 

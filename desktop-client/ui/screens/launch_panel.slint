@@ -21,7 +21,7 @@ export component LaunchPanel inherits Rectangle {
     Text {
         x: 24px;
         y: 20px;
-        text: "官方模式启动";
+        text: "启动中心";
         color: #18324a;
         font-size: 24px;
         font-weight: 800;
@@ -38,6 +38,18 @@ export component LaunchPanel inherits Rectangle {
     }
 
     Rectangle {
+        x: parent.width - 114px;
+        y: 18px;
+        width: 90px;
+        height: 30px;
+        background: #eef6ff;
+        border-radius: 14px;
+        border-color: #d5e4f7;
+        border-width: 1px;
+        Text { x: 16px; y: 8px; text: "双模式"; color: #315577; font-size: 11px; font-weight: 700; }
+    }
+
+    Rectangle {
         x: 24px;
         y: 98px;
         width: parent.width - 48px;
@@ -49,6 +61,17 @@ export component LaunchPanel inherits Rectangle {
 
         Text { x: 16px; y: 14px; text: "Codex Desktop"; color: #24415c; font-size: 15px; font-weight: 700; }
         Text { x: 16px; y: 38px; text: root.desktop-available ? "已检测到可启动目标" : "未检测到可用 Desktop"; color: #688097; font-size: 12px; }
+        Rectangle {
+            x: parent.width - 86px;
+            y: 20px;
+            width: 62px;
+            height: 24px;
+            background: root.desktop-available ? #eaf8ef : #f2f5f8;
+            border-radius: 12px;
+            border-color: root.desktop-available ? #cce6d4 : #d7e4f0;
+            border-width: 1px;
+            Text { x: 14px; y: 6px; text: root.desktop-available ? "就绪" : "缺失"; color: root.desktop-available ? #2d6a42 : #6d8398; font-size: 10px; font-weight: 700; }
+        }
     }
 
     Rectangle {
@@ -63,6 +86,17 @@ export component LaunchPanel inherits Rectangle {
 
         Text { x: 16px; y: 14px; text: "Codex CLI"; color: #24415c; font-size: 15px; font-weight: 700; }
         Text { x: 16px; y: 38px; text: root.cli-available ? "已检测到可启动目标" : "未检测到可用 CLI"; color: #688097; font-size: 12px; }
+        Rectangle {
+            x: parent.width - 86px;
+            y: 20px;
+            width: 62px;
+            height: 24px;
+            background: root.cli-available ? #eaf8ef : #f2f5f8;
+            border-radius: 12px;
+            border-color: root.cli-available ? #cce6d4 : #d7e4f0;
+            border-width: 1px;
+            Text { x: 14px; y: 6px; text: root.cli-available ? "就绪" : "缺失"; color: root.cli-available ? #2d6a42 : #6d8398; font-size: 10px; font-weight: 700; }
+        }
     }
 
     Text {

@@ -27,15 +27,66 @@ export component RedeemScreen inherits Rectangle {
     Text {
         x: 24px;
         y: 54px;
-        width: parent.width - 48px;
+        width: parent.width - 224px;
         text: root.subscription-summary-text;
         color: #688097;
         font-size: 13px;
         wrap: word-wrap;
     }
 
-    LineEdit {
+    Rectangle {
+        x: parent.width - 176px;
+        y: 20px;
+        width: 152px;
+        height: 30px;
+        background: #eef6ff;
+        border-radius: 14px;
+        border-color: #d5e4f7;
+        border-width: 1px;
+        Text { x: 16px; y: 8px; text: "计费工作台"; color: #315577; font-size: 11px; font-weight: 700; }
+    }
+
+    Rectangle {
         x: 24px;
+        y: 92px;
+        width: 122px;
+        height: 42px;
+        background: #ffffff;
+        border-radius: 16px;
+        border-color: #d7e4f0;
+        border-width: 1px;
+        Text { x: 14px; y: 8px; text: "订阅项目"; color: #6a8299; font-size: 11px; font-weight: 700; }
+        Text { x: 14px; y: 21px; text: root.subscription-lines.length; color: #18324a; font-size: 16px; font-weight: 800; }
+    }
+
+    Rectangle {
+        x: 158px;
+        y: 92px;
+        width: 122px;
+        height: 42px;
+        background: #ffffff;
+        border-radius: 16px;
+        border-color: #d7e4f0;
+        border-width: 1px;
+        Text { x: 14px; y: 8px; text: "最近订单"; color: #6a8299; font-size: 11px; font-weight: 700; }
+        Text { x: 14px; y: 21px; text: root.order-lines.length; color: #18324a; font-size: 16px; font-weight: 800; }
+    }
+
+    Rectangle {
+        x: 292px;
+        y: 92px;
+        width: 122px;
+        height: 42px;
+        background: #ffffff;
+        border-radius: 16px;
+        border-color: #d7e4f0;
+        border-width: 1px;
+        Text { x: 14px; y: 8px; text: "兑换记录"; color: #6a8299; font-size: 11px; font-weight: 700; }
+        Text { x: 14px; y: 21px; text: root.history-lines.length; color: #18324a; font-size: 16px; font-weight: 800; }
+    }
+
+    LineEdit {
+        x: 430px;
         y: 92px;
         width: parent.width - 168px;
         height: 40px;
