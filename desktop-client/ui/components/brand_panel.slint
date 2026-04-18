@@ -3,54 +3,73 @@ export component BrandPanel inherits Rectangle {
     in property <string> status-copy: "你的电子牛马已就位。";
     in property <string> launch-copy: "少折腾，直接开工。";
 
-    background: #081524;
+    background: @linear-gradient(180deg, #f7fbff 0%, #eef6fb 100%);
     border-radius: 28px;
-    border-color: #173a57;
+    border-color: #dbe8f1;
     border-width: 1px;
 
     Rectangle {
         x: 28px;
         y: 28px;
-        width: 124px;
-        height: 124px;
-        background: #112438;
-        border-radius: 34px;
-        border-color: #214864;
+        width: parent.width - 56px;
+        height: 220px;
+        background: @linear-gradient(135deg, #f7fcff 0%, #dff3ff 45%, #edf8ff 100%);
+        border-radius: 30px;
+        border-color: #d1e6f4;
         border-width: 1px;
 
         Rectangle {
-            x: 33px;
-            y: 33px;
-            width: 58px;
-            height: 58px;
-            background: @linear-gradient(135deg, #ffe07f 0%, #ff9c44 60%, #ff7346 100%);
+            x: 34px;
+            y: 34px;
+            width: 132px;
+            height: 132px;
+            background: @radial-gradient(circle, #ffffff 0%, #d9f2ff 55%, #b7e5ff 100%);
+            border-radius: 66px;
+            border-color: #c7e8f8;
+            border-width: 1px;
+        }
+
+        Rectangle {
+            x: 74px;
+            y: 74px;
+            width: 52px;
+            height: 52px;
+            background: @linear-gradient(135deg, #9ce8ff 0%, #4dbef0 100%);
             border-radius: 18px;
         }
-    }
 
-    Rectangle {
-        x: 178px;
-        y: 88px;
-        width: parent.width - 212px;
-        height: 2px;
-        background: @linear-gradient(90deg, #ffb56f 0%, #53c7ff 100%);
+        Rectangle {
+            x: 170px;
+            y: 48px;
+            width: parent.width - 214px;
+            height: 2px;
+            background: @linear-gradient(90deg, #7ed8ff 0%, #dff5ff 100%);
+        }
+
+        Rectangle {
+            x: 152px;
+            y: 122px;
+            width: parent.width - 206px;
+            height: 2px;
+            background: @linear-gradient(90deg, #8fe0ff 0%, #ecf9ff 100%);
+        }
     }
 
     Text {
         x: 28px;
-        y: 188px;
+        y: 276px;
         text: root.product-name;
-        color: #f4fbff;
+        color: #18324a;
         font-size: 34px;
         font-weight: 800;
     }
 
     Text {
         x: 28px;
-        y: 234px;
+        y: 322px;
         width: parent.width - 56px;
         text: root.launch-copy;
-        color: #d4ebfb;
+        color: #3a6a84;
         font-size: 16px;
         font-weight: 600;
         wrap: word-wrap;
@@ -58,30 +77,29 @@ export component BrandPanel inherits Rectangle {
 
     Text {
         x: 28px;
-        y: 286px;
+        y: 366px;
         width: parent.width - 56px;
         text: root.status-copy;
-        color: #96b8cf;
+        color: #6a879a;
         font-size: 14px;
         wrap: word-wrap;
     }
 
     Rectangle {
         x: 28px;
-        y: parent.height - 156px;
+        y: parent.height - 182px;
         width: parent.width - 56px;
-        height: 54px;
-        background: #102334;
+        height: 72px;
+        background: #ffffffcc;
         border-radius: 18px;
-        border-color: #214763;
+        border-color: #d6e7f1;
         border-width: 1px;
 
         Text {
             x: 16px;
             y: 10px;
-            text: "启动感"
-            ;
-            color: #8bb1cb;
+            text: "系统公告";
+            color: #2b5f82;
             font-size: 11px;
             font-weight: 700;
         }
@@ -90,10 +108,20 @@ export component BrandPanel inherits Rectangle {
             x: 16px;
             y: 26px;
             width: parent.width - 32px;
-            text: "一键进入，不让你卡在表单和环境折腾里。";
-            color: #d5ebfb;
+            text: "V2.4 版本已发布，现已支持更稳定的亮色客户端骨架。";
+            color: #5f7892;
             font-size: 12px;
             wrap: word-wrap;
         }
+    }
+
+    Text {
+        x: 28px;
+        y: parent.height - 86px;
+        width: parent.width - 56px;
+        text: "Precision Editorial Engine";
+        color: #8aa1b3;
+        font-size: 12px;
+        horizontal-alignment: center;
     }
 }

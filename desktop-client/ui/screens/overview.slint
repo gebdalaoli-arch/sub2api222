@@ -34,120 +34,173 @@ export component OverviewScreen inherits Rectangle {
 
     Rectangle {
         x: 0px;
-        y: 86px;
+        y: 88px;
         width: parent.width;
-        height: 116px;
-        background: #f8fbff;
-        border-radius: 24px;
-        border-color: #d7e4f0;
+        height: 148px;
+        background: @linear-gradient(135deg, #fafdff 0%, #eef7fc 100%);
+        border-radius: 28px;
+        border-color: #dae8f2;
         border-width: 1px;
 
         Rectangle {
             x: 20px;
-            y: 18px;
+            y: 24px;
             width: (parent.width - 80px) / 3;
-            height: 80px;
+            height: 98px;
             background: #ffffff;
             border-radius: 18px;
             border-color: #d7e4f0;
             border-width: 1px;
             Text { x: 16px; y: 14px; text: "余额"; color: #6a8299; font-size: 12px; font-weight: 700; }
-            Text { x: 16px; y: 40px; text: root.balance-text; color: #18324a; font-size: 18px; font-weight: 800; }
+            Text { x: 16px; y: 42px; text: root.balance-text; color: #18324a; font-size: 20px; font-weight: 800; }
         }
 
         Rectangle {
             x: 30px + (parent.width - 80px) / 3;
-            y: 18px;
+            y: 24px;
             width: (parent.width - 80px) / 3;
-            height: 80px;
+            height: 98px;
             background: #ffffff;
             border-radius: 18px;
             border-color: #d7e4f0;
             border-width: 1px;
             Text { x: 16px; y: 14px; text: "并发"; color: #6a8299; font-size: 12px; font-weight: 700; }
-            Text { x: 16px; y: 40px; text: root.usage-text; color: #18324a; font-size: 18px; font-weight: 800; }
+            Text { x: 16px; y: 42px; text: root.usage-text; color: #18324a; font-size: 20px; font-weight: 800; }
         }
 
         Rectangle {
             x: 40px + ((parent.width - 80px) / 3) * 2;
-            y: 18px;
+            y: 24px;
             width: (parent.width - 80px) / 3;
-            height: 80px;
+            height: 98px;
             background: #ffffff;
             border-radius: 18px;
             border-color: #d7e4f0;
             border-width: 1px;
             Text { x: 16px; y: 14px; text: "状态"; color: #6a8299; font-size: 12px; font-weight: 700; }
-            Text { x: 16px; y: 40px; width: parent.width - 32px; text: root.account-status-text; color: #18324a; font-size: 14px; font-weight: 700; wrap: word-wrap; }
+            Text { x: 16px; y: 42px; width: parent.width - 32px; text: root.account-status-text; color: #18324a; font-size: 14px; font-weight: 700; wrap: word-wrap; }
         }
     }
 
     Rectangle {
         x: 0px;
-        y: 226px;
+        y: 258px;
         width: 276px;
-        height: 178px;
-        background: #f8fbff;
-        border-radius: 24px;
+        height: 196px;
+        background: @linear-gradient(135deg, #edf8ff 0%, #f8fcff 100%);
+        border-radius: 28px;
         border-color: #d7e4f0;
         border-width: 1px;
         TouchArea { clicked => { root.open-launch-requested(); } }
 
-        Text { x: 20px; y: 22px; text: "启动中心"; color: #18324a; font-size: 22px; font-weight: 800; }
-        Text { x: 20px; y: 58px; width: parent.width - 40px; text: "查看官方模式与平台代理模式，进入目标安装状态与 group 详情。"; color: #688097; font-size: 13px; wrap: word-wrap; }
+        Text { x: 20px; y: 22px; text: "启动 Codex"; color: #18324a; font-size: 22px; font-weight: 800; }
+        Text { x: 20px; y: 58px; width: parent.width - 40px; text: "从这里直接进入主工作流，默认桌面版，可切换 CLI。"; color: #688097; font-size: 13px; wrap: word-wrap; }
+        Text { x: 20px; y: 104px; text: "当前版本：V2.4"; color: #2b59d0; font-size: 12px; font-weight: 700; }
         Button {
             x: 20px;
-            y: 120px;
+            y: 138px;
             width: 132px;
             height: 40px;
-            text: "查看启动详情";
+            text: "立即进入";
             clicked => { root.open-launch-requested(); }
         }
     }
 
     Rectangle {
         x: 292px;
-        y: 226px;
+        y: 258px;
         width: 276px;
-        height: 178px;
+        height: 196px;
         background: #f8fbff;
-        border-radius: 24px;
+        border-radius: 28px;
         border-color: #d7e4f0;
         border-width: 1px;
         TouchArea { clicked => { root.open-billing-requested(); } }
 
         Text { x: 20px; y: 22px; text: "计费中心"; color: #18324a; font-size: 22px; font-weight: 800; }
-        Text { x: 20px; y: 58px; width: parent.width - 40px; text: "进入订阅、订单和兑换记录详情，不再把所有计费信息直接平铺。"; color: #688097; font-size: 13px; wrap: word-wrap; }
+        Text { x: 20px; y: 58px; width: parent.width - 40px; text: "查看账户余额、本月消耗和订单明细，不把所有信息直接平铺。"; color: #688097; font-size: 13px; wrap: word-wrap; }
+        Text { x: 20px; y: 104px; text: root.balance-text; color: #18324a; font-size: 24px; font-weight: 800; }
         Button {
             x: 20px;
-            y: 120px;
-            width: 132px;
+            y: 144px;
+            width: 92px;
             height: 40px;
-            text: "查看计费详情";
+            text: "充值";
+            clicked => { root.open-billing-requested(); }
+        }
+        Button {
+            x: 122px;
+            y: 144px;
+            width: 110px;
+            height: 40px;
+            text: "账单明细";
             clicked => { root.open-billing-requested(); }
         }
     }
 
     Rectangle {
         x: 584px;
-        y: 226px;
+        y: 258px;
         width: parent.width - 584px;
-        height: 178px;
+        height: 196px;
         background: #f8fbff;
-        border-radius: 24px;
+        border-radius: 28px;
         border-color: #d7e4f0;
         border-width: 1px;
         TouchArea { clicked => { root.open-help-requested(); } }
 
-        Text { x: 20px; y: 22px; text: "帮助与安全"; color: #18324a; font-size: 22px; font-weight: 800; }
+        Text { x: 20px; y: 22px; text: "设置与帮助"; color: #18324a; font-size: 22px; font-weight: 800; }
         Text { x: 20px; y: 58px; width: parent.width - 40px; text: root.notice-text; color: #688097; font-size: 13px; wrap: word-wrap; }
+        Text { x: 20px; y: 104px; text: "系统状态良好"; color: #18324a; font-size: 20px; font-weight: 800; }
         Button {
             x: 20px;
-            y: 120px;
-            width: 146px;
+            y: 144px;
+            width: 104px;
             height: 40px;
-            text: "打开帮助详情";
+            text: "偏好设置";
             clicked => { root.open-help-requested(); }
+        }
+        Button {
+            x: 136px;
+            y: 144px;
+            width: 92px;
+            height: 40px;
+            text: "在线支持";
+            clicked => { root.open-help-requested(); }
+        }
+    }
+
+    Rectangle {
+        x: 0px;
+        y: 478px;
+        width: parent.width;
+        height: parent.height - 478px;
+        background: #f8fbff;
+        border-radius: 28px;
+        border-color: #d7e4f0;
+        border-width: 1px;
+
+        Text {
+            x: 20px;
+            y: 18px;
+            text: "系统公告";
+            color: #18324a;
+            font-size: 20px;
+            font-weight: 800;
+        }
+
+        Rectangle {
+            x: 20px;
+            y: 54px;
+            width: parent.width - 40px;
+            height: 76px;
+            background: #ffffff;
+            border-radius: 18px;
+            border-color: #d7e4f0;
+            border-width: 1px;
+            Text { x: 16px; y: 16px; text: "V2.4 版本已发布"; color: #18324a; font-size: 16px; font-weight: 700; }
+            Text { x: 16px; y: 40px; text: "2026-04-19"; color: #688097; font-size: 11px; }
+            Text { x: 102px; y: 40px; width: parent.width - 118px; text: "现在支持更稳定的亮色客户端骨架和新的公告中心。"; color: #688097; font-size: 12px; wrap: word-wrap; }
         }
     }
 }
