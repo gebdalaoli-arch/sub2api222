@@ -16,6 +16,7 @@ This directory contains files for deploying Sub2API on Linux servers.
 | `docker-compose.yml` | Docker Compose configuration (named volumes) |
 | `docker-compose.local.yml` | Docker Compose configuration (local directories, easy migration) |
 | `docker-deploy.sh` | **One-click Docker deployment script (recommended)** |
+| `update-local-docker-deployment.sh` | 使用当前仓库源码构建并更新 `docker-compose.local.yml` 部署 |
 | `.env.example` | Docker environment variables template |
 | `DOCKER.md` | Docker Hub documentation |
 | `install.sh` | One-click binary installation script |
@@ -105,6 +106,27 @@ docker compose -f docker-compose.local.yml logs -f sub2api
 | **docker-compose.yml** | Named volumes (/var/lib/docker/volumes/) | ⚠️ Requires docker commands | Simple setup, don't need migration |
 
 **Recommendation:** Use `docker-compose.local.yml` (deployed by `docker-deploy.sh`) for easier data management and migration.
+
+### Incremental Update For Existing Self-Hosted Deployment
+
+If your server already runs the local-directory Compose deployment and you want to deploy the **current checkout** instead of pulling an older Docker Hub image, use:
+
+```bash
+chmod +x deploy/update-local-docker-deployment.sh
+./deploy/update-local-docker-deployment.sh
+```
+
+This script:
+
+- verifies `deploy/.env` and `deploy/docker-compose.local.yml`
+- backs up current deploy files
+- builds `weishaw/sub2api:latest` from the current repository source
+- restarts the `docker-compose.local.yml` deployment
+- runs a local `/health` check
+
+For the exact verification and rollback checklist, see:
+
+- `docs/superpowers/deploy/2026-04-19-server-incremental-update-cn.md`
 
 ### How Auto-Setup Works
 

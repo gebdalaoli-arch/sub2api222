@@ -24,6 +24,12 @@
 
 当前不把这版定义为“最终商业正式版”，但已经是“可安装、可演示、可继续灰度测试”的桌面客户端基础版本。
 
+如果后续要继续套壳、交接研发或接手部署，请继续看：
+
+- [桌面客户端交接文档](D:/挣钱/token/token客户端/docs/superpowers/handoff/2026-04-19-desktop-client-handoff.md)
+- [VMware Desktop GUI 补测记录](D:/挣钱/token/token客户端/docs/superpowers/verification/2026-04-19-desktop-gui-vm-test.md)
+- [服务器增量更新说明](D:/挣钱/token/token客户端/docs/superpowers/deploy/2026-04-19-server-incremental-update-cn.md)
+
 ## 3. 产品结构
 
 客户端 UI 目前按四个主区组织：
