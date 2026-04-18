@@ -129,12 +129,16 @@ vite.config.js
 docs/*
 !docs/PAYMENT.md
 !docs/PAYMENT_CN.md
+!docs/superpowers/
+!docs/superpowers/specs/
+!docs/superpowers/specs/*.md
 .serena/
 .codex/
 frontend/coverage/
 aicodex
 output/
 .gomodcache/
+.superpowers/
 
 
 # Rust desktop client build artifacts
