@@ -47,12 +47,25 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build-desktop-installer.ps
 
 - 生成 `desktop-client\target\release\sub2api-desktop.exe`
 - 生成 Inno Setup 安装包 `dist\desktop-client\Sub2API-Desktop-Setup-<version>.exe`
+- 生成对应的 `SHA256` 校验文件
 - 在 Windows 下为 exe 嵌入版本信息和图标
+
+如果你已经有代码签名证书，可以继续运行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\sign-desktop-installer.ps1 -CertThumbprint "<thumbprint>"
+```
+
+或：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\sign-desktop-installer.ps1 -PfxPath "C:\certs\codesign.pfx" -PfxPassword "<password>"
+```
 
 这里临时使用 `rsproxy.cn` 是因为当前机器访问 crates.io 出现 TLS 握手失败；如果你的网络能直连 crates.io，可以去掉两个 `--config` 参数。
 
 ## 当前边界
 
-- 已有：亮色桌面应用壳、基础路由枚举、账号认证 JSON 契约、2FA 登录响应契约、`/auth/me`、`/groups/available`、desktop session create/refresh/revoke 调用层、HTTP 错误保真、系统凭据存储接口、登录/注册/邮箱验证码/忘记密码 UI 与主程序接线、Codex Desktop/CLI 安装检测、官方模式启动、平台模式受管 home 基础、Windows 安装包脚本。
-- 未接入：CDK 兑换真实请求、platform session 与 UI 启动中心的最终接线、平台模式自动续期与退出清理、订单/订阅明细、图标签名。
+- 已有：亮色桌面应用壳、基础路由枚举、账号认证 JSON 契约、2FA 登录响应契约、`/auth/me`、`/groups/available`、`/redeem`、`/redeem/history`、`/subscriptions/summary`、desktop session create/refresh/revoke 调用层、HTTP 错误保真、系统凭据存储接口、登录/注册/邮箱验证码/忘记密码/CDK 兑换 UI 与主程序接线、Codex Desktop/CLI 安装检测、官方模式启动、平台代理模式启动、受管 home/runtime 元数据、平台会话自动续期与退出回收、Windows 安装包脚本与 SHA256 输出。
+- 未接入：订单明细、订阅明细页、真实证书签名执行、生产 API 地址固化后的最终发布包。
 - 安全约束：后续 UI 仍不展示连接密钥、服务地址或 runtime 凭证；refresh token 默认走系统凭据存储，文件实现仅作为测试替身。

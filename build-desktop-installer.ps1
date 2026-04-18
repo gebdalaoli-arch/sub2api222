@@ -20,6 +20,7 @@ $issPath = Join-Path $repoRoot "desktop-client\packaging\windows\desktop-client.
 $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 $cargoConfigDir = Join-Path $repoRoot ".cargo"
 $cargoConfigPath = Join-Path $cargoConfigDir "config.toml"
+$installerPath = Join-Path $outputDir "Sub2API-Desktop-Setup-$appVersion.exe"
 
 if (-not (Test-Path $iscc)) {
     throw "未找到 Inno Setup 编译器：$iscc"
@@ -58,4 +59,13 @@ Write-Host "==> 生成 Inno Setup 安装包"
     "/DMyRepoRoot=$repoRoot" `
     $issPath
 
+if (-not (Test-Path $installerPath)) {
+    throw "未生成安装包：$installerPath"
+}
+
+$hash = (Get-FileHash $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
+$hashPath = "$installerPath.sha256"
+Set-Content -Path $hashPath -Value "$hash  $(Split-Path $installerPath -Leaf)" -Encoding ascii
+
 Write-Host "==> 安装包输出目录: $outputDir"
+Write-Host "==> SHA256 文件: $hashPath"
