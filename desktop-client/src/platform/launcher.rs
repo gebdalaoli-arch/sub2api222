@@ -18,8 +18,7 @@ pub struct LaunchCommandSpec {
 
 pub const WINDOWS_STORE_DESKTOP_PLATFORM_UNSUPPORTED: &str =
     "WINDOWS_STORE_DESKTOP_PLATFORM_UNSUPPORTED";
-pub const WINDOWS_STORE_DESKTOP_ALREADY_RUNNING: &str =
-    "WINDOWS_STORE_DESKTOP_ALREADY_RUNNING";
+pub const WINDOWS_STORE_DESKTOP_ALREADY_RUNNING: &str = "WINDOWS_STORE_DESKTOP_ALREADY_RUNNING";
 
 impl LaunchCommandSpec {
     pub fn direct(executable: PathBuf) -> Self {
@@ -34,9 +33,7 @@ impl LaunchCommandSpec {
 }
 
 pub fn validate_platform_launch_target(target: &InstalledTarget) -> Result<()> {
-    if is_windows_store_desktop_target(target)
-        && !cfg!(test)
-        && windows_store_desktop_is_running()
+    if is_windows_store_desktop_target(target) && !cfg!(test) && windows_store_desktop_is_running()
     {
         anyhow::bail!(WINDOWS_STORE_DESKTOP_ALREADY_RUNNING);
     }
@@ -97,8 +94,19 @@ pub fn launch_official(target: &InstalledTarget) -> Result<()> {
 }
 
 pub fn platform_launch_command(target: &InstalledTarget, codex_home: &Path) -> LaunchCommandSpec {
-    let mut spec = if is_windows_store_desktop_target(target) {
-        LaunchCommandSpec::direct(target.executable.clone())
+    let mut spec = if let Some(app_id) = windows_store_app_id(target) {
+        LaunchCommandSpec {
+            program: OsString::from("cmd"),
+            args: vec![
+                OsString::from("/C"),
+                OsString::from("start"),
+                OsString::from(""),
+                OsString::from(format!(r"shell:AppsFolder\{app_id}")),
+            ],
+            envs: Vec::new(),
+            current_dir: None,
+            tracks_child_lifecycle: false,
+        }
     } else {
         official_launch_command(target)
     };
@@ -106,9 +114,6 @@ pub fn platform_launch_command(target: &InstalledTarget, codex_home: &Path) -> L
         OsString::from("CODEX_HOME"),
         codex_home.as_os_str().to_os_string(),
     ));
-    if is_windows_store_desktop_target(target) {
-        spec.current_dir = Some(codex_home.to_path_buf());
-    }
     spec
 }
 
@@ -141,7 +146,10 @@ fn windows_store_app_id(target: &InstalledTarget) -> Option<String> {
     }
 
     let normalized = target.executable.to_string_lossy().replace('/', "\\");
-    if !normalized.to_ascii_lowercase().contains("windowsapps\\openai.codex_") {
+    if !normalized
+        .to_ascii_lowercase()
+        .contains("windowsapps\\openai.codex_")
+    {
         return None;
     }
 
@@ -186,7 +194,10 @@ fn windows_tasklist_reports_codex_running(tasklist_stdout: &str) -> bool {
         let Some(first_column) = line.split(',').next() else {
             return false;
         };
-        first_column.trim().trim_matches('"').eq_ignore_ascii_case("Codex.exe")
+        first_column
+            .trim()
+            .trim_matches('"')
+            .eq_ignore_ascii_case("Codex.exe")
     })
 }
 
@@ -240,7 +251,7 @@ mod tests {
     }
 
     #[test]
-    fn platform_launch_for_windows_store_desktop_uses_direct_executable_with_isolated_home() {
+    fn platform_launch_for_windows_store_desktop_uses_shell_launcher_with_isolated_home() {
         let target = InstalledTarget {
             kind: LaunchTarget::Desktop,
             executable: PathBuf::from(
@@ -252,13 +263,15 @@ mod tests {
         let runtime_home = PathBuf::from(r"D:\TokenClient\runtime\platform-desktop");
         let spec = platform_launch_command(&target, runtime_home.as_path());
 
+        assert_eq!(spec.program.to_string_lossy(), "cmd");
+        assert_eq!(spec.args[0].to_string_lossy(), "/C");
+        assert_eq!(spec.args[1].to_string_lossy(), "start");
         assert_eq!(
-            spec.program.to_string_lossy(),
-            r"C:\Program Files\WindowsApps\OpenAI.Codex_1.0.0.0_x64__2p2nqsd0c76g0\app\Codex.exe"
+            spec.args[3].to_string_lossy(),
+            r"shell:AppsFolder\OpenAI.Codex_2p2nqsd0c76g0!App"
         );
-        assert!(spec.args.is_empty());
-        assert!(spec.tracks_child_lifecycle);
-        assert_eq!(spec.current_dir, Some(runtime_home.clone()));
+        assert!(!spec.tracks_child_lifecycle);
+        assert_eq!(spec.current_dir, None);
         assert!(spec.envs.iter().any(|(key, value)| {
             key.to_string_lossy() == "CODEX_HOME"
                 && value.to_string_lossy() == runtime_home.to_string_lossy()
