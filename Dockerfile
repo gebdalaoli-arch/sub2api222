@@ -55,8 +55,14 @@ WORKDIR /app/backend
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 
+# Install wire for dependency injection code generation
+RUN go install github.com/google/wire/cmd/wire@latest
+
 # Copy backend source first
 COPY backend/ ./
+
+# Regenerate wire_gen.go to match current code
+RUN cd cmd/server && wire
 
 # Copy frontend dist from previous stage (must be after backend copy to avoid being overwritten)
 COPY --from=frontend-builder /app/backend/internal/web/dist ./internal/web/dist
