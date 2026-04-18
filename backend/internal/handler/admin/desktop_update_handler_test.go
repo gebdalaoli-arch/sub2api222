@@ -3,6 +3,7 @@ package admin
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -41,6 +42,31 @@ func TestDesktopUpdateAdminHandler_CreateReleaseFromMultipartUpload(t *testing.T
 	require.Contains(t, rec.Body.String(), `"version":"0.2.0"`)
 }
 
+func TestDesktopUpdateAdminHandler_CreateStandaloneAnnouncement(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/admin/desktop-updates/announcements",
+		bytes.NewBufferString(`{"title":"维护提醒","content":"今晚维护","kind":"maintenance","pinned":true}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	ctx.Request = req
+
+	handler := NewDesktopUpdateHandler(newDesktopUpdateServiceStub())
+	handler.CreateStandaloneAnnouncement(ctx)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var payload struct {
+		Data service.DesktopStandaloneAnnouncementRecord `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &payload))
+	require.Equal(t, "维护提醒", payload.Data.Title)
+	require.True(t, payload.Data.Pinned)
+}
+
 type desktopUpdateServiceStub struct{}
 
 func newDesktopUpdateServiceStub() *desktopUpdateServiceStub {
@@ -76,5 +102,46 @@ func (s *desktopUpdateServiceStub) UpdateRelease(_ context.Context, releaseID in
 }
 
 func (s *desktopUpdateServiceStub) DeleteRelease(_ context.Context, _ int64) error {
+	return nil
+}
+
+func (s *desktopUpdateServiceStub) ListStandaloneAnnouncements(_ context.Context) ([]service.DesktopStandaloneAnnouncementRecord, error) {
+	return []service.DesktopStandaloneAnnouncementRecord{{
+		ID:      1,
+		Title:   "维护提醒",
+		Content: "今晚维护",
+		Kind:    "maintenance",
+		Pinned:  true,
+	}}, nil
+}
+
+func (s *desktopUpdateServiceStub) CreateStandaloneAnnouncement(_ context.Context, input service.CreateDesktopStandaloneAnnouncementInput) (*service.DesktopStandaloneAnnouncementRecord, error) {
+	return &service.DesktopStandaloneAnnouncementRecord{
+		ID:      1,
+		Title:   input.Title,
+		Content: input.Content,
+		Kind:    input.Kind,
+		Pinned:  input.Pinned,
+	}, nil
+}
+
+func (s *desktopUpdateServiceStub) UpdateStandaloneAnnouncement(_ context.Context, announcementID int64, input service.UpdateDesktopStandaloneAnnouncementInput) (*service.DesktopStandaloneAnnouncementRecord, error) {
+	item := &service.DesktopStandaloneAnnouncementRecord{ID: announcementID}
+	if input.Title != nil {
+		item.Title = *input.Title
+	}
+	if input.Content != nil {
+		item.Content = *input.Content
+	}
+	if input.Kind != nil {
+		item.Kind = *input.Kind
+	}
+	if input.Pinned != nil {
+		item.Pinned = *input.Pinned
+	}
+	return item, nil
+}
+
+func (s *desktopUpdateServiceStub) DeleteStandaloneAnnouncement(_ context.Context, _ int64) error {
 	return nil
 }

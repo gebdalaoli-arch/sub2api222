@@ -38,7 +38,12 @@ func (s *DesktopUpdateService) loadFeed(ctx context.Context) (*DesktopUpdateFeed
 	raw, err := s.settingRepo.GetValue(ctx, SettingKeyDesktopUpdateFeed)
 	if err != nil {
 		if err == ErrSettingNotFound {
-			return &DesktopUpdateFeed{NextID: 1, Releases: []DesktopReleaseRecord{}}, nil
+			return &DesktopUpdateFeed{
+				NextID:                  1,
+				NextAnnouncementID:      1,
+				Releases:                []DesktopReleaseRecord{},
+				StandaloneAnnouncements: []DesktopStandaloneAnnouncementRecord{},
+			}, nil
 		}
 		return nil, fmt.Errorf("load desktop update feed: %w", err)
 	}
@@ -50,8 +55,14 @@ func (s *DesktopUpdateService) loadFeed(ctx context.Context) (*DesktopUpdateFeed
 	if feed.NextID == 0 {
 		feed.NextID = int64(len(feed.Releases) + 1)
 	}
+	if feed.NextAnnouncementID == 0 {
+		feed.NextAnnouncementID = int64(len(feed.StandaloneAnnouncements) + 1)
+	}
 	if feed.Releases == nil {
 		feed.Releases = []DesktopReleaseRecord{}
+	}
+	if feed.StandaloneAnnouncements == nil {
+		feed.StandaloneAnnouncements = []DesktopStandaloneAnnouncementRecord{}
 	}
 	return feed, nil
 }
@@ -281,17 +292,133 @@ func (s *DesktopUpdateService) DeleteRelease(ctx context.Context, releaseID int6
 	return nil
 }
 
+func (s *DesktopUpdateService) ListStandaloneAnnouncements(ctx context.Context) ([]DesktopStandaloneAnnouncementRecord, error) {
+	feed, err := s.loadFeed(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	items := append([]DesktopStandaloneAnnouncementRecord(nil), feed.StandaloneAnnouncements...)
+	sortDesktopStandaloneAnnouncements(items)
+	return items, nil
+}
+
+func (s *DesktopUpdateService) CreateStandaloneAnnouncement(ctx context.Context, input CreateDesktopStandaloneAnnouncementInput) (*DesktopStandaloneAnnouncementRecord, error) {
+	feed, err := s.loadFeed(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	record := DesktopStandaloneAnnouncementRecord{
+		ID:        feed.NextAnnouncementID,
+		ReleaseID: input.ReleaseID,
+		Title:     strings.TrimSpace(input.Title),
+		Content:   strings.TrimSpace(input.Content),
+		Kind:      strings.TrimSpace(input.Kind),
+		Pinned:    input.Pinned,
+		StartsAt:  input.StartsAt,
+		EndsAt:    input.EndsAt,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	feed.StandaloneAnnouncements = append(feed.StandaloneAnnouncements, record)
+	feed.NextAnnouncementID++
+	if err := s.saveFeed(ctx, feed); err != nil {
+		return nil, err
+	}
+	return &record, nil
+}
+
+func (s *DesktopUpdateService) UpdateStandaloneAnnouncement(ctx context.Context, announcementID int64, input UpdateDesktopStandaloneAnnouncementInput) (*DesktopStandaloneAnnouncementRecord, error) {
+	feed, err := s.loadFeed(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	index := desktopStandaloneAnnouncementIndexByID(feed.StandaloneAnnouncements, announcementID)
+	if index < 0 {
+		return nil, ErrDesktopReleaseNotFound
+	}
+
+	record := &feed.StandaloneAnnouncements[index]
+	if input.ReleaseID != nil {
+		record.ReleaseID = input.ReleaseID
+	}
+	if input.Title != nil {
+		record.Title = strings.TrimSpace(*input.Title)
+	}
+	if input.Content != nil {
+		record.Content = strings.TrimSpace(*input.Content)
+	}
+	if input.Kind != nil {
+		record.Kind = strings.TrimSpace(*input.Kind)
+	}
+	if input.Pinned != nil {
+		record.Pinned = *input.Pinned
+	}
+	if input.StartsAt != nil {
+		record.StartsAt = *input.StartsAt
+	}
+	if input.EndsAt != nil {
+		record.EndsAt = *input.EndsAt
+	}
+	record.UpdatedAt = time.Now().UTC()
+
+	if err := s.saveFeed(ctx, feed); err != nil {
+		return nil, err
+	}
+	updated := *record
+	return &updated, nil
+}
+
+func (s *DesktopUpdateService) DeleteStandaloneAnnouncement(ctx context.Context, announcementID int64) error {
+	feed, err := s.loadFeed(ctx)
+	if err != nil {
+		return err
+	}
+
+	index := desktopStandaloneAnnouncementIndexByID(feed.StandaloneAnnouncements, announcementID)
+	if index < 0 {
+		return ErrDesktopReleaseNotFound
+	}
+	feed.StandaloneAnnouncements = append(
+		feed.StandaloneAnnouncements[:index],
+		feed.StandaloneAnnouncements[index+1:]...,
+	)
+	return s.saveFeed(ctx, feed)
+}
+
 func (s *DesktopUpdateService) ListAnnouncements(ctx context.Context, platform, arch string) ([]DesktopAnnouncementItem, error) {
 	feed, err := s.loadFeed(ctx)
 	if err != nil {
 		return nil, err
 	}
 
+	now := time.Now().UTC()
+	items := make([]DesktopAnnouncementItem, 0, len(feed.StandaloneAnnouncements)+4)
+	for i := range feed.StandaloneAnnouncements {
+		record := feed.StandaloneAnnouncements[i]
+		if !isStandaloneAnnouncementActive(record, now) {
+			continue
+		}
+		items = append(items, DesktopAnnouncementItem{
+			Title:    record.Title,
+			Content:  record.Content,
+			Kind:     record.Kind,
+			Pinned:   record.Pinned,
+			StartsAt: record.StartsAt,
+			EndsAt:   record.EndsAt,
+		})
+	}
+	sortDesktopAnnouncementItems(items)
+
 	release := latestPublishedDesktopRelease(feed.Releases, platform, arch)
 	if release == nil {
-		return []DesktopAnnouncementItem{}, nil
+		return items, nil
 	}
-	return append([]DesktopAnnouncementItem(nil), release.AnnouncementItems...), nil
+	return append(items, release.AnnouncementItems...), nil
 }
 
 func (s *DesktopUpdateService) ServePackage(ctx context.Context, releaseID int64) (string, string, error) {
@@ -352,6 +479,52 @@ func sortDesktopReleases(releases []DesktopReleaseRecord) {
 			}
 		}
 	}
+}
+
+func desktopStandaloneAnnouncementIndexByID(items []DesktopStandaloneAnnouncementRecord, announcementID int64) int {
+	for i := range items {
+		if items[i].ID == announcementID {
+			return i
+		}
+	}
+	return -1
+}
+
+func sortDesktopStandaloneAnnouncements(items []DesktopStandaloneAnnouncementRecord) {
+	for i := 0; i < len(items); i++ {
+		for j := i + 1; j < len(items); j++ {
+			if shouldSwapStandaloneAnnouncements(items[i], items[j]) {
+				items[i], items[j] = items[j], items[i]
+			}
+		}
+	}
+}
+
+func sortDesktopAnnouncementItems(items []DesktopAnnouncementItem) {
+	for i := 0; i < len(items); i++ {
+		for j := i + 1; j < len(items); j++ {
+			if !items[i].Pinned && items[j].Pinned {
+				items[i], items[j] = items[j], items[i]
+			}
+		}
+	}
+}
+
+func shouldSwapStandaloneAnnouncements(left, right DesktopStandaloneAnnouncementRecord) bool {
+	if left.Pinned != right.Pinned {
+		return !left.Pinned && right.Pinned
+	}
+	return left.CreatedAt.Before(right.CreatedAt)
+}
+
+func isStandaloneAnnouncementActive(record DesktopStandaloneAnnouncementRecord, now time.Time) bool {
+	if record.StartsAt != nil && record.StartsAt.After(now) {
+		return false
+	}
+	if record.EndsAt != nil && !record.EndsAt.After(now) {
+		return false
+	}
+	return true
 }
 
 func buildDesktopReleaseSlug(id int64, version, platform, arch string) string {

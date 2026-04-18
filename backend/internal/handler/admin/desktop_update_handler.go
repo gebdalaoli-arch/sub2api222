@@ -20,6 +20,10 @@ type desktopUpdateAdminService interface {
 	GetReleaseByID(ctx context.Context, releaseID int64) (*service.DesktopReleaseRecord, error)
 	UpdateRelease(ctx context.Context, releaseID int64, input service.UpdateDesktopReleaseInput) (*service.DesktopReleaseRecord, error)
 	DeleteRelease(ctx context.Context, releaseID int64) error
+	ListStandaloneAnnouncements(ctx context.Context) ([]service.DesktopStandaloneAnnouncementRecord, error)
+	CreateStandaloneAnnouncement(ctx context.Context, input service.CreateDesktopStandaloneAnnouncementInput) (*service.DesktopStandaloneAnnouncementRecord, error)
+	UpdateStandaloneAnnouncement(ctx context.Context, announcementID int64, input service.UpdateDesktopStandaloneAnnouncementInput) (*service.DesktopStandaloneAnnouncementRecord, error)
+	DeleteStandaloneAnnouncement(ctx context.Context, announcementID int64) error
 }
 
 type DesktopUpdateHandler struct {
@@ -146,19 +150,84 @@ func (h *DesktopUpdateHandler) DeleteRelease(c *gin.Context) {
 }
 
 func (h *DesktopUpdateHandler) ListStandaloneAnnouncements(c *gin.Context) {
-	response.Success(c, []service.DesktopAnnouncementItem{})
+	items, err := h.service.ListStandaloneAnnouncements(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, items)
 }
 
 func (h *DesktopUpdateHandler) CreateStandaloneAnnouncement(c *gin.Context) {
-	response.Error(c, http.StatusNotImplemented, "standalone desktop announcements are not implemented yet")
+	var req struct {
+		ReleaseID *int64 `json:"release_id"`
+		Title     string `json:"title" binding:"required"`
+		Content   string `json:"content" binding:"required"`
+		Kind      string `json:"kind" binding:"required"`
+		Pinned    bool   `json:"pinned"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	item, err := h.service.CreateStandaloneAnnouncement(c.Request.Context(), service.CreateDesktopStandaloneAnnouncementInput{
+		ReleaseID: req.ReleaseID,
+		Title:     req.Title,
+		Content:   req.Content,
+		Kind:      req.Kind,
+		Pinned:    req.Pinned,
+	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, item)
 }
 
 func (h *DesktopUpdateHandler) UpdateStandaloneAnnouncement(c *gin.Context) {
-	response.Error(c, http.StatusNotImplemented, "standalone desktop announcements are not implemented yet")
+	announcementID, ok := parseAdminDesktopAnnouncementID(c)
+	if !ok {
+		return
+	}
+
+	var req struct {
+		ReleaseID *int64  `json:"release_id"`
+		Title     *string `json:"title"`
+		Content   *string `json:"content"`
+		Kind      *string `json:"kind"`
+		Pinned    *bool   `json:"pinned"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	item, err := h.service.UpdateStandaloneAnnouncement(c.Request.Context(), announcementID, service.UpdateDesktopStandaloneAnnouncementInput{
+		ReleaseID: req.ReleaseID,
+		Title:     req.Title,
+		Content:   req.Content,
+		Kind:      req.Kind,
+		Pinned:    req.Pinned,
+	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, item)
 }
 
 func (h *DesktopUpdateHandler) DeleteStandaloneAnnouncement(c *gin.Context) {
-	response.Error(c, http.StatusNotImplemented, "standalone desktop announcements are not implemented yet")
+	announcementID, ok := parseAdminDesktopAnnouncementID(c)
+	if !ok {
+		return
+	}
+
+	if err := h.service.DeleteStandaloneAnnouncement(c.Request.Context(), announcementID); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"message": "desktop announcement deleted"})
 }
 
 func parseAdminDesktopReleaseID(c *gin.Context) (int64, bool) {
@@ -168,6 +237,15 @@ func parseAdminDesktopReleaseID(c *gin.Context) (int64, bool) {
 		return 0, false
 	}
 	return releaseID, true
+}
+
+func parseAdminDesktopAnnouncementID(c *gin.Context) (int64, bool) {
+	announcementID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || announcementID <= 0 {
+		response.BadRequest(c, "invalid announcement id")
+		return 0, false
+	}
+	return announcementID, true
 }
 
 func parseBoolForm(raw string) bool {

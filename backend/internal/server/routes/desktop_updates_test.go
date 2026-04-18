@@ -38,6 +38,32 @@ func TestDesktopUpdateRoutes_RegisterPublicCheckAndPackageEndpoints(t *testing.T
 	require.NotEqual(t, http.StatusNotFound, rec.Code)
 }
 
+func TestDesktopUpdateRoutes_PublicAnnouncementsEndpointResponds(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	v1 := r.Group("/api/v1")
+
+	h := &handler.Handlers{
+		DesktopUpdates: handler.NewDesktopUpdateHandler(&desktopUpdateRouteServiceStub{}),
+	}
+
+	RegisterDesktopRoutes(
+		r,
+		v1,
+		h,
+		servermiddleware.JWTAuthMiddleware(func(c *gin.Context) { c.Next() }),
+		servermiddleware.DesktopRuntimeAuthMiddleware(func(c *gin.Context) { c.Next() }),
+		nil,
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/desktop/updates/announcements?platform=windows&arch=x64", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), "维护提醒")
+}
+
 type desktopUpdateRouteServiceStub struct{}
 
 func (s *desktopUpdateRouteServiceStub) CheckForClient(_ context.Context, _ service.DesktopUpdateCheckInput) (*service.DesktopUpdateCheckResult, error) {

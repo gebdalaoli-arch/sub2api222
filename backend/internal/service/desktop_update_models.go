@@ -33,8 +33,23 @@ type DesktopReleaseRecord struct {
 }
 
 type DesktopUpdateFeed struct {
-	NextID   int64                  `json:"next_id"`
-	Releases []DesktopReleaseRecord `json:"releases"`
+	NextID                  int64                                 `json:"next_id"`
+	NextAnnouncementID      int64                                 `json:"next_announcement_id"`
+	Releases                []DesktopReleaseRecord                `json:"releases"`
+	StandaloneAnnouncements []DesktopStandaloneAnnouncementRecord `json:"standalone_announcements"`
+}
+
+type DesktopStandaloneAnnouncementRecord struct {
+	ID        int64      `json:"id"`
+	ReleaseID *int64     `json:"release_id,omitempty"`
+	Title     string     `json:"title"`
+	Content   string     `json:"content"`
+	Kind      string     `json:"kind"`
+	Pinned    bool       `json:"pinned"`
+	StartsAt  *time.Time `json:"starts_at,omitempty"`
+	EndsAt    *time.Time `json:"ends_at,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
 }
 
 type CreateDesktopReleaseInput struct {
@@ -60,6 +75,26 @@ type UpdateDesktopReleaseInput struct {
 	Published               *bool
 	ForceUpdate             *bool
 	MinimumSupportedVersion *string
+}
+
+type CreateDesktopStandaloneAnnouncementInput struct {
+	ReleaseID *int64
+	Title     string
+	Content   string
+	Kind      string
+	Pinned    bool
+	StartsAt  *time.Time
+	EndsAt    *time.Time
+}
+
+type UpdateDesktopStandaloneAnnouncementInput struct {
+	ReleaseID *int64
+	Title     *string
+	Content   *string
+	Kind      *string
+	Pinned    *bool
+	StartsAt  **time.Time
+	EndsAt    **time.Time
 }
 
 type DesktopUpdateCheckInput struct {
