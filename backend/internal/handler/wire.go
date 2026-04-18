@@ -87,6 +87,12 @@ func ProvideDesktopUpdateHandler(service *service.DesktopUpdateService) *Desktop
 	return NewDesktopUpdateHandler(service)
 }
 
+// ProvideAdminDesktopUpdateHandler bridges *service.DesktopUpdateService → admin.NewDesktopUpdateHandler
+// which accepts an unexported interface that Wire cannot bind automatically.
+func ProvideAdminDesktopUpdateHandler(svc *service.DesktopUpdateService) *admin.DesktopUpdateHandler {
+	return admin.NewDesktopUpdateHandler(svc)
+}
+
 // ProvideHandlers creates the Handlers struct
 func ProvideHandlers(
 	authHandler *AuthHandler,
@@ -153,7 +159,7 @@ var ProviderSet = wire.NewSet(
 	admin.NewGroupHandler,
 	admin.NewAccountHandler,
 	admin.NewAnnouncementHandler,
-	admin.NewDesktopUpdateHandler,
+	ProvideAdminDesktopUpdateHandler,
 	admin.NewDataManagementHandler,
 	admin.NewBackupHandler,
 	admin.NewOAuthHandler,
