@@ -48,9 +48,14 @@ use sub2api_desktop::{
     config::{app_config, AppConfig},
     platform::{
         install_detection::{detect_installed_targets, InstalledTarget, LaunchTarget},
-        launcher::{launch_official, launch_platform, validate_platform_launch_target},
+        launcher::{
+            launch_official, launch_platform, requires_user_home_injection,
+            validate_platform_launch_target, windows_store_desktop_is_running_for_launch,
+        },
         managed_home::{
-            cleanup_runtime_roots_older_than, write_platform_home, write_runtime_metadata,
+            backup_user_codex_config, cleanup_runtime_roots_older_than,
+            inject_platform_config_into_user_home, resolve_user_codex_home,
+            restore_user_codex_config, write_platform_home, write_runtime_metadata,
             ManagedHomePaths,
         },
         runtime_bootstrap::StartupDiagnostics,
@@ -348,33 +353,53 @@ fn start_platform_launch(
                 let paths = ManagedHomePaths::new(runtime_root, &platform_session.profile_key);
                 let gateway_url = platform_session.gateway_url(&config.api_base_url);
 
-                let result = write_platform_home(&paths, &gateway_url, runtime_token)
-                    .and_then(|_| {
+                let uses_user_home_injection = requires_user_home_injection(&target);
+                let target_label = target.display_name.clone();
+                let result = if uses_user_home_injection {
+                    resolve_user_codex_home().and_then(|user_home| {
+                        backup_user_codex_config(&user_home)?;
+                        inject_platform_config_into_user_home(
+                            &user_home,
+                            &gateway_url,
+                            runtime_token,
+                        )?;
                         write_runtime_metadata(
                             &paths,
                             &platform_session.session_id,
                             &platform_session.profile_key,
-                            match target_kind {
-                                LaunchTarget::Desktop => "desktop",
-                                LaunchTarget::Cli => "cli",
-                            },
-                        )
+                            "desktop",
+                        )?;
+                        match launch_platform(&target, &user_home) {
+                            Ok(child) => Ok((child, Some(user_home))),
+                            Err(error) => {
+                                let _ = restore_user_codex_config(&user_home);
+                                Err(error)
+                            }
+                        }
                     })
-                    .and_then(|_| launch_platform(&target, &paths.codex_home));
+                } else {
+                    write_platform_home(&paths, &gateway_url, runtime_token)
+                        .and_then(|_| {
+                            write_runtime_metadata(
+                                &paths,
+                                &platform_session.session_id,
+                                &platform_session.profile_key,
+                                match target_kind {
+                                    LaunchTarget::Desktop => "desktop",
+                                    LaunchTarget::Cli => "cli",
+                                },
+                            )
+                        })
+                        .and_then(|_| launch_platform(&target, &paths.codex_home))
+                        .map(|child| (child, None))
+                };
 
                 match result {
-                    Ok(maybe_child) => {
-                        let message = if maybe_child.is_some() {
-                            format!(
-                                "已为分组“{}”创建平台代理会话，并启动 {}。",
-                                group.name, target.display_name
-                            )
-                        } else {
-                            format!(
-                                "已为分组“{}”创建平台代理会话，并启动 {}。当前启动方式不支持退出跟踪，会话将按超时自动回收。",
-                                group.name, target.display_name
-                            )
-                        };
+                    Ok((maybe_child, injected_home)) => {
+                        let message = format!(
+                            "已为分组“{}”创建平台代理会话，并启动 {}。",
+                            group.name, target_label
+                        );
                         let stop_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
                         spawn_platform_refresh_loop(
                             ui_handle.clone(),
@@ -393,8 +418,20 @@ fn start_platform_launch(
                                 token_store.clone(),
                                 platform_session.session_id.clone(),
                                 paths.root.clone(),
+                                injected_home,
                                 stop_flag,
                                 child,
+                            );
+                        } else if let Some(user_home) = injected_home {
+                            spawn_windows_store_exit_watcher(
+                                ui_handle.clone(),
+                                Arc::clone(&config),
+                                Arc::clone(&auth_session),
+                                token_store.clone(),
+                                platform_session.session_id.clone(),
+                                paths.root.clone(),
+                                user_home,
+                                stop_flag,
                             );
                         }
                         let _ = ui_handle.upgrade_in_event_loop(move |app| {
@@ -1043,6 +1080,7 @@ fn spawn_platform_exit_watcher(
     token_store: SystemCredentialStore,
     session_id: String,
     runtime_root: std::path::PathBuf,
+    injected_user_home: Option<std::path::PathBuf>,
     stop_flag: Arc<std::sync::atomic::AtomicBool>,
     mut child: std::process::Child,
 ) {
@@ -1051,6 +1089,9 @@ fn spawn_platform_exit_watcher(
         stop_flag.store(true, std::sync::atomic::Ordering::Relaxed);
         let revoke_result =
             revoke_platform_session(&config, &auth_session, &token_store, &session_id);
+        if let Some(user_home) = injected_user_home.as_ref() {
+            let _ = restore_user_codex_config(user_home);
+        }
         let _ = std::fs::remove_dir_all(&runtime_root);
 
         let _ = app_handle.upgrade_in_event_loop(move |app| match revoke_result {
@@ -1060,6 +1101,62 @@ fn spawn_platform_exit_watcher(
             Err(error) => app.set_launch_status_text(SharedString::from(format!(
                 "平台代理进程已退出，但会话回收失败：{error}"
             ))),
+        });
+    });
+}
+
+fn spawn_windows_store_exit_watcher(
+    app_handle: slint::Weak<AppWindow>,
+    config: Arc<AppConfig>,
+    auth_session: SharedAuthSession,
+    token_store: SystemCredentialStore,
+    session_id: String,
+    runtime_root: std::path::PathBuf,
+    user_home: std::path::PathBuf,
+    stop_flag: Arc<std::sync::atomic::AtomicBool>,
+) {
+    thread::spawn(move || {
+        let mut seen_running = false;
+        for _ in 0..60 {
+            if stop_flag.load(std::sync::atomic::Ordering::Relaxed) {
+                return;
+            }
+            if windows_store_desktop_is_running_for_launch() {
+                seen_running = true;
+                break;
+            }
+            thread::sleep(Duration::from_secs(1));
+        }
+
+        if seen_running {
+            while windows_store_desktop_is_running_for_launch() {
+                if stop_flag.load(std::sync::atomic::Ordering::Relaxed) {
+                    break;
+                }
+                thread::sleep(Duration::from_secs(2));
+            }
+        }
+
+        stop_flag.store(true, std::sync::atomic::Ordering::Relaxed);
+        let revoke_result =
+            revoke_platform_session(&config, &auth_session, &token_store, &session_id);
+        let restore_result = restore_user_codex_config(&user_home);
+        let _ = std::fs::remove_dir_all(&runtime_root);
+
+        let _ = app_handle.upgrade_in_event_loop(move |app| {
+            let message = match (revoke_result, restore_result) {
+                (Ok(()), Ok(())) => "平台代理会话已正常结束，并完成回收清理。".to_string(),
+                (Err(error), Ok(())) => {
+                    format!("平台代理桌面版已退出，但会话回收失败：{error}")
+                }
+                (Ok(()), Err(error)) => {
+                    format!("平台代理桌面版已退出，但用户配置恢复失败：{error}")
+                }
+                (Err(revoke_error), Err(restore_error)) => format!(
+                    "平台代理桌面版已退出，但会话回收失败：{revoke_error}；用户配置恢复失败：{restore_error}"
+                ),
+            };
+            app.set_launch_status_text(SharedString::from(message));
         });
     });
 }

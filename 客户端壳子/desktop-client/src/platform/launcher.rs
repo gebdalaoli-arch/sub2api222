@@ -110,10 +110,12 @@ pub fn platform_launch_command(target: &InstalledTarget, codex_home: &Path) -> L
     } else {
         official_launch_command(target)
     };
-    spec.envs.push((
-        OsString::from("CODEX_HOME"),
-        codex_home.as_os_str().to_os_string(),
-    ));
+    if !requires_user_home_injection(target) {
+        spec.envs.push((
+            OsString::from("CODEX_HOME"),
+            codex_home.as_os_str().to_os_string(),
+        ));
+    }
     spec
 }
 
@@ -121,6 +123,14 @@ pub fn launch_platform(target: &InstalledTarget, codex_home: &Path) -> Result<Op
     validate_platform_launch_target(target)?;
     let spec = platform_launch_command(target, codex_home);
     spawn_command(spec)
+}
+
+pub fn requires_user_home_injection(target: &InstalledTarget) -> bool {
+    is_windows_store_desktop_target(target)
+}
+
+pub fn windows_store_desktop_is_running_for_launch() -> bool {
+    windows_store_desktop_is_running()
 }
 
 fn spawn_command(spec: LaunchCommandSpec) -> Result<Option<Child>> {
@@ -211,7 +221,8 @@ fn windows_tasklist_reports_codex_running(tasklist_stdout: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        official_launch_command, platform_launch_command, validate_platform_launch_target,
+        official_launch_command, platform_launch_command, requires_user_home_injection,
+        validate_platform_launch_target,
         windows_tasklist_reports_codex_running,
     };
     use crate::platform::install_detection::{InstalledTarget, LaunchTarget};
@@ -277,10 +288,7 @@ mod tests {
         );
         assert!(!spec.tracks_child_lifecycle);
         assert_eq!(spec.current_dir, None);
-        assert!(spec.envs.iter().any(|(key, value)| {
-            key.to_string_lossy() == "CODEX_HOME"
-                && value.to_string_lossy() == runtime_home.to_string_lossy()
-        }));
+        assert!(spec.envs.is_empty());
     }
 
     #[test]
@@ -332,6 +340,17 @@ mod tests {
         };
 
         assert!(validate_platform_launch_target(&target).is_ok());
+    }
+
+    #[test]
+    fn windows_store_desktop_requires_user_home_injection() {
+        let target = InstalledTarget {
+            kind: LaunchTarget::Desktop,
+            executable: PathBuf::from(r"shell:AppsFolder\OpenAI.Codex_2p2nqsd0c76g0!App"),
+            display_name: "Codex Desktop".to_string(),
+        };
+
+        assert!(requires_user_home_injection(&target));
     }
 
     #[test]
