@@ -6,6 +6,7 @@
 import { apiClient } from '../client'
 
 export type BillingMode = 'token' | 'per_request' | 'image'
+export type SettlementUnit = 'money' | 'token'
 
 export interface PricingInterval {
   id?: number
@@ -47,6 +48,11 @@ export interface Channel {
   name: string
   description: string
   status: string
+  settlement_unit: SettlementUnit
+  token_input_ratio_milli: number
+  token_output_ratio_milli: number
+  token_cache_write_ratio_milli: number
+  token_cache_read_ratio_milli: number
   billing_model_source: string // "requested" | "upstream"
   restrict_models: boolean
   features_config?: Record<string, unknown>
@@ -63,6 +69,11 @@ export interface CreateChannelRequest {
   name: string
   description?: string
   group_ids?: number[]
+  settlement_unit?: SettlementUnit
+  token_input_ratio_milli?: number
+  token_output_ratio_milli?: number
+  token_cache_write_ratio_milli?: number
+  token_cache_read_ratio_milli?: number
   model_pricing?: ChannelModelPricing[]
   model_mapping?: Record<string, Record<string, string>>
   billing_model_source?: string
@@ -77,6 +88,11 @@ export interface UpdateChannelRequest {
   description?: string
   status?: string
   group_ids?: number[]
+  settlement_unit?: SettlementUnit
+  token_input_ratio_milli?: number
+  token_output_ratio_milli?: number
+  token_cache_write_ratio_milli?: number
+  token_cache_read_ratio_milli?: number
   model_pricing?: ChannelModelPricing[]
   model_mapping?: Record<string, Record<string, string>>
   billing_model_source?: string

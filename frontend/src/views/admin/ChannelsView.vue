@@ -228,6 +228,72 @@
               </p>
             </div>
 
+            <div>
+              <label class="input-label">{{ t('admin.channels.form.settlementUnit', 'Settlement Unit') }}</label>
+              <Select v-model="form.settlement_unit" :options="settlementUnitOptions" />
+              <p class="mt-1 text-xs text-gray-400">
+                {{ t('admin.channels.form.settlementUnitHint', '桌面客户端渠道使用 Token 结算，原版 Web 默认继续走金额结算。') }}
+              </p>
+            </div>
+
+            <div
+              v-if="isTokenSettlement"
+              class="space-y-3 rounded-lg border border-primary-200 bg-primary-50/60 p-4 dark:border-primary-800 dark:bg-primary-900/10"
+            >
+              <div>
+                <label class="input-label">{{ t('admin.channels.form.tokenRatioTitle', 'Token 扣费倍率') }}</label>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.channels.form.tokenRatioHint', '单位是 milli-token / token。1000 表示 1:1，2000 表示 2:1，100 表示 0.1:1。') }}
+                </p>
+              </div>
+              <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div>
+                  <label class="input-label text-xs">{{ t('admin.channels.form.tokenInputRatio', '输入倍率') }}</label>
+                  <input
+                    v-model.number="form.token_input_ratio_milli"
+                    type="number"
+                    min="1"
+                    step="1"
+                    class="input"
+                    placeholder="1000"
+                  />
+                </div>
+                <div>
+                  <label class="input-label text-xs">{{ t('admin.channels.form.tokenOutputRatio', '输出倍率') }}</label>
+                  <input
+                    v-model.number="form.token_output_ratio_milli"
+                    type="number"
+                    min="1"
+                    step="1"
+                    class="input"
+                    placeholder="1000"
+                  />
+                </div>
+                <div>
+                  <label class="input-label text-xs">{{ t('admin.channels.form.tokenCacheWriteRatio', '缓存写入倍率') }}</label>
+                  <input
+                    v-model.number="form.token_cache_write_ratio_milli"
+                    type="number"
+                    min="1"
+                    step="1"
+                    class="input"
+                    placeholder="1000"
+                  />
+                </div>
+                <div>
+                  <label class="input-label text-xs">{{ t('admin.channels.form.tokenCacheReadRatio', '缓存读取倍率') }}</label>
+                  <input
+                    v-model.number="form.token_cache_read_ratio_milli"
+                    type="number"
+                    min="1"
+                    step="1"
+                    class="input"
+                    placeholder="1000"
+                  />
+                </div>
+              </div>
+            </div>
+
             <!-- Platform Management -->
             <div class="space-y-3">
               <label class="input-label mb-0">{{ t('admin.channels.form.platformConfig', '平台配置') }}</label>
@@ -593,6 +659,11 @@ import { adminAPI } from '@/api/admin'
 import type { Channel, ChannelModelPricing, CreateChannelRequest, UpdateChannelRequest, AccountStatsPricingRule } from '@/api/admin/channels'
 import type { PricingFormEntry } from '@/components/admin/channel/types'
 import { mTokToPerToken, perTokenToMTok, apiIntervalsToForm, formIntervalsToAPI, findModelConflict, validateIntervals } from '@/components/admin/channel/types'
+import {
+  applySettlementToChannelRequest,
+  channelToSettlementForm,
+  createDefaultChannelSettlementForm
+} from '@/components/admin/channel/settlement'
 import type { AdminGroup, GroupPlatform } from '@/types'
 import type { Column } from '@/components/common/types'
 import { platformTextClass, platformBadgeLightClass } from '@/utils/platformColors'
@@ -674,6 +745,11 @@ const billingModelSourceOptions = computed(() => [
   { value: 'upstream', label: t('admin.channels.form.billingModelSourceUpstream', 'Bill by final upstream model') }
 ])
 
+const settlementUnitOptions = computed(() => [
+  { value: 'money', label: t('admin.channels.form.settlementUnitMoney', '金额结算') },
+  { value: 'token', label: t('admin.channels.form.settlementUnitToken', 'Token 结算') }
+])
+
 // ── State ──
 const channels = ref<Channel[]>([])
 const loading = ref(false)
@@ -711,9 +787,12 @@ const form = reactive({
   status: 'active',
   restrict_models: false,
   billing_model_source: 'channel_mapped' as string,
+  ...createDefaultChannelSettlementForm(),
   platforms: [] as PlatformSection[],
   apply_pricing_to_account_stats: false,
 })
+
+const isTokenSettlement = computed(() => form.settlement_unit === 'token')
 
 let abortController: AbortController | null = null
 
@@ -1191,11 +1270,17 @@ function handleSort(key: string, order: 'asc' | 'desc') {
 
 // ── Dialog ──
 function resetForm() {
+  const settlementDefaults = createDefaultChannelSettlementForm()
   form.name = ''
   form.description = ''
   form.status = 'active'
   form.restrict_models = false
   form.billing_model_source = 'channel_mapped'
+  form.settlement_unit = settlementDefaults.settlement_unit
+  form.token_input_ratio_milli = settlementDefaults.token_input_ratio_milli
+  form.token_output_ratio_milli = settlementDefaults.token_output_ratio_milli
+  form.token_cache_write_ratio_milli = settlementDefaults.token_cache_write_ratio_milli
+  form.token_cache_read_ratio_milli = settlementDefaults.token_cache_read_ratio_milli
   form.platforms = []
   form.apply_pricing_to_account_stats = false
   activeTab.value = 'basic'
@@ -1212,12 +1297,18 @@ async function openCreateDialog() {
 }
 
 async function openEditDialog(channel: Channel) {
+  const settlement = channelToSettlementForm(channel)
   editingChannel.value = channel
   form.name = channel.name
   form.description = channel.description || ''
   form.status = channel.status
   form.restrict_models = channel.restrict_models || false
   form.billing_model_source = channel.billing_model_source || 'channel_mapped'
+  form.settlement_unit = settlement.settlement_unit
+  form.token_input_ratio_milli = settlement.token_input_ratio_milli
+  form.token_output_ratio_milli = settlement.token_output_ratio_milli
+  form.token_cache_write_ratio_milli = settlement.token_cache_write_ratio_milli
+  form.token_cache_read_ratio_milli = settlement.token_cache_read_ratio_milli
   form.apply_pricing_to_account_stats = channel.apply_pricing_to_account_stats || false
   // Must load groups first so apiToForm can map groupID → platform
   await Promise.all([loadGroups(), loadAllChannelsForConflict()])
@@ -1397,6 +1488,7 @@ async function handleSubmit() {
   }
 
   const { group_ids, model_pricing, model_mapping, features_config } = formToAPI()
+  const settlementRequest = applySettlementToChannelRequest(form)
 
   submitting.value = true
   try {
@@ -1408,6 +1500,7 @@ async function handleSubmit() {
         group_ids,
         model_pricing,
         model_mapping: Object.keys(model_mapping).length > 0 ? model_mapping : {},
+        ...settlementRequest,
         billing_model_source: form.billing_model_source,
         restrict_models: form.restrict_models,
         features_config,
@@ -1423,6 +1516,7 @@ async function handleSubmit() {
         group_ids,
         model_pricing,
         model_mapping: Object.keys(model_mapping).length > 0 ? model_mapping : {},
+        ...settlementRequest,
         billing_model_source: form.billing_model_source,
         restrict_models: form.restrict_models,
         features_config,
