@@ -46,9 +46,15 @@ func (r *channelRepository) Create(ctx context.Context, channel *service.Channel
 			return err
 		}
 		err = tx.QueryRowContext(ctx,
-			`INSERT INTO channels (name, description, status, model_mapping, billing_model_source, restrict_models, features, features_config, apply_pricing_to_account_stats) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			`INSERT INTO channels (
+				name, description, status, settlement_unit,
+				token_input_ratio_milli, token_output_ratio_milli, token_cache_write_ratio_milli, token_cache_read_ratio_milli,
+				model_mapping, billing_model_source, restrict_models, features, features_config, apply_pricing_to_account_stats
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 			 RETURNING id, created_at, updated_at`,
-			channel.Name, channel.Description, channel.Status, modelMappingJSON, channel.BillingModelSource, channel.RestrictModels, channel.Features, featuresConfigJSON, channel.ApplyPricingToAccountStats,
+			channel.Name, channel.Description, channel.Status, channel.SettlementUnit,
+			channel.TokenInputRatioMilli, channel.TokenOutputRatioMilli, channel.TokenCacheWriteRatioMilli, channel.TokenCacheReadRatioMilli,
+			modelMappingJSON, channel.BillingModelSource, channel.RestrictModels, channel.Features, featuresConfigJSON, channel.ApplyPricingToAccountStats,
 		).Scan(&channel.ID, &channel.CreatedAt, &channel.UpdatedAt)
 		if err != nil {
 			if isUniqueViolation(err) {
@@ -86,9 +92,13 @@ func (r *channelRepository) GetByID(ctx context.Context, id int64) (*service.Cha
 	ch := &service.Channel{}
 	var modelMappingJSON, featuresConfigJSON []byte
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, name, description, status, model_mapping, billing_model_source, restrict_models, features, features_config, apply_pricing_to_account_stats, created_at, updated_at
+		`SELECT id, name, description, status, settlement_unit,
+		        token_input_ratio_milli, token_output_ratio_milli, token_cache_write_ratio_milli, token_cache_read_ratio_milli,
+		        model_mapping, billing_model_source, restrict_models, features, features_config, apply_pricing_to_account_stats, created_at, updated_at
 		 FROM channels WHERE id = $1`, id,
-	).Scan(&ch.ID, &ch.Name, &ch.Description, &ch.Status, &modelMappingJSON, &ch.BillingModelSource, &ch.RestrictModels, &ch.Features, &featuresConfigJSON, &ch.ApplyPricingToAccountStats, &ch.CreatedAt, &ch.UpdatedAt)
+	).Scan(&ch.ID, &ch.Name, &ch.Description, &ch.Status, &ch.SettlementUnit,
+		&ch.TokenInputRatioMilli, &ch.TokenOutputRatioMilli, &ch.TokenCacheWriteRatioMilli, &ch.TokenCacheReadRatioMilli,
+		&modelMappingJSON, &ch.BillingModelSource, &ch.RestrictModels, &ch.Features, &featuresConfigJSON, &ch.ApplyPricingToAccountStats, &ch.CreatedAt, &ch.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, service.ErrChannelNotFound
 	}
@@ -130,9 +140,14 @@ func (r *channelRepository) Update(ctx context.Context, channel *service.Channel
 			return err
 		}
 		result, err := tx.ExecContext(ctx,
-			`UPDATE channels SET name = $1, description = $2, status = $3, model_mapping = $4, billing_model_source = $5, restrict_models = $6, features = $7, features_config = $8, apply_pricing_to_account_stats = $9, updated_at = NOW()
-			 WHERE id = $10`,
-			channel.Name, channel.Description, channel.Status, modelMappingJSON, channel.BillingModelSource, channel.RestrictModels, channel.Features, featuresConfigJSON, channel.ApplyPricingToAccountStats, channel.ID,
+			`UPDATE channels SET
+			 name = $1, description = $2, status = $3, settlement_unit = $4,
+			 token_input_ratio_milli = $5, token_output_ratio_milli = $6, token_cache_write_ratio_milli = $7, token_cache_read_ratio_milli = $8,
+			 model_mapping = $9, billing_model_source = $10, restrict_models = $11, features = $12, features_config = $13, apply_pricing_to_account_stats = $14, updated_at = NOW()
+			 WHERE id = $15`,
+			channel.Name, channel.Description, channel.Status, channel.SettlementUnit,
+			channel.TokenInputRatioMilli, channel.TokenOutputRatioMilli, channel.TokenCacheWriteRatioMilli, channel.TokenCacheReadRatioMilli,
+			modelMappingJSON, channel.BillingModelSource, channel.RestrictModels, channel.Features, featuresConfigJSON, channel.ApplyPricingToAccountStats, channel.ID,
 		)
 		if err != nil {
 			if isUniqueViolation(err) {
@@ -216,7 +231,9 @@ func (r *channelRepository) List(ctx context.Context, params pagination.Paginati
 
 	// 查询 channel 列表
 	dataQuery := fmt.Sprintf(
-		`SELECT c.id, c.name, c.description, c.status, c.model_mapping, c.billing_model_source, c.restrict_models, c.features, c.features_config, c.apply_pricing_to_account_stats, c.created_at, c.updated_at
+		`SELECT c.id, c.name, c.description, c.status, c.settlement_unit,
+		        c.token_input_ratio_milli, c.token_output_ratio_milli, c.token_cache_write_ratio_milli, c.token_cache_read_ratio_milli,
+		        c.model_mapping, c.billing_model_source, c.restrict_models, c.features, c.features_config, c.apply_pricing_to_account_stats, c.created_at, c.updated_at
 		 FROM channels c WHERE %s ORDER BY %s LIMIT $%d OFFSET $%d`,
 		whereClause, channelListOrderBy(params), argIdx, argIdx+1,
 	)
@@ -233,7 +250,9 @@ func (r *channelRepository) List(ctx context.Context, params pagination.Paginati
 	for rows.Next() {
 		var ch service.Channel
 		var modelMappingJSON, featuresConfigJSON []byte
-		if err := rows.Scan(&ch.ID, &ch.Name, &ch.Description, &ch.Status, &modelMappingJSON, &ch.BillingModelSource, &ch.RestrictModels, &ch.Features, &featuresConfigJSON, &ch.ApplyPricingToAccountStats, &ch.CreatedAt, &ch.UpdatedAt); err != nil {
+		if err := rows.Scan(&ch.ID, &ch.Name, &ch.Description, &ch.Status, &ch.SettlementUnit,
+			&ch.TokenInputRatioMilli, &ch.TokenOutputRatioMilli, &ch.TokenCacheWriteRatioMilli, &ch.TokenCacheReadRatioMilli,
+			&modelMappingJSON, &ch.BillingModelSource, &ch.RestrictModels, &ch.Features, &featuresConfigJSON, &ch.ApplyPricingToAccountStats, &ch.CreatedAt, &ch.UpdatedAt); err != nil {
 			return nil, nil, fmt.Errorf("scan channel: %w", err)
 		}
 		ch.ModelMapping = unmarshalModelMapping(modelMappingJSON)
@@ -308,7 +327,10 @@ func channelListOrderBy(params pagination.PaginationParams) string {
 
 func (r *channelRepository) ListAll(ctx context.Context) ([]service.Channel, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, name, description, status, model_mapping, billing_model_source, restrict_models, features, features_config, apply_pricing_to_account_stats, created_at, updated_at FROM channels ORDER BY id`,
+		`SELECT id, name, description, status, settlement_unit,
+		        token_input_ratio_milli, token_output_ratio_milli, token_cache_write_ratio_milli, token_cache_read_ratio_milli,
+		        model_mapping, billing_model_source, restrict_models, features, features_config, apply_pricing_to_account_stats, created_at, updated_at
+		 FROM channels ORDER BY id`,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("query all channels: %w", err)
@@ -320,7 +342,9 @@ func (r *channelRepository) ListAll(ctx context.Context) ([]service.Channel, err
 	for rows.Next() {
 		var ch service.Channel
 		var modelMappingJSON, featuresConfigJSON []byte
-		if err := rows.Scan(&ch.ID, &ch.Name, &ch.Description, &ch.Status, &modelMappingJSON, &ch.BillingModelSource, &ch.RestrictModels, &ch.Features, &featuresConfigJSON, &ch.ApplyPricingToAccountStats, &ch.CreatedAt, &ch.UpdatedAt); err != nil {
+		if err := rows.Scan(&ch.ID, &ch.Name, &ch.Description, &ch.Status, &ch.SettlementUnit,
+			&ch.TokenInputRatioMilli, &ch.TokenOutputRatioMilli, &ch.TokenCacheWriteRatioMilli, &ch.TokenCacheReadRatioMilli,
+			&modelMappingJSON, &ch.BillingModelSource, &ch.RestrictModels, &ch.Features, &featuresConfigJSON, &ch.ApplyPricingToAccountStats, &ch.CreatedAt, &ch.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan channel: %w", err)
 		}
 		ch.ModelMapping = unmarshalModelMapping(modelMappingJSON)

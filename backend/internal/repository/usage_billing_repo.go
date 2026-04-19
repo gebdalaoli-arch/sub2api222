@@ -112,7 +112,12 @@ func (r *usageBillingRepository) applyUsageBillingEffects(ctx context.Context, t
 		}
 	}
 
-	if cmd.BalanceCost > 0 {
+	if cmd.TokenDebitMilli > 0 && cmd.ChannelID > 0 {
+		if err := applyUsageBillingTokenWalletDebit(ctx, tx, cmd.UserID, cmd.ChannelID, cmd.TokenDebitMilli, cmd.RequestID); err != nil {
+			return err
+		}
+		result.UsedTokenWallet = true
+	} else if cmd.BalanceCost > 0 {
 		newBalance, err := deductUsageBillingBalance(ctx, tx, cmd.UserID, cmd.BalanceCost)
 		if err != nil {
 			return err
@@ -189,6 +194,43 @@ func deductUsageBillingBalance(ctx context.Context, tx *sql.Tx, userID int64, am
 		return 0, err
 	}
 	return newBalance, nil
+}
+
+func applyUsageBillingTokenWalletDebit(ctx context.Context, tx *sql.Tx, userID, channelID, amountMilli int64, requestID string) error {
+	if amountMilli <= 0 {
+		return nil
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO client_token_wallets (
+			user_id, channel_id, balance_milli_tokens, total_recharged_milli_tokens, total_consumed_milli_tokens
+		) VALUES ($1, $2, 0, 0, 0)
+		ON CONFLICT (user_id, channel_id) DO NOTHING
+	`, userID, channelID); err != nil {
+		return err
+	}
+
+	var balanceAfter int64
+	err := tx.QueryRowContext(ctx, `
+		UPDATE client_token_wallets
+		SET balance_milli_tokens = balance_milli_tokens - $1,
+			total_consumed_milli_tokens = total_consumed_milli_tokens + $1,
+			updated_at = NOW()
+		WHERE user_id = $2 AND channel_id = $3
+		RETURNING balance_milli_tokens
+	`, amountMilli, userID, channelID).Scan(&balanceAfter)
+	if errors.Is(err, sql.ErrNoRows) {
+		return service.ErrUserNotFound
+	}
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO client_token_wallet_ledgers (
+			user_id, channel_id, source_type, source_id, credit_milli_tokens, debit_milli_tokens, balance_after_milli_tokens
+		) VALUES ($1, $2, $3, $4, 0, $5, $6)
+	`, userID, channelID, service.TokenLedgerSourceUsage, requestID, amountMilli, balanceAfter)
+	return err
 }
 
 func incrementUsageBillingAPIKeyQuota(ctx context.Context, tx *sql.Tx, apiKeyID int64, amount float64) (bool, error) {

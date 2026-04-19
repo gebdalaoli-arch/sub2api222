@@ -4559,6 +4559,28 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		)
 	}
 
+	var tokenSettlement *TokenSettlementInfo
+	if !isSubscriptionBilling {
+		channelID, debitMilli, usesToken, tokenErr := ResolveUsageTokenDebit(
+			ctx,
+			s.channelService,
+			apiKey.GroupID,
+			usageLog.InputTokens,
+			usageLog.OutputTokens,
+			usageLog.CacheCreationTokens,
+			usageLog.CacheReadTokens,
+		)
+		if tokenErr != nil {
+			return tokenErr
+		}
+		if usesToken {
+			tokenSettlement = &TokenSettlementInfo{ChannelID: channelID, DebitMilli: debitMilli}
+			if usageLog.ChannelID == nil && channelID > 0 {
+				usageLog.ChannelID = &channelID
+			}
+		}
+	}
+
 	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
 		writeUsageLogBestEffort(ctx, s.usageLogRepo, usageLog, "service.openai_gateway")
 		logger.LegacyPrintf("service.openai_gateway", "[SIMPLE MODE] Usage recorded (not billed): user=%d, tokens=%d", usageLog.UserID, usageLog.TotalTokens())
@@ -4577,6 +4599,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 			IsSubscriptionBill:    isSubscriptionBilling,
 			AccountRateMultiplier: accountRateMultiplier,
 			APIKeyService:         input.APIKeyService,
+			TokenSettlement:       tokenSettlement,
 		}, s.billingDeps(), s.usageBillingRepo)
 		return err
 	}()

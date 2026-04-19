@@ -14,8 +14,8 @@ import (
 )
 
 // NewAPIKeyAuthMiddleware 创建 API Key 认证中间件
-func NewAPIKeyAuthMiddleware(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, cfg *config.Config) APIKeyAuthMiddleware {
-	return APIKeyAuthMiddleware(apiKeyAuthWithSubscription(apiKeyService, subscriptionService, cfg))
+func NewAPIKeyAuthMiddleware(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, tokenBillingService *service.ClientTokenBillingService, cfg *config.Config) APIKeyAuthMiddleware {
+	return APIKeyAuthMiddleware(apiKeyAuthWithSubscription(apiKeyService, subscriptionService, tokenBillingService, cfg))
 }
 
 // apiKeyAuthWithSubscription API Key认证中间件（支持订阅验证）
@@ -25,7 +25,7 @@ func NewAPIKeyAuthMiddleware(apiKeyService *service.APIKeyService, subscriptionS
 //   - 计费执行（Billing Enforcement）：过期/配额/订阅/余额检查 —— skipBilling 时整块跳过
 //
 // /v1/usage 端点只需鉴权，不需要计费执行（允许过期/配额耗尽的 Key 查询自身用量）。
-func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, cfg *config.Config) gin.HandlerFunc {
+func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, tokenBillingService *service.ClientTokenBillingService, cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// ── 1. 提取 API Key ──────────────────────────────────────────
 
@@ -194,6 +194,20 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 					subscriptionService.DoWindowMaintenance(&maintenanceCopy)
 				}
 			} else {
+				if apiKey.Group != nil && tokenBillingService != nil {
+					usesTokenSettlement, allowed, tokenErr := tokenBillingService.CheckAccess(c.Request.Context(), apiKey.User.ID, apiKey.Group.ID)
+					if tokenErr != nil {
+						AbortWithError(c, 500, "TOKEN_BILLING_CHECK_FAILED", "Failed to validate token balance")
+						return
+					}
+					if usesTokenSettlement {
+						if !allowed {
+							AbortWithError(c, 403, "INSUFFICIENT_BALANCE", "Insufficient token balance")
+							return
+						}
+						goto authSuccess
+					}
+				}
 				// 非订阅模式 或 订阅模式但 subscriptionService 未注入：回退到余额检查
 				if apiKey.User.Balance <= 0 {
 					AbortWithError(c, 403, "INSUFFICIENT_BALANCE", "Insufficient account balance")
@@ -203,6 +217,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		}
 
 		// ── 7. 设置上下文 → Next ─────────────────────────────────────
+	authSuccess:
 
 		if subscription != nil {
 			c.Set(string(ContextKeySubscription), subscription)

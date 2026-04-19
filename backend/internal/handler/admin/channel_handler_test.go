@@ -198,6 +198,29 @@ func TestChannelToResponse_WithIntervals(t *testing.T) {
 	require.Equal(t, 2, iv1.SortOrder)
 }
 
+func TestChannelToResponse_WithTokenSettlementFields(t *testing.T) {
+	now := time.Now()
+	ch := &service.Channel{
+		ID:                        7,
+		Name:                      "desktop-openai",
+		Status:                    "active",
+		SettlementUnit:            service.SettlementUnitToken,
+		TokenInputRatioMilli:      1000,
+		TokenOutputRatioMilli:     2000,
+		TokenCacheWriteRatioMilli: 300,
+		TokenCacheReadRatioMilli:  100,
+		CreatedAt:                 now,
+		UpdatedAt:                 now,
+	}
+
+	resp := channelToResponse(ch)
+	require.Equal(t, "token", resp.SettlementUnit)
+	require.Equal(t, int64(1000), resp.TokenInputRatioMilli)
+	require.Equal(t, int64(2000), resp.TokenOutputRatioMilli)
+	require.Equal(t, int64(300), resp.TokenCacheWriteRatioMilli)
+	require.Equal(t, int64(100), resp.TokenCacheReadRatioMilli)
+}
+
 func TestChannelToResponse_MultipleEntries(t *testing.T) {
 	now := time.Now()
 	ch := &service.Channel{

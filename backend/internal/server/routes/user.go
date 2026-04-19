@@ -77,6 +77,11 @@ func RegisterUserRoutes(
 			usage.POST("/dashboard/api-keys-usage", h.Usage.DashboardAPIKeysUsage)
 		}
 
+		client := authenticated.Group("/client")
+		{
+			client.GET("/billing-summary", h.ClientBilling.GetSummary)
+		}
+
 		// 公告（用户可见）
 		announcements := authenticated.Group("/announcements")
 		{

@@ -28,8 +28,9 @@
 2. `Desktop Runtime usage / synthetic API key` 持久化能力
 3. `Windows 桌面客户端更新与公告瀑布` 能力
 4. `本地源码构建并更新 docker-compose.local.yml` 的部署能力
+5. `桌面客户端专用 Token 计费支线` 能力
 
-这四块里，前面三块直接决定桌面客户端是否可用；第四块决定部署时是否会把这些能力重新覆盖掉。
+这五块里，前面四块直接决定桌面客户端是否可用；第五块决定桌面端费用展示和后端结算是否还能保持一致。
 
 ---
 
@@ -241,6 +242,91 @@
 
 ---
 
+## 3.5 Desktop Client Token Billing 契约
+
+这是“桌面客户端只按 Token 充值/消费/展示”的基础。
+
+如果缺失，客户端会出现：
+
+- 首页剩余 Token、累计充值、累计消费继续依赖本地换算
+- CDK 兑换记录和实际余额对不上
+- 请求明明有 Token 钱包，但 API Key 鉴权仍按 `users.balance` 拦截
+- usage 完成后仍然扣用户金额余额，而不是扣客户端 Token 钱包
+
+### 必须存在的服务端能力
+
+1. 渠道级 Token 结算配置
+2. 用户级 Token 钱包与流水
+3. `token` 类型 CDK 兑换
+4. 用户侧 Token 汇总接口
+5. API Key 鉴权阶段的 Token 余额放行
+6. unified usage billing 阶段的 Token 扣减
+
+### 必须存在的数据库契约
+
+- `channels`
+  - `settlement_unit`
+  - `token_input_ratio_milli`
+  - `token_output_ratio_milli`
+  - `token_cache_write_ratio_milli`
+  - `token_cache_read_ratio_milli`
+- `client_token_wallets`
+- `client_token_wallet_ledgers`
+
+### 必须存在的公开接口
+
+- `GET /api/v1/client/billing-summary`
+- `POST /api/v1/redeem`
+- `GET /api/v1/redeem/history`
+
+其中：
+
+- `/api/v1/client/billing-summary` 必须直接返回服务端聚合好的：
+  - `remaining_tokens`
+  - `recharged_tokens`
+  - `consumed_tokens`
+- `/api/v1/redeem/history` 中 `type=token` 的记录必须带 `token_amount`
+
+### 必须存在的管理员接口/契约
+
+- `POST /api/v1/admin/channels`
+- `PUT /api/v1/admin/channels/:id`
+- `POST /api/v1/admin/redeem-codes/generate`
+- `POST /api/v1/admin/redeem-codes/create-and-redeem`
+
+其中：
+
+- 渠道配置必须允许 `settlement_unit = token`
+- 兑换码类型必须允许 `type = token`
+- `token` 类型兑换码必须携带 `group_id`
+- 当前实现里 `redeem_codes.value` 直接承载 Token 总数，单位是 `token`
+
+### 关键文件组
+
+- `backend/migrations/110_client_token_billing.sql`
+- `backend/internal/service/client_token_billing.go`
+- `backend/internal/repository/client_token_wallet_repo.go`
+- `backend/internal/service/channel.go`
+- `backend/internal/service/channel_service.go`
+- `backend/internal/repository/channel_repo.go`
+- `backend/internal/service/redeem_service.go`
+- `backend/internal/service/usage_billing.go`
+- `backend/internal/repository/usage_billing_repo.go`
+- `backend/internal/server/middleware/api_key_auth.go`
+- `backend/internal/server/middleware/api_key_auth_google.go`
+- `backend/internal/handler/client_billing_handler.go`
+- `backend/internal/server/routes/user.go`
+
+### 升级时的硬规则
+
+- 不能把 `settlement_unit` 和四个 Token 倍率字段删掉
+- 不能把 `client_token_wallets` / `client_token_wallet_ledgers` 回滚掉
+- 不能把 `type=token` 的兑换码逻辑删回 `balance`
+- 不能让 Token 渠道重新依赖 `users.balance`
+- 不能删除 `/api/v1/client/billing-summary`
+
+---
+
 ## 4. 当前相对官方的服务端改造清单（按模块）
 
 ## 4.1 Backend 新增/修改模块
@@ -284,6 +370,22 @@
 - `backend/internal/pkg/antigravity/oauth.go`
 
 这里的关键结论是：仓库不再内嵌第三方 client secret，运行环境必须通过环境变量提供。
+
+### E. Desktop Client Token Billing
+
+- `backend/migrations/110_client_token_billing.sql`
+- `backend/internal/service/client_token_billing.go`
+- `backend/internal/repository/client_token_wallet_repo.go`
+- `backend/internal/service/channel.go`
+- `backend/internal/service/channel_service.go`
+- `backend/internal/repository/channel_repo.go`
+- `backend/internal/service/redeem_service.go`
+- `backend/internal/service/usage_billing.go`
+- `backend/internal/repository/usage_billing_repo.go`
+- `backend/internal/server/middleware/api_key_auth.go`
+- `backend/internal/server/middleware/api_key_auth_google.go`
+- `backend/internal/handler/client_billing_handler.go`
+- `backend/internal/server/routes/user.go`
 
 ---
 
@@ -355,6 +457,9 @@ curl -i "http://127.0.0.1:8080/api/v1/desktop/updates/announcements?platform=win
 2. 平台 CLI 仍可创建 desktop session
 3. 走平台代理问答后，`/api/v1/usage` 仍能看到记录
 4. 客户端“检查更新”能拿到真实响应，而不是静态演示值
+5. `GET /api/v1/client/billing-summary` 能返回 Token 汇总
+6. `type=token` 的 CDK 兑换后，不再改 `users.balance`
+7. Token 渠道 API Key 在余额为 0 但 Token 钱包有值时仍可通过鉴权
 
 ---
 
@@ -378,5 +483,6 @@ curl -i "http://127.0.0.1:8080/api/v1/desktop/updates/announcements?platform=win
 1. **Desktop Session / Runtime 网关不能丢**
 2. **Desktop Runtime usage 与 synthetic API key 不能回退**
 3. **Desktop Updates / Announcement Waterfall 不能回退成官方空白状态**
+4. **Desktop Client Token Billing 支线不能重新退回客户端本地换算**
 
-如果这三条里任意一条被覆盖掉，客户端就会出现“能打开但不能真正工作”的退化。
+如果这四条里任意一条被覆盖掉，客户端就会出现“能打开但不能真正工作”的退化。

@@ -30,6 +30,11 @@ type createChannelRequest struct {
 	Name                       string                           `json:"name" binding:"required,max=100"`
 	Description                string                           `json:"description"`
 	GroupIDs                   []int64                          `json:"group_ids"`
+	SettlementUnit             string                           `json:"settlement_unit" binding:"omitempty,oneof=money token"`
+	TokenInputRatioMilli       int64                            `json:"token_input_ratio_milli"`
+	TokenOutputRatioMilli      int64                            `json:"token_output_ratio_milli"`
+	TokenCacheWriteRatioMilli  int64                            `json:"token_cache_write_ratio_milli"`
+	TokenCacheReadRatioMilli   int64                            `json:"token_cache_read_ratio_milli"`
 	ModelPricing               []channelModelPricingRequest     `json:"model_pricing"`
 	ModelMapping               map[string]map[string]string     `json:"model_mapping"`
 	BillingModelSource         string                           `json:"billing_model_source" binding:"omitempty,oneof=requested upstream channel_mapped"`
@@ -45,6 +50,11 @@ type updateChannelRequest struct {
 	Description                *string                           `json:"description"`
 	Status                     string                            `json:"status" binding:"omitempty,oneof=active disabled"`
 	GroupIDs                   *[]int64                          `json:"group_ids"`
+	SettlementUnit             string                            `json:"settlement_unit" binding:"omitempty,oneof=money token"`
+	TokenInputRatioMilli       *int64                            `json:"token_input_ratio_milli"`
+	TokenOutputRatioMilli      *int64                            `json:"token_output_ratio_milli"`
+	TokenCacheWriteRatioMilli  *int64                            `json:"token_cache_write_ratio_milli"`
+	TokenCacheReadRatioMilli   *int64                            `json:"token_cache_read_ratio_milli"`
 	ModelPricing               *[]channelModelPricingRequest     `json:"model_pricing"`
 	ModelMapping               map[string]map[string]string      `json:"model_mapping"`
 	BillingModelSource         string                            `json:"billing_model_source" binding:"omitempty,oneof=requested upstream channel_mapped"`
@@ -92,6 +102,11 @@ type channelResponse struct {
 	Name                       string                            `json:"name"`
 	Description                string                            `json:"description"`
 	Status                     string                            `json:"status"`
+	SettlementUnit             string                            `json:"settlement_unit"`
+	TokenInputRatioMilli       int64                             `json:"token_input_ratio_milli"`
+	TokenOutputRatioMilli      int64                             `json:"token_output_ratio_milli"`
+	TokenCacheWriteRatioMilli  int64                             `json:"token_cache_write_ratio_milli"`
+	TokenCacheReadRatioMilli   int64                             `json:"token_cache_read_ratio_milli"`
 	BillingModelSource         string                            `json:"billing_model_source"`
 	RestrictModels             bool                              `json:"restrict_models"`
 	Features                   string                            `json:"features"`
@@ -145,17 +160,25 @@ func channelToResponse(ch *service.Channel) *channelResponse {
 		return nil
 	}
 	resp := &channelResponse{
-		ID:             ch.ID,
-		Name:           ch.Name,
-		Description:    ch.Description,
-		Status:         ch.Status,
-		RestrictModels: ch.RestrictModels,
-		Features:       ch.Features,
-		FeaturesConfig: ch.FeaturesConfig,
-		GroupIDs:       ch.GroupIDs,
-		ModelMapping:   ch.ModelMapping,
-		CreatedAt:      ch.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:      ch.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		ID:                        ch.ID,
+		Name:                      ch.Name,
+		Description:               ch.Description,
+		Status:                    ch.Status,
+		SettlementUnit:            string(ch.SettlementUnit),
+		TokenInputRatioMilli:      ch.TokenInputRatioMilli,
+		TokenOutputRatioMilli:     ch.TokenOutputRatioMilli,
+		TokenCacheWriteRatioMilli: ch.TokenCacheWriteRatioMilli,
+		TokenCacheReadRatioMilli:  ch.TokenCacheReadRatioMilli,
+		RestrictModels:            ch.RestrictModels,
+		Features:                  ch.Features,
+		FeaturesConfig:            ch.FeaturesConfig,
+		GroupIDs:                  ch.GroupIDs,
+		ModelMapping:              ch.ModelMapping,
+		CreatedAt:                 ch.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:                 ch.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+	}
+	if resp.SettlementUnit == "" {
+		resp.SettlementUnit = string(service.SettlementUnitMoney)
 	}
 	resp.BillingModelSource = ch.BillingModelSource
 	if resp.BillingModelSource == "" {
@@ -378,6 +401,11 @@ func (h *ChannelHandler) Create(c *gin.Context) {
 		Name:                       req.Name,
 		Description:                req.Description,
 		GroupIDs:                   req.GroupIDs,
+		SettlementUnit:             service.SettlementUnit(req.SettlementUnit),
+		TokenInputRatioMilli:       req.TokenInputRatioMilli,
+		TokenOutputRatioMilli:      req.TokenOutputRatioMilli,
+		TokenCacheWriteRatioMilli:  req.TokenCacheWriteRatioMilli,
+		TokenCacheReadRatioMilli:   req.TokenCacheReadRatioMilli,
 		ModelPricing:               pricing,
 		ModelMapping:               req.ModelMapping,
 		BillingModelSource:         req.BillingModelSource,
@@ -415,6 +443,11 @@ func (h *ChannelHandler) Update(c *gin.Context) {
 		Description:                req.Description,
 		Status:                     req.Status,
 		GroupIDs:                   req.GroupIDs,
+		SettlementUnit:             service.SettlementUnit(req.SettlementUnit),
+		TokenInputRatioMilli:       req.TokenInputRatioMilli,
+		TokenOutputRatioMilli:      req.TokenOutputRatioMilli,
+		TokenCacheWriteRatioMilli:  req.TokenCacheWriteRatioMilli,
+		TokenCacheReadRatioMilli:   req.TokenCacheReadRatioMilli,
 		ModelMapping:               req.ModelMapping,
 		BillingModelSource:         req.BillingModelSource,
 		RestrictModels:             req.RestrictModels,

@@ -28,6 +28,7 @@ func SetupRouter(
 	apiKeyAuth middleware2.APIKeyAuthMiddleware,
 	desktopAuth middleware2.DesktopRuntimeAuthMiddleware,
 	apiKeyService *service.APIKeyService,
+	tokenBillingService *service.ClientTokenBillingService,
 	subscriptionService *service.SubscriptionService,
 	opsService *service.OpsService,
 	settingService *service.SettingService,
@@ -82,7 +83,7 @@ func SetupRouter(
 	}
 
 	// 注册路由
-	registerRoutes(r, handlers, jwtAuth, adminAuth, apiKeyAuth, desktopAuth, apiKeyService, subscriptionService, opsService, settingService, cfg, redisClient)
+	registerRoutes(r, handlers, jwtAuth, adminAuth, apiKeyAuth, desktopAuth, apiKeyService, tokenBillingService, subscriptionService, opsService, settingService, cfg, redisClient)
 
 	return r
 }
@@ -96,6 +97,7 @@ func registerRoutes(
 	apiKeyAuth middleware2.APIKeyAuthMiddleware,
 	desktopAuth middleware2.DesktopRuntimeAuthMiddleware,
 	apiKeyService *service.APIKeyService,
+	tokenBillingService *service.ClientTokenBillingService,
 	subscriptionService *service.SubscriptionService,
 	opsService *service.OpsService,
 	settingService *service.SettingService,
@@ -113,6 +115,6 @@ func registerRoutes(
 	routes.RegisterUserRoutes(v1, h, jwtAuth, settingService)
 	routes.RegisterDesktopRoutes(r, v1, h, jwtAuth, desktopAuth, settingService)
 	routes.RegisterAdminRoutes(v1, h, adminAuth)
-	routes.RegisterGatewayRoutes(r, h, apiKeyAuth, apiKeyService, subscriptionService, opsService, settingService, cfg)
+	routes.RegisterGatewayRoutes(r, h, apiKeyAuth, apiKeyService, tokenBillingService, subscriptionService, opsService, settingService, cfg)
 	routes.RegisterPaymentRoutes(v1, h.Payment, h.PaymentWebhook, h.Admin.Payment, jwtAuth, adminAuth, settingService)
 }

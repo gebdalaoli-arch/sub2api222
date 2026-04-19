@@ -41,6 +41,7 @@ const (
 	RedeemTypeConcurrency  = domain.RedeemTypeConcurrency
 	RedeemTypeSubscription = domain.RedeemTypeSubscription
 	RedeemTypeInvitation   = domain.RedeemTypeInvitation
+	RedeemTypeToken        = domain.RedeemTypeToken
 )
 
 // PromoCode status constants

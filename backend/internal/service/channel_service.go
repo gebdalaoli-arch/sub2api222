@@ -572,6 +572,17 @@ func validateChannelConfig(pricing []ChannelModelPricing, mapping map[string]map
 	return validateNoConflictingMappings(mapping)
 }
 
+func normalizeChannelSettlementConfig(channel *Channel) error {
+	if channel == nil {
+		return nil
+	}
+	if !channel.SettlementUnit.IsValid() {
+		return infraerrors.BadRequest("INVALID_SETTLEMENT_UNIT", "settlement_unit must be money or token")
+	}
+	channel.NormalizeSettlementConfig()
+	return nil
+}
+
 // validatePricingEntries 校验定价条目（冲突检测 + 区间校验 + 计费模式校验），
 // 同时用于主渠道定价和 account_stats_pricing_rules 的内部定价。
 func validatePricingEntries(pricing []ChannelModelPricing) error {
@@ -674,6 +685,11 @@ func (s *ChannelService) Create(ctx context.Context, input *CreateChannelInput) 
 		Name:                       input.Name,
 		Description:                input.Description,
 		Status:                     StatusActive,
+		SettlementUnit:             input.SettlementUnit,
+		TokenInputRatioMilli:       input.TokenInputRatioMilli,
+		TokenOutputRatioMilli:      input.TokenOutputRatioMilli,
+		TokenCacheWriteRatioMilli:  input.TokenCacheWriteRatioMilli,
+		TokenCacheReadRatioMilli:   input.TokenCacheReadRatioMilli,
 		BillingModelSource:         input.BillingModelSource,
 		RestrictModels:             input.RestrictModels,
 		GroupIDs:                   input.GroupIDs,
@@ -686,6 +702,9 @@ func (s *ChannelService) Create(ctx context.Context, input *CreateChannelInput) 
 	}
 	if channel.BillingModelSource == "" {
 		channel.BillingModelSource = BillingModelSourceChannelMapped
+	}
+	if err := normalizeChannelSettlementConfig(channel); err != nil {
+		return nil, err
 	}
 
 	if err := validateChannelConfig(channel.ModelPricing, channel.ModelMapping); err != nil {
@@ -763,6 +782,21 @@ func (s *ChannelService) applyUpdateInput(ctx context.Context, channel *Channel,
 	if input.RestrictModels != nil {
 		channel.RestrictModels = *input.RestrictModels
 	}
+	if input.SettlementUnit != "" {
+		channel.SettlementUnit = input.SettlementUnit
+	}
+	if input.TokenInputRatioMilli != nil {
+		channel.TokenInputRatioMilli = *input.TokenInputRatioMilli
+	}
+	if input.TokenOutputRatioMilli != nil {
+		channel.TokenOutputRatioMilli = *input.TokenOutputRatioMilli
+	}
+	if input.TokenCacheWriteRatioMilli != nil {
+		channel.TokenCacheWriteRatioMilli = *input.TokenCacheWriteRatioMilli
+	}
+	if input.TokenCacheReadRatioMilli != nil {
+		channel.TokenCacheReadRatioMilli = *input.TokenCacheReadRatioMilli
+	}
 	if input.Features != nil {
 		channel.Features = *input.Features
 	}
@@ -789,6 +823,9 @@ func (s *ChannelService) applyUpdateInput(ctx context.Context, channel *Channel,
 	}
 	if input.AccountStatsPricingRules != nil {
 		channel.AccountStatsPricingRules = *input.AccountStatsPricingRules
+	}
+	if err := normalizeChannelSettlementConfig(channel); err != nil {
+		return err
 	}
 	return nil
 }
@@ -958,6 +995,11 @@ type CreateChannelInput struct {
 	Name                       string
 	Description                string
 	GroupIDs                   []int64
+	SettlementUnit             SettlementUnit
+	TokenInputRatioMilli       int64
+	TokenOutputRatioMilli      int64
+	TokenCacheWriteRatioMilli  int64
+	TokenCacheReadRatioMilli   int64
 	ModelPricing               []ChannelModelPricing
 	ModelMapping               map[string]map[string]string // platform → {src→dst}
 	BillingModelSource         string
@@ -974,6 +1016,11 @@ type UpdateChannelInput struct {
 	Description                *string
 	Status                     string
 	GroupIDs                   *[]int64
+	SettlementUnit             SettlementUnit
+	TokenInputRatioMilli       *int64
+	TokenOutputRatioMilli      *int64
+	TokenCacheWriteRatioMilli  *int64
+	TokenCacheReadRatioMilli   *int64
 	ModelPricing               *[]ChannelModelPricing
 	ModelMapping               map[string]map[string]string // platform → {src→dst}
 	BillingModelSource         string

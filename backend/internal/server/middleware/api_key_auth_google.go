@@ -13,14 +13,14 @@ import (
 
 // APIKeyAuthGoogle is a Google-style error wrapper for API key auth.
 func APIKeyAuthGoogle(apiKeyService *service.APIKeyService, cfg *config.Config) gin.HandlerFunc {
-	return APIKeyAuthWithSubscriptionGoogle(apiKeyService, nil, cfg)
+	return APIKeyAuthWithSubscriptionGoogle(apiKeyService, nil, nil, cfg)
 }
 
 // APIKeyAuthWithSubscriptionGoogle behaves like ApiKeyAuthWithSubscription but returns Google-style errors:
 // {"error":{"code":401,"message":"...","status":"UNAUTHENTICATED"}}
 //
 // It is intended for Gemini native endpoints (/v1beta) to match Gemini SDK expectations.
-func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, cfg *config.Config) gin.HandlerFunc {
+func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, tokenBillingService *service.ClientTokenBillingService, cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if v := strings.TrimSpace(c.Query("api_key")); v != "" {
 			abortWithGoogleError(c, 400, "Query parameter api_key is deprecated. Use Authorization header or key instead.")
@@ -100,12 +100,27 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 				subscriptionService.DoWindowMaintenance(&maintenanceCopy)
 			}
 		} else {
+			if apiKey.Group != nil && tokenBillingService != nil {
+				usesTokenSettlement, allowed, tokenErr := tokenBillingService.CheckAccess(c.Request.Context(), apiKey.User.ID, apiKey.Group.ID)
+				if tokenErr != nil {
+					abortWithGoogleError(c, 500, "Failed to validate token balance")
+					return
+				}
+				if usesTokenSettlement {
+					if !allowed {
+						abortWithGoogleError(c, 403, "Insufficient token balance")
+						return
+					}
+					goto authSuccess
+				}
+			}
 			if apiKey.User.Balance <= 0 {
 				abortWithGoogleError(c, 403, "Insufficient account balance")
 				return
 			}
 		}
 
+	authSuccess:
 		c.Set(string(ContextKeyAPIKey), apiKey)
 		c.Set(string(ContextKeyUser), AuthSubject{
 			UserID:      apiKey.User.ID,

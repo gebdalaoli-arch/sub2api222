@@ -403,6 +403,10 @@ func ProvideDesktopUpdateService(settingRepo SettingRepository) *DesktopUpdateSe
 	return NewDesktopUpdateService(settingRepo, filepath.Join("data", "desktop-updates"))
 }
 
+func ProvideClientTokenChannelResolver(channelService *ChannelService) ClientTokenChannelResolver {
+	return channelService
+}
+
 // ProviderSet is the Wire provider set for all services
 var ProviderSet = wire.NewSet(
 	// Core services
@@ -419,6 +423,8 @@ var ProviderSet = wire.NewSet(
 	NewDashboardService,
 	ProvidePricingService,
 	NewBillingService,
+	ProvideClientTokenChannelResolver,
+	NewClientTokenBillingService,
 	NewBillingCacheService,
 	NewAnnouncementService,
 	NewAdminService,

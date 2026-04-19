@@ -16,6 +16,13 @@ const (
 	BillingModeImage      BillingMode = "image"       // 图片计费（当前按次，预留 token 计费）
 )
 
+type SettlementUnit string
+
+const (
+	SettlementUnitMoney SettlementUnit = "money"
+	SettlementUnitToken SettlementUnit = "token"
+)
+
 // IsValid 检查 BillingMode 是否为合法值
 func (m BillingMode) IsValid() bool {
 	switch m {
@@ -23,6 +30,15 @@ func (m BillingMode) IsValid() bool {
 		return true
 	}
 	return false
+}
+
+func (u SettlementUnit) IsValid() bool {
+	switch u {
+	case SettlementUnitMoney, SettlementUnitToken, "":
+		return true
+	default:
+		return false
+	}
 }
 
 const (
@@ -33,16 +49,21 @@ const (
 
 // Channel 渠道实体
 type Channel struct {
-	ID                 int64
-	Name               string
-	Description        string
-	Status             string
-	BillingModelSource string         // "requested", "upstream", or "channel_mapped"
-	RestrictModels     bool           // 是否限制模型（仅允许定价列表中的模型）
-	Features           string         // 渠道特性描述（JSON 数组），用于支付页面展示
-	FeaturesConfig     map[string]any // 渠道功能配置（如 web search emulation）
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	ID                        int64
+	Name                      string
+	Description               string
+	Status                    string
+	SettlementUnit            SettlementUnit
+	TokenInputRatioMilli      int64
+	TokenOutputRatioMilli     int64
+	TokenCacheWriteRatioMilli int64
+	TokenCacheReadRatioMilli  int64
+	BillingModelSource        string         // "requested", "upstream", or "channel_mapped"
+	RestrictModels            bool           // 是否限制模型（仅允许定价列表中的模型）
+	Features                  string         // 渠道特性描述（JSON 数组），用于支付页面展示
+	FeaturesConfig            map[string]any // 渠道功能配置（如 web search emulation）
+	CreatedAt                 time.Time
+	UpdatedAt                 time.Time
 
 	// 关联的分组 ID 列表
 	GroupIDs []int64
@@ -109,6 +130,51 @@ type PricingInterval struct {
 // IsActive 判断渠道是否启用
 func (c *Channel) IsActive() bool {
 	return c.Status == StatusActive
+}
+
+func (c *Channel) UsesTokenSettlement() bool {
+	return c != nil && c.SettlementUnit == SettlementUnitToken
+}
+
+func (c *Channel) normalizedSettlementUnit() SettlementUnit {
+	if c == nil || c.SettlementUnit == "" {
+		return SettlementUnitMoney
+	}
+	return c.SettlementUnit
+}
+
+func (c *Channel) normalizedTokenRatio(value int64) int64 {
+	if value > 0 {
+		return value
+	}
+	return 1000
+}
+
+func (c *Channel) NormalizeSettlementConfig() {
+	if c == nil {
+		return
+	}
+	if c.SettlementUnit == "" {
+		c.SettlementUnit = SettlementUnitMoney
+	}
+	if c.SettlementUnit != SettlementUnitToken {
+		return
+	}
+	c.TokenInputRatioMilli = c.normalizedTokenRatio(c.TokenInputRatioMilli)
+	c.TokenOutputRatioMilli = c.normalizedTokenRatio(c.TokenOutputRatioMilli)
+	c.TokenCacheWriteRatioMilli = c.normalizedTokenRatio(c.TokenCacheWriteRatioMilli)
+	c.TokenCacheReadRatioMilli = c.normalizedTokenRatio(c.TokenCacheReadRatioMilli)
+}
+
+func (c *Channel) ComputeTokenDebitMilli(inputTokens, outputTokens, cacheWriteTokens, cacheReadTokens int) int64 {
+	if c == nil || c.normalizedSettlementUnit() != SettlementUnitToken {
+		return 0
+	}
+	c.NormalizeSettlementConfig()
+	return int64(inputTokens)*c.TokenInputRatioMilli +
+		int64(outputTokens)*c.TokenOutputRatioMilli +
+		int64(cacheWriteTokens)*c.TokenCacheWriteRatioMilli +
+		int64(cacheReadTokens)*c.TokenCacheReadRatioMilli
 }
 
 // GetModelPricing 根据模型名查找渠道定价，未找到返回 nil。

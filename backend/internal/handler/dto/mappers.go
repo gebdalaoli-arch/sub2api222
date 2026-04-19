@@ -529,6 +529,10 @@ func redeemCodeFromServiceBase(rc *service.RedeemCode) RedeemCode {
 		User:         UserFromServiceShallow(rc.User),
 		Group:        GroupFromServiceShallow(rc.Group),
 	}
+	if rc.Type == service.RedeemTypeToken {
+		tokenAmount := rc.TokenAmount()
+		out.TokenAmount = &tokenAmount
+	}
 
 	// For admin_balance/admin_concurrency types, include notes so users can see
 	// why they were charged or credited by admin

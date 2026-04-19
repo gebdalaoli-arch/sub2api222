@@ -58,9 +58,10 @@ type RedeemCodeRepository interface {
 
 // GenerateCodesRequest 生成兑换码请求
 type GenerateCodesRequest struct {
-	Count int     `json:"count"`
-	Value float64 `json:"value"`
-	Type  string  `json:"type"`
+	Count   int     `json:"count"`
+	Value   float64 `json:"value"`
+	Type    string  `json:"type"`
+	GroupID *int64  `json:"group_id"`
 }
 
 // RedeemCodeResponse 兑换码响应
@@ -79,6 +80,7 @@ type RedeemService struct {
 	cache                RedeemCache
 	billingCacheService  *BillingCacheService
 	entClient            *dbent.Client
+	tokenBillingService  *ClientTokenBillingService
 	authCacheInvalidator APIKeyAuthCacheInvalidator
 }
 
@@ -90,6 +92,7 @@ func NewRedeemService(
 	cache RedeemCache,
 	billingCacheService *BillingCacheService,
 	entClient *dbent.Client,
+	tokenBillingService *ClientTokenBillingService,
 	authCacheInvalidator APIKeyAuthCacheInvalidator,
 ) *RedeemService {
 	return &RedeemService{
@@ -99,6 +102,7 @@ func NewRedeemService(
 		cache:                cache,
 		billingCacheService:  billingCacheService,
 		entClient:            entClient,
+		tokenBillingService:  tokenBillingService,
 		authCacheInvalidator: authCacheInvalidator,
 	}
 }
@@ -144,6 +148,9 @@ func (s *RedeemService) GenerateCodes(ctx context.Context, req GenerateCodesRequ
 	if codeType == "" {
 		codeType = RedeemTypeBalance
 	}
+	if codeType == RedeemTypeToken && req.GroupID == nil {
+		return nil, errors.New("group_id is required for token redeem code")
+	}
 
 	// 邀请码类型的 value 设为 0
 	value := req.Value
@@ -159,10 +166,11 @@ func (s *RedeemService) GenerateCodes(ctx context.Context, req GenerateCodesRequ
 		}
 
 		codes = append(codes, RedeemCode{
-			Code:   code,
-			Type:   codeType,
-			Value:  value,
-			Status: StatusUnused,
+			Code:    code,
+			Type:    codeType,
+			Value:   value,
+			Status:  StatusUnused,
+			GroupID: req.GroupID,
 		})
 	}
 
@@ -190,6 +198,12 @@ func (s *RedeemService) CreateCode(ctx context.Context, code *RedeemCode) error 
 	}
 	if code.Type != RedeemTypeInvitation && code.Value == 0 {
 		return errors.New("value must not be zero")
+	}
+	if code.Type == RedeemTypeToken && code.GroupID == nil {
+		return errors.New("group_id is required for token redeem code")
+	}
+	if code.Type == RedeemTypeSubscription && code.GroupID == nil {
+		return errors.New("group_id is required for subscription redeem code")
 	}
 	if code.Status == "" {
 		code.Status = StatusUnused
@@ -286,6 +300,9 @@ func (s *RedeemService) Redeem(ctx context.Context, userID int64, code string) (
 	if redeemCode.Type == RedeemTypeSubscription && redeemCode.GroupID == nil {
 		return nil, infraerrors.BadRequest("REDEEM_CODE_INVALID", "invalid subscription redeem code: missing group_id")
 	}
+	if redeemCode.Type == RedeemTypeToken && redeemCode.GroupID == nil {
+		return nil, infraerrors.BadRequest("REDEEM_CODE_INVALID", "invalid token redeem code: missing group_id")
+	}
 
 	// 获取用户信息
 	user, err := s.userRepo.GetByID(ctx, userID)
@@ -357,6 +374,14 @@ func (s *RedeemService) Redeem(ctx context.Context, userID int64, code string) (
 			}
 		}
 
+	case RedeemTypeToken:
+		if s.tokenBillingService == nil {
+			return nil, infraerrors.BadRequest("TOKEN_BILLING_DISABLED", "token billing service is not configured")
+		}
+		if _, err := s.tokenBillingService.CreditRedeemCode(txCtx, userID, *redeemCode.GroupID, redeemCode.TokenAmount(), redeemCode.Code); err != nil {
+			return nil, fmt.Errorf("credit token wallet: %w", err)
+		}
+
 	default:
 		return nil, fmt.Errorf("unsupported redeem type: %s", redeemCode.Type)
 	}
@@ -414,6 +439,10 @@ func (s *RedeemService) invalidateRedeemCaches(ctx context.Context, userID int64
 				defer cancel()
 				_ = s.billingCacheService.InvalidateSubscription(cacheCtx, userID, groupID)
 			}()
+		}
+	case RedeemTypeToken:
+		if s.authCacheInvalidator != nil {
+			s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, userID)
 		}
 	}
 }

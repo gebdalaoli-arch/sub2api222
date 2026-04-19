@@ -90,6 +90,7 @@ var ProviderSet = wire.NewSet(
 	NewTLSFingerprintProfileRepository,
 	NewDesktopSessionRepository,
 	NewChannelRepository,
+	NewClientTokenWalletRepository,
 
 	// Cache implementations
 	NewGatewayCache,

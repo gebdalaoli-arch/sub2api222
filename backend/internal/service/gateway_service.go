@@ -7293,6 +7293,12 @@ type postUsageBillingParams struct {
 	IsSubscriptionBill    bool
 	AccountRateMultiplier float64
 	APIKeyService         APIKeyQuotaUpdater
+	TokenSettlement       *TokenSettlementInfo
+}
+
+type TokenSettlementInfo struct {
+	ChannelID  int64
+	DebitMilli int64
 }
 
 func (p *postUsageBillingParams) shouldDeductAPIKeyQuota() bool {
@@ -7323,6 +7329,14 @@ func postUsageBilling(ctx context.Context, p *postUsageBillingParams, deps *bill
 			}
 		}
 	} else {
+		if p.TokenSettlement != nil {
+			slog.Warn("usage billing fallback skipped token wallet deduction because unified billing repo is unavailable",
+				"user_id", p.User.ID,
+				"channel_id", p.TokenSettlement.ChannelID,
+				"debit_milli", p.TokenSettlement.DebitMilli,
+			)
+			goto quotaUpdates
+		}
 		if cost.ActualCost > 0 {
 			if err := deps.userRepo.DeductBalance(billingCtx, p.User.ID, cost.ActualCost); err != nil {
 				slog.Error("deduct balance failed", "user_id", p.User.ID, "error", err)
@@ -7330,6 +7344,7 @@ func postUsageBilling(ctx context.Context, p *postUsageBillingParams, deps *bill
 		}
 	}
 
+quotaUpdates:
 	if p.shouldDeductAPIKeyQuota() {
 		if err := p.APIKeyService.UpdateQuotaUsed(billingCtx, p.APIKey.ID, cost.ActualCost); err != nil {
 			slog.Error("update api key quota failed", "api_key_id", p.APIKey.ID, "error", err)
@@ -7400,6 +7415,9 @@ func buildUsageBillingCommand(requestID string, usageLog *UsageLog, p *postUsage
 	}
 	if usageLog != nil {
 		cmd.Model = usageLog.Model
+		if usageLog.ChannelID != nil {
+			cmd.ChannelID = *usageLog.ChannelID
+		}
 		cmd.BillingType = usageLog.BillingType
 		cmd.InputTokens = usageLog.InputTokens
 		cmd.OutputTokens = usageLog.OutputTokens
@@ -7420,6 +7438,9 @@ func buildUsageBillingCommand(requestID string, usageLog *UsageLog, p *postUsage
 	if p.IsSubscriptionBill && p.Subscription != nil && p.Cost.TotalCost > 0 {
 		cmd.SubscriptionID = &p.Subscription.ID
 		cmd.SubscriptionCost = p.Cost.TotalCost
+	} else if p.TokenSettlement != nil && p.TokenSettlement.DebitMilli > 0 {
+		cmd.ChannelID = p.TokenSettlement.ChannelID
+		cmd.TokenDebitMilli = p.TokenSettlement.DebitMilli
 	} else if p.Cost.ActualCost > 0 {
 		cmd.BalanceCost = p.Cost.ActualCost
 	}
@@ -7481,7 +7502,7 @@ func finalizePostUsageBilling(p *postUsageBillingParams, deps *billingDeps, resu
 		if p.Cost.TotalCost > 0 && p.User != nil && p.APIKey != nil && p.APIKey.GroupID != nil {
 			deps.billingCacheService.QueueUpdateSubscriptionUsage(p.User.ID, *p.APIKey.GroupID, p.Cost.TotalCost)
 		}
-	} else if p.Cost.ActualCost > 0 && p.User != nil {
+	} else if p.Cost.ActualCost > 0 && p.User != nil && p.TokenSettlement == nil {
 		deps.billingCacheService.QueueDeductBalance(p.User.ID, p.Cost.ActualCost)
 	}
 
@@ -7506,7 +7527,7 @@ func notifyBalanceLow(p *postUsageBillingParams, deps *billingDeps, result *Usag
 			slog.Error("panic in notifyBalanceLow", "recover", r)
 		}
 	}()
-	if p.IsSubscriptionBill || p.Cost.ActualCost <= 0 || p.User == nil || deps.balanceNotifyService == nil {
+	if p.IsSubscriptionBill || p.TokenSettlement != nil || p.Cost.ActualCost <= 0 || p.User == nil || deps.balanceNotifyService == nil {
 		slog.Debug("notifyBalanceLow: skipped",
 			"is_subscription", p.IsSubscriptionBill,
 			"actual_cost", p.Cost.ActualCost,
@@ -7811,6 +7832,28 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 		)
 	}
 
+	var tokenSettlement *TokenSettlementInfo
+	if !isSubscriptionBilling {
+		channelID, debitMilli, usesToken, tokenErr := ResolveUsageTokenDebit(
+			ctx,
+			s.channelService,
+			apiKey.GroupID,
+			usageLog.InputTokens,
+			usageLog.OutputTokens,
+			usageLog.CacheCreationTokens,
+			usageLog.CacheReadTokens,
+		)
+		if tokenErr != nil {
+			return tokenErr
+		}
+		if usesToken {
+			tokenSettlement = &TokenSettlementInfo{ChannelID: channelID, DebitMilli: debitMilli}
+			if usageLog.ChannelID == nil && channelID > 0 {
+				usageLog.ChannelID = &channelID
+			}
+		}
+	}
+
 	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
 		writeUsageLogBestEffort(ctx, s.usageLogRepo, usageLog, "service.gateway")
 		logger.LegacyPrintf("service.gateway", "[SIMPLE MODE] Usage recorded (not billed): user=%d, tokens=%d", usageLog.UserID, usageLog.TotalTokens())
@@ -7829,6 +7872,7 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 		IsSubscriptionBill:    isSubscriptionBilling,
 		AccountRateMultiplier: accountRateMultiplier,
 		APIKeyService:         input.APIKeyService,
+		TokenSettlement:       tokenSettlement,
 	}, s.billingDeps(), s.usageBillingRepo)
 
 	if billingErr != nil {

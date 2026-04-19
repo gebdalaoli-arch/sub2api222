@@ -24,6 +24,13 @@ type RedeemCode struct {
 	Group *Group
 }
 
+func (r *RedeemCode) TokenAmount() float64 {
+	if r == nil || r.Type != RedeemTypeToken {
+		return 0
+	}
+	return r.Value
+}
+
 func (r *RedeemCode) IsUsed() bool {
 	return r.Status == StatusUsed
 }
