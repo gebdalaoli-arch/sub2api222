@@ -6,7 +6,11 @@ pub struct UsageDetailViewModel {
     pub total_requests_text: String,
     pub total_tokens_text: String,
     pub total_actual_cost_text: String,
-    pub lines: Vec<String>,
+    pub model_lines: Vec<String>,
+    pub time_lines: Vec<String>,
+    pub input_lines: Vec<String>,
+    pub output_lines: Vec<String>,
+    pub page_meta_text: String,
 }
 
 impl UsageDetailViewModel {
@@ -16,7 +20,11 @@ impl UsageDetailViewModel {
             total_requests_text: "0".to_string(),
             total_tokens_text: "0".to_string(),
             total_actual_cost_text: "¥0.000000".to_string(),
-            lines: vec!["登录后可查看模型、Token、时间与费用明细。".to_string()],
+            model_lines: vec!["暂无数据".to_string()],
+            time_lines: vec!["暂无数据".to_string()],
+            input_lines: vec!["0".to_string()],
+            output_lines: vec!["0".to_string()],
+            page_meta_text: "第 0 / 0 页".to_string(),
         }
     }
 
@@ -26,7 +34,10 @@ impl UsageDetailViewModel {
         };
 
         if page.items.is_empty() {
-            return Self::empty();
+            return Self {
+                page_meta_text: format!("第 {} / {} 页", page.page, page.pages.max(1)),
+                ..Self::empty()
+            };
         }
 
         let total_tokens = page
@@ -35,45 +46,51 @@ impl UsageDetailViewModel {
             .map(total_tokens_for_log)
             .sum::<i64>();
         let total_actual_cost = page.items.iter().map(|item| item.actual_cost).sum::<f64>();
-        let lines = page.items.iter().take(12).map(format_usage_line).collect();
 
         Self {
             summary_title: format!("最近 {} 条消费明细", page.items.len()),
             total_requests_text: page.items.len().to_string(),
             total_tokens_text: total_tokens.to_string(),
             total_actual_cost_text: format!("¥{total_actual_cost:.6}"),
-            lines,
+            model_lines: page.items.iter().map(|item| item.model.clone()).collect(),
+            time_lines: page.items.iter().map(format_time_line).collect(),
+            input_lines: page.items.iter().map(format_input_line).collect(),
+            output_lines: page.items.iter().map(format_output_line).collect(),
+            page_meta_text: format!("第 {} / {} 页", page.page, page.pages.max(1)),
         }
     }
 }
 
 fn total_tokens_for_log(log: &UsageLog) -> i64 {
-    log.input_tokens + log.output_tokens + log.cache_creation_tokens + log.cache_read_tokens
+    merged_input_tokens(log) + merged_output_tokens(log)
 }
 
-fn format_usage_line(log: &UsageLog) -> String {
-    let time = log.created_at.replace('T', " ").trim_end_matches('Z').to_string();
-    let api_key_name = log
-        .api_key
-        .as_ref()
-        .map(|item| item.name.as_str())
-        .unwrap_or("未命名 Key");
-    let endpoint = log
-        .inbound_endpoint
-        .as_deref()
-        .unwrap_or("/v1/unknown");
-    format!(
-        "{} · {}\n{} · {} · 输入 {} · 输出 {} · 缓存 {} / {} · ¥{:.6}",
-        log.model,
-        time,
-        api_key_name,
-        endpoint,
-        log.input_tokens,
-        log.output_tokens,
-        log.cache_creation_tokens,
-        log.cache_read_tokens,
-        log.actual_cost
-    )
+fn merged_input_tokens(log: &UsageLog) -> i64 {
+    log.input_tokens + log.cache_creation_tokens + log.cache_read_tokens
+}
+
+fn merged_output_tokens(log: &UsageLog) -> i64 {
+    if log.image_count > 0 && log.output_tokens == 0 {
+        log.image_count
+    } else {
+        log.output_tokens
+    }
+}
+
+fn format_time_line(log: &UsageLog) -> String {
+    log.created_at.replace('T', " ").trim_end_matches('Z').to_string()
+}
+
+fn format_input_line(log: &UsageLog) -> String {
+    merged_input_tokens(log).to_string()
+}
+
+fn format_output_line(log: &UsageLog) -> String {
+    if log.image_count > 0 && log.output_tokens == 0 {
+        format!("图片 {}", log.image_count)
+    } else {
+        merged_output_tokens(log).to_string()
+    }
 }
 
 #[cfg(test)]
@@ -137,11 +154,11 @@ mod tests {
         assert_eq!(vm.total_requests_text, "1");
         assert_eq!(vm.total_tokens_text, "609");
         assert_eq!(vm.total_actual_cost_text, "¥0.004500");
-        assert!(vm.lines[0].contains("gpt-5.4"));
-        assert!(vm.lines[0].contains("2025-01-02 15:04:05"));
-        assert!(vm.lines[0].contains("输入 123"));
-        assert!(vm.lines[0].contains("输出 456"));
-        assert!(vm.lines[0].contains("¥0.004500"));
+        assert_eq!(vm.model_lines[0], "gpt-5.4");
+        assert_eq!(vm.time_lines[0], "2025-01-02 15:04:05");
+        assert_eq!(vm.input_lines[0], "153");
+        assert_eq!(vm.output_lines[0], "456");
+        assert_eq!(vm.page_meta_text, "第 1 / 1 页");
     }
 
     #[test]
@@ -152,6 +169,7 @@ mod tests {
         assert_eq!(vm.total_requests_text, "0");
         assert_eq!(vm.total_tokens_text, "0");
         assert_eq!(vm.total_actual_cost_text, "¥0.000000");
-        assert_eq!(vm.lines, vec!["登录后可查看模型、Token、时间与费用明细。".to_string()]);
+        assert_eq!(vm.model_lines, vec!["暂无数据".to_string()]);
+        assert_eq!(vm.page_meta_text, "第 0 / 0 页");
     }
 }

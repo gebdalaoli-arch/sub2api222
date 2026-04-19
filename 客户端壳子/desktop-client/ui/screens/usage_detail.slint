@@ -1,14 +1,24 @@
-import { Button } from "std-widgets.slint";
+import { Button, ComboBox } from "std-widgets.slint";
 
 export component UsageDetailScreen inherits Rectangle {
     in property <string> summary-title: "最近 0 条消费明细";
     in property <string> total-requests-text: "0";
     in property <string> total-tokens-text: "0";
-    in property <string> total-actual-cost-text: "$0.000000";
-    in property <[string]> usage-lines: ["登录后可查看模型、Token、时间与费用明细。"];
+    in property <string> total-actual-cost-text: "¥0.000000";
+    in property <[string]> model-lines: ["暂无数据"];
+    in property <[string]> time-lines: ["暂无数据"];
+    in property <[string]> input-lines: ["0"];
+    in property <[string]> output-lines: ["0"];
+    in property <string> page-meta-text: "第 0 / 0 页";
+    in property <[string]> view-mode-options: ["按时间", "按模型"];
+    in-out property <int> selected-view-mode-index: 0;
     in property <string> status-text: "登录后可查看消费明细。";
 
     callback refresh-requested();
+    callback prev-page-requested();
+    callback next-page-requested();
+    callback view-mode-changed(int);
+    callback export-excel-requested();
 
     background: #ffffff;
     border-radius: 12px;
@@ -27,25 +37,52 @@ export component UsageDetailScreen inherits Rectangle {
     Text {
         x: 24px;
         y: 58px;
-        width: parent.width - 160px;
-        text: "按时间倒序查看每次调用的模型、Token 消耗、请求时间与费用。";
+        width: parent.width - 48px;
+        text: "按模型、时间、输入（含缓存输入）和输出（含缓存输出）查看消费记录。";
         color: #596064;
         font-size: 13px;
         wrap: word-wrap;
     }
 
+    ComboBox {
+        x: 24px;
+        y: 92px;
+        width: 140px;
+        height: 34px;
+        model: root.view-mode-options;
+        current-index <=> root.selected-view-mode-index;
+    }
+
+    Button {
+        x: 176px;
+        y: 92px;
+        width: 72px;
+        height: 34px;
+        text: "应用";
+        clicked => { root.view-mode-changed(root.selected-view-mode-index); }
+    }
+
+    Button {
+        x: 260px;
+        y: 92px;
+        width: 96px;
+        height: 34px;
+        text: "导出 Excel";
+        clicked => { root.export-excel-requested(); }
+    }
+
     Button {
         x: parent.width - 120px;
-        y: 22px;
+        y: 92px;
         width: 96px;
-        height: 36px;
+        height: 34px;
         text: "刷新";
         clicked => { root.refresh-requested(); }
     }
 
     Rectangle {
         x: 24px;
-        y: 108px;
+        y: 146px;
         width: (parent.width - 64px) / 3;
         height: 88px;
         background: #f7f9fb;
@@ -56,7 +93,7 @@ export component UsageDetailScreen inherits Rectangle {
 
     Rectangle {
         x: 32px + (parent.width - 64px) / 3;
-        y: 108px;
+        y: 146px;
         width: (parent.width - 64px) / 3;
         height: 88px;
         background: #f7f9fb;
@@ -67,7 +104,7 @@ export component UsageDetailScreen inherits Rectangle {
 
     Rectangle {
         x: 40px + ((parent.width - 64px) / 3) * 2;
-        y: 108px;
+        y: 146px;
         width: (parent.width - 64px) / 3;
         height: 88px;
         background: #f7f9fb;
@@ -78,7 +115,7 @@ export component UsageDetailScreen inherits Rectangle {
 
     Rectangle {
         x: 24px;
-        y: 214px;
+        y: 252px;
         width: parent.width - 48px;
         height: 48px;
         background: #eef8ff;
@@ -96,29 +133,95 @@ export component UsageDetailScreen inherits Rectangle {
 
     Rectangle {
         x: 24px;
-        y: 278px;
+        y: 318px;
         width: parent.width - 48px;
-        height: parent.height - 302px;
+        height: parent.height - 384px;
         background: #eaeff2;
         border-radius: 20px;
 
-        for line[index] in root.usage-lines : Rectangle {
+        for text[index] in root.model-lines : Rectangle {
             x: 18px;
             y: 18px + index * 88px;
             width: parent.width - 36px;
             height: 76px;
             background: #ffffff;
-            border-radius: 12px;
+            border-radius: 14px;
 
-            Text {
+            Rectangle {
                 x: 14px;
                 y: 12px;
-                width: parent.width - 28px;
-                text: line;
-                color: #596064;
-                font-size: 12px;
-                wrap: word-wrap;
+                width: 144px;
+                height: 24px;
+                background: #eef6ff;
+                border-radius: 12px;
+                Text { width: parent.width; height: parent.height; text: "模型 · " + text; color: #1d5fa7; font-size: 11px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
             }
+
+            Rectangle {
+                x: 170px;
+                y: 12px;
+                width: 220px;
+                height: 24px;
+                background: #f3f1ff;
+                border-radius: 12px;
+                Text { width: parent.width; height: parent.height; text: "时间 · " + root.time-lines[index]; color: #6b4ec9; font-size: 11px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+            }
+
+            Rectangle {
+                x: 402px;
+                y: 12px;
+                width: 180px;
+                height: 24px;
+                background: #edf9f0;
+                border-radius: 12px;
+                Text { width: parent.width; height: parent.height; text: "输入 · " + root.input-lines[index]; color: #2d7a43; font-size: 11px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+            }
+
+            Rectangle {
+                x: 594px;
+                y: 12px;
+                width: parent.width - 608px;
+                height: 24px;
+                background: #fff3e8;
+                border-radius: 12px;
+                Text { width: parent.width; height: parent.height; text: "输出 · " + root.output-lines[index]; color: #c6692a; font-size: 11px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+            }
+        }
+    }
+
+    Rectangle {
+        x: 24px;
+        y: parent.height - 54px;
+        width: parent.width - 48px;
+        height: 34px;
+        background: transparent;
+
+        Button {
+            x: 0px;
+            y: 0px;
+            width: 84px;
+            height: 34px;
+            text: "上一页";
+            clicked => { root.prev-page-requested(); }
+        }
+
+        Text {
+            x: (parent.width - 180px) / 2;
+            y: 8px;
+            width: 180px;
+            text: root.page-meta-text;
+            color: #596064;
+            font-size: 12px;
+            horizontal-alignment: center;
+        }
+
+        Button {
+            x: parent.width - 84px;
+            y: 0px;
+            width: 84px;
+            height: 34px;
+            text: "下一页";
+            clicked => { root.next-page-requested(); }
         }
     }
 }

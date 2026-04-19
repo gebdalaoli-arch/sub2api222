@@ -86,10 +86,11 @@ mod tests {
         assert!(billing_detail.contains("订阅明细"));
         assert!(billing_detail.contains("订单明细"));
         assert!(help_detail.contains("设置与帮助"));
-        assert!(help_detail.contains("安全边界"));
+        assert!(help_detail.contains("查看使用密钥"));
+        assert!(help_detail.contains("输入账户密码"));
         assert!(help_detail.contains("检查更新"));
         assert!(usage_detail.contains("消费明细"));
-        assert!(usage_detail.contains("模型、Token、时间与费用"));
+        assert!(usage_detail.contains("按模型、时间、输入（含缓存输入）和输出（含缓存输出）查看消费记录"));
         assert!(update_dialog.contains("发现新版本"));
         assert!(update_dialog.contains("立即更新"));
     }

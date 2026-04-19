@@ -25,6 +25,7 @@ use sub2api_desktop::{
         },
         groups::{fetch_available_groups_blocking, GroupPlatform, GroupSummary},
         http::ApiClient,
+        keys::{create_api_key_blocking, CreateAPIKeyRequest},
         payment::{
             create_order_blocking, fetch_checkout_info_blocking, fetch_my_orders_blocking,
             fetch_order_blocking, CheckoutInfo, CreateOrderRequest, PaymentOrder, SubscriptionPlan,
@@ -38,13 +39,13 @@ use sub2api_desktop::{
             check_desktop_update_blocking, list_desktop_announcements_blocking,
             resolve_desktop_download_url, DesktopAnnouncementItem, DesktopUpdateCheckResponse,
         },
-        usage::{fetch_usage_logs_blocking, PaginatedUsageLogs},
+        usage::{fetch_usage_logs_blocking, PaginatedUsageLogs, UsageQuery},
     },
     app::{
         auth_flow::{build_login_submission, should_restore_session, LoginSubmission},
         launch_errors::describe_platform_launch_error,
         view_models::{
-            billing_vm::BillingViewModel,
+            billing_vm::{format_token_equivalent, BillingViewModel},
             dashboard_vm::DashboardViewModel,
             launch_vm::LaunchViewModel,
             update_vm::{UpdateDialogState, UpdateViewModel},
@@ -86,11 +87,69 @@ type SharedOrders = Arc<Mutex<Vec<PaymentOrder>>>;
 type SharedCheckoutInfo = Arc<Mutex<Option<CheckoutInfo>>>;
 type SharedPendingPayment = Arc<Mutex<Option<PendingPaymentState>>>;
 type SharedUsagePage = Arc<Mutex<Option<PaginatedUsageLogs>>>;
+type SharedUsageQuery = Arc<Mutex<UsageQueryState>>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct PendingPaymentState {
     order_id: i64,
     open_target: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct UsageQueryState {
+    page: i32,
+    page_size: i32,
+    view_mode: UsageViewMode,
+}
+
+impl Default for UsageQueryState {
+    fn default() -> Self {
+        Self {
+            page: 1,
+            page_size: 20,
+            view_mode: UsageViewMode::ByTime,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UsageViewMode {
+    ByTime,
+    ByModel,
+}
+
+impl UsageViewMode {
+    fn options() -> Vec<&'static str> {
+        vec!["按时间", "按模型"]
+    }
+
+    fn from_index(index: i32) -> Self {
+        match index {
+            1 => Self::ByModel,
+            _ => Self::ByTime,
+        }
+    }
+
+    fn to_index(self) -> i32 {
+        match self {
+            Self::ByTime => 0,
+            Self::ByModel => 1,
+        }
+    }
+
+    fn sort_by(self) -> &'static str {
+        match self {
+            Self::ByTime => "created_at",
+            Self::ByModel => "model",
+        }
+    }
+
+    fn sort_order(self) -> &'static str {
+        match self {
+            Self::ByTime => "desc",
+            Self::ByModel => "asc",
+        }
+    }
 }
 
 fn main() -> anyhow::Result<()> {
@@ -121,6 +180,7 @@ fn main() -> anyhow::Result<()> {
     let checkout_info: SharedCheckoutInfo = Arc::new(Mutex::new(None));
     let pending_payment: SharedPendingPayment = Arc::new(Mutex::new(None));
     let usage_page: SharedUsagePage = Arc::new(Mutex::new(None));
+    let usage_query: SharedUsageQuery = Arc::new(Mutex::new(UsageQueryState::default()));
 
     apply_launch_state(&app, &targets.borrow());
     apply_logged_out_state(&app);
@@ -154,6 +214,7 @@ fn main() -> anyhow::Result<()> {
         Arc::clone(&checkout_info),
         Arc::clone(&pending_payment),
         Arc::clone(&usage_page),
+        Arc::clone(&usage_query),
     );
     wire_billing_callbacks(
         &app,
@@ -166,6 +227,7 @@ fn main() -> anyhow::Result<()> {
         Arc::clone(&checkout_info),
         Arc::clone(&pending_payment),
         Arc::clone(&usage_page),
+        Arc::clone(&usage_query),
     );
     wire_usage_callbacks(
         &app,
@@ -177,6 +239,13 @@ fn main() -> anyhow::Result<()> {
         Arc::clone(&recent_orders),
         Arc::clone(&checkout_info),
         Arc::clone(&usage_page),
+        Arc::clone(&usage_query),
+    );
+    wire_use_key_callbacks(
+        &app,
+        Arc::clone(&config),
+        Arc::clone(&auth_session),
+        Arc::clone(&available_groups),
     );
     wire_update_callbacks(&app, Arc::clone(&config));
     restore_saved_session(
@@ -193,6 +262,7 @@ fn main() -> anyhow::Result<()> {
         Arc::clone(&checkout_info),
         Arc::clone(&pending_payment),
         Arc::clone(&usage_page),
+        Arc::clone(&usage_query),
     );
 
     startup_diagnostics.log(format!(
@@ -517,6 +587,7 @@ fn wire_auth_callbacks(
     checkout_info: SharedCheckoutInfo,
     pending_payment: SharedPendingPayment,
     usage_page: SharedUsagePage,
+    usage_query: SharedUsageQuery,
 ) {
     let login_app = app.as_weak();
     let login_config = Arc::clone(&config);
@@ -531,6 +602,7 @@ fn wire_auth_callbacks(
     let login_checkout = Arc::clone(&checkout_info);
     let login_pending_payment = Arc::clone(&pending_payment);
     let login_usage_page = Arc::clone(&usage_page);
+    let login_usage_query = Arc::clone(&usage_query);
     app.on_login_requested(move || {
         let Some(app) = login_app.upgrade() else {
             return;
@@ -577,6 +649,7 @@ fn wire_auth_callbacks(
         let checkout_info = Arc::clone(&login_checkout);
         let pending_payment = Arc::clone(&login_pending_payment);
         let usage_page = Arc::clone(&login_usage_page);
+        let usage_query = Arc::clone(&login_usage_query);
         thread::spawn(move || {
             let client = ApiClient::new(config.api_base_url.clone());
             let result = match submission {
@@ -610,6 +683,7 @@ fn wire_auth_callbacks(
                         &checkout_info,
                         &pending_payment,
                         &usage_page,
+                        &usage_query,
                         email,
                         Some(password.clone()),
                         auth,
@@ -629,7 +703,12 @@ fn wire_auth_callbacks(
                         if let Some(session) =
                             auth_session.lock().ok().and_then(|state| state.clone())
                         {
-                            apply_authenticated_state(&app, &session, group_count);
+                            apply_authenticated_state(
+                                &app,
+                                &session,
+                                group_count,
+                                first_openai_group(&groups_snapshot),
+                            );
                             apply_available_groups_state(&app, &groups_snapshot);
                             apply_billing_state(&app, &billing_vm);
                             apply_checkout_state(&app, checkout_snapshot.as_ref());
@@ -677,6 +756,7 @@ fn wire_auth_callbacks(
     let register_checkout = Arc::clone(&checkout_info);
     let register_pending_payment = Arc::clone(&pending_payment);
     let register_usage_page = Arc::clone(&usage_page);
+    let register_usage_query = Arc::clone(&usage_query);
     app.on_register_requested(move || {
         let Some(app) = register_app.upgrade() else {
             return;
@@ -713,6 +793,7 @@ fn wire_auth_callbacks(
         let checkout_info = Arc::clone(&register_checkout);
         let pending_payment = Arc::clone(&register_pending_payment);
         let usage_page = Arc::clone(&register_usage_page);
+        let usage_query = Arc::clone(&register_usage_query);
         thread::spawn(move || {
             let client = ApiClient::new(config.api_base_url.clone());
             let request = RegisterRequest::new(email.trim(), password.clone())
@@ -733,6 +814,7 @@ fn wire_auth_callbacks(
                         &checkout_info,
                         &pending_payment,
                         &usage_page,
+                        &usage_query,
                         email,
                         Some(password.clone()),
                         auth,
@@ -752,7 +834,12 @@ fn wire_auth_callbacks(
                         if let Some(session) =
                             auth_session.lock().ok().and_then(|state| state.clone())
                         {
-                            apply_authenticated_state(&app, &session, group_count);
+                            apply_authenticated_state(
+                                &app,
+                                &session,
+                                group_count,
+                                first_openai_group(&groups_snapshot),
+                            );
                             apply_available_groups_state(&app, &groups_snapshot);
                             apply_billing_state(&app, &billing_vm);
                             apply_checkout_state(&app, checkout_snapshot.as_ref());
@@ -907,6 +994,7 @@ fn wire_billing_callbacks(
     checkout_info: SharedCheckoutInfo,
     pending_payment: SharedPendingPayment,
     usage_page: SharedUsagePage,
+    usage_query: SharedUsageQuery,
 ) {
     let redeem_app = app.as_weak();
     let redeem_config = Arc::clone(&config);
@@ -917,6 +1005,7 @@ fn wire_billing_callbacks(
     let redeem_orders = Arc::clone(&recent_orders);
     let redeem_checkout = Arc::clone(&checkout_info);
     let redeem_usage_page = Arc::clone(&usage_page);
+    let redeem_usage_query = Arc::clone(&usage_query);
     app.on_redeem_requested(move || {
         let Some(app) = redeem_app.upgrade() else {
             return;
@@ -937,6 +1026,7 @@ fn wire_billing_callbacks(
         let recent_orders = Arc::clone(&redeem_orders);
         let checkout_info = Arc::clone(&redeem_checkout);
         let usage_page = Arc::clone(&redeem_usage_page);
+        let usage_query = Arc::clone(&redeem_usage_query);
         thread::spawn(move || {
             let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) else {
                 let _ = ui_handle.upgrade_in_event_loop(move |app| {
@@ -959,6 +1049,7 @@ fn wire_billing_callbacks(
                         &redeem_history_store,
                         &checkout_info,
                         &usage_page,
+                        &usage_query,
                     );
                     let checkout_snapshot = current_checkout_snapshot(&checkout_info);
                     let usage_vm = current_usage_vm(&usage_page);
@@ -977,7 +1068,12 @@ fn wire_billing_callbacks(
                         if let Some(session) =
                             auth_session.lock().ok().and_then(|state| state.clone())
                         {
-                            apply_authenticated_state(&app, &session, group_count);
+                            apply_authenticated_state(
+                                &app,
+                                &session,
+                                group_count,
+                                first_openai_group(&groups_snapshot),
+                            );
                         }
                         apply_available_groups_state(&app, &groups_snapshot);
                         apply_billing_state(&app, &billing_vm);
@@ -1006,6 +1102,7 @@ fn wire_billing_callbacks(
     let recharge_checkout = Arc::clone(&checkout_info);
     let recharge_pending = Arc::clone(&pending_payment);
     let recharge_usage_page = Arc::clone(&usage_page);
+    let recharge_usage_query = Arc::clone(&usage_query);
     app.on_billing_recharge_requested(move || {
         let Some(app) = recharge_app.upgrade() else {
             return;
@@ -1028,6 +1125,7 @@ fn wire_billing_callbacks(
         let checkout_info = Arc::clone(&recharge_checkout);
         let pending_payment = Arc::clone(&recharge_pending);
         let usage_page = Arc::clone(&recharge_usage_page);
+        let usage_query = Arc::clone(&recharge_usage_query);
         let selected_method_index = app.get_billing_selected_payment_method_index() as usize;
         thread::spawn(move || {
             let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) else {
@@ -1088,6 +1186,7 @@ fn wire_billing_callbacks(
                         &redeem_history,
                         &checkout_info,
                         &usage_page,
+                        &usage_query,
                     );
                     let checkout_snapshot = current_checkout_snapshot(&checkout_info);
                     let usage_vm = current_usage_vm(&usage_page);
@@ -1125,6 +1224,7 @@ fn wire_billing_callbacks(
     let subscribe_checkout = Arc::clone(&checkout_info);
     let subscribe_pending = Arc::clone(&pending_payment);
     let subscribe_usage_page = Arc::clone(&usage_page);
+    let subscribe_usage_query = Arc::clone(&usage_query);
     app.on_billing_subscription_requested(move || {
         let Some(app) = subscribe_app.upgrade() else {
             return;
@@ -1141,6 +1241,7 @@ fn wire_billing_callbacks(
         let checkout_info = Arc::clone(&subscribe_checkout);
         let pending_payment = Arc::clone(&subscribe_pending);
         let usage_page = Arc::clone(&subscribe_usage_page);
+        let usage_query = Arc::clone(&subscribe_usage_query);
         let selected_method_index = app.get_billing_selected_payment_method_index() as usize;
         let selected_plan_index = app.get_billing_selected_subscription_plan_index() as usize;
         thread::spawn(move || {
@@ -1209,6 +1310,7 @@ fn wire_billing_callbacks(
                         &redeem_history,
                         &checkout_info,
                         &usage_page,
+                        &usage_query,
                     );
                     let checkout_snapshot = current_checkout_snapshot(&checkout_info);
                     let usage_vm = current_usage_vm(&usage_page);
@@ -1266,6 +1368,7 @@ fn wire_billing_callbacks(
     let refresh_billing_checkout = Arc::clone(&checkout_info);
     let refresh_billing_pending = Arc::clone(&pending_payment);
     let refresh_billing_usage_page = Arc::clone(&usage_page);
+    let refresh_billing_usage_query = Arc::clone(&usage_query);
     app.on_billing_refresh_requested(move || {
         let Some(app) = refresh_billing_app.upgrade() else {
             return;
@@ -1282,6 +1385,7 @@ fn wire_billing_callbacks(
         let checkout_info = Arc::clone(&refresh_billing_checkout);
         let pending_payment = Arc::clone(&refresh_billing_pending);
         let usage_page = Arc::clone(&refresh_billing_usage_page);
+        let usage_query = Arc::clone(&refresh_billing_usage_query);
         thread::spawn(move || {
             let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) else {
                 let _ = ui_handle.upgrade_in_event_loop(move |app| {
@@ -1312,6 +1416,7 @@ fn wire_billing_callbacks(
                 &redeem_history,
                 &checkout_info,
                 &usage_page,
+                &usage_query,
             );
             let checkout_snapshot = current_checkout_snapshot(&checkout_info);
             let usage_vm = current_usage_vm(&usage_page);
@@ -1319,7 +1424,12 @@ fn wire_billing_callbacks(
                 .unwrap_or_else(|| "计费数据已刷新，可继续创建或追踪订单。".to_string());
             let _ = ui_handle.upgrade_in_event_loop(move |app| {
                 if let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) {
-                    apply_authenticated_state(&app, &session, group_count);
+                    apply_authenticated_state(
+                        &app,
+                        &session,
+                        group_count,
+                        first_openai_group(&groups_snapshot),
+                    );
                 }
                 apply_available_groups_state(&app, &groups_snapshot);
                 apply_billing_state(&app, &billing_vm);
@@ -1335,40 +1445,25 @@ fn wire_usage_callbacks(
     app: &AppWindow,
     config: Arc<AppConfig>,
     auth_session: SharedAuthSession,
-    available_groups: SharedGroups,
-    subscription_summary: SharedSubscriptionSummary,
-    redeem_history: SharedRedeemHistory,
-    recent_orders: SharedOrders,
-    checkout_info: SharedCheckoutInfo,
+    _available_groups: SharedGroups,
+    _subscription_summary: SharedSubscriptionSummary,
+    _redeem_history: SharedRedeemHistory,
+    _recent_orders: SharedOrders,
+    _checkout_info: SharedCheckoutInfo,
     usage_page: SharedUsagePage,
+    usage_query: SharedUsageQuery,
 ) {
-    let usage_app = app.as_weak();
-    let usage_config = Arc::clone(&config);
-    let usage_session = Arc::clone(&auth_session);
-    let usage_groups = Arc::clone(&available_groups);
-    let usage_summary = Arc::clone(&subscription_summary);
-    let usage_history = Arc::clone(&redeem_history);
-    let usage_orders = Arc::clone(&recent_orders);
-    let usage_checkout = Arc::clone(&checkout_info);
-    let usage_page_state = Arc::clone(&usage_page);
-    app.on_usage_refresh_requested(move || {
-        let Some(app) = usage_app.upgrade() else {
-            return;
-        };
-        app.set_usage_status_text(SharedString::from("正在刷新消费明细..."));
-
-        let ui_handle = usage_app.clone();
-        let config = Arc::clone(&usage_config);
-        let auth_session = Arc::clone(&usage_session);
-        let available_groups = Arc::clone(&usage_groups);
-        let subscription_summary = Arc::clone(&usage_summary);
-        let redeem_history = Arc::clone(&usage_history);
-        let recent_orders = Arc::clone(&usage_orders);
-        let checkout_info = Arc::clone(&usage_checkout);
-        let usage_page = Arc::clone(&usage_page_state);
+    let bind_usage_loader = |
+        app_handle: slint::Weak<AppWindow>,
+        config: Arc<AppConfig>,
+        auth_session: SharedAuthSession,
+        usage_page: SharedUsagePage,
+        usage_query: SharedUsageQuery,
+        status_text: &'static str,
+    | {
         thread::spawn(move || {
             let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) else {
-                let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                let _ = app_handle.upgrade_in_event_loop(move |app| {
                     app.set_usage_status_text(SharedString::from("请先登录后再查看消费明细。"));
                 });
                 return;
@@ -1376,28 +1471,262 @@ fn wire_usage_callbacks(
 
             let client = ApiClient::new(config.api_base_url.clone())
                 .with_access_token(Some(session.access_token));
-            let (group_count, groups_snapshot, billing_vm) = sync_user_side_state(
-                &client,
-                &auth_session,
-                &available_groups,
-                &subscription_summary,
-                &recent_orders,
-                &redeem_history,
-                &checkout_info,
-                &usage_page,
-            );
-            let usage_vm = current_usage_vm(&usage_page);
-            let checkout_snapshot = current_checkout_snapshot(&checkout_info);
-            let _ = ui_handle.upgrade_in_event_loop(move |app| {
-                if let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) {
-                    apply_authenticated_state(&app, &session, group_count);
+            match fetch_and_store_usage_page(&client, &usage_page, &usage_query) {
+                Ok(_) => {
+                    let usage_vm = current_usage_vm(&usage_page);
+                    let selected_index = current_usage_query_state(&usage_query).view_mode.to_index();
+                    let _ = app_handle.upgrade_in_event_loop(move |app| {
+                        apply_usage_state(&app, &usage_vm);
+                        app.set_usage_selected_view_mode_index(selected_index);
+                        app.set_usage_status_text(SharedString::from(status_text));
+                    });
                 }
-                apply_available_groups_state(&app, &groups_snapshot);
-                apply_billing_state(&app, &billing_vm);
-                apply_checkout_state(&app, checkout_snapshot.as_ref());
-                apply_usage_state(&app, &usage_vm);
-                app.set_usage_status_text(SharedString::from("消费明细已刷新。"));
-            });
+                Err(error) => {
+                    let _ = app_handle.upgrade_in_event_loop(move |app| {
+                        app.set_usage_status_text(SharedString::from(format!(
+                            "刷新消费明细失败：{error}"
+                        )));
+                    });
+                }
+            }
+        });
+    };
+
+    let usage_app = app.as_weak();
+    let usage_config = Arc::clone(&config);
+    let usage_session = Arc::clone(&auth_session);
+    let usage_page_state = Arc::clone(&usage_page);
+    let usage_query_state = Arc::clone(&usage_query);
+    app.on_usage_refresh_requested(move || {
+        if let Some(app) = usage_app.upgrade() {
+            app.set_usage_status_text(SharedString::from("正在刷新消费明细..."));
+        }
+        bind_usage_loader(
+            usage_app.clone(),
+            Arc::clone(&usage_config),
+            Arc::clone(&usage_session),
+            Arc::clone(&usage_page_state),
+            Arc::clone(&usage_query_state),
+            "消费明细已刷新。",
+        );
+    });
+
+    let prev_app = app.as_weak();
+    let prev_config = Arc::clone(&config);
+    let prev_session = Arc::clone(&auth_session);
+    let prev_usage_page = Arc::clone(&usage_page);
+    let prev_usage_query = Arc::clone(&usage_query);
+    app.on_usage_prev_page_requested(move || {
+        if let Ok(mut state) = prev_usage_query.lock() {
+            if state.page > 1 {
+                state.page -= 1;
+            }
+        }
+        bind_usage_loader(
+            prev_app.clone(),
+            Arc::clone(&prev_config),
+            Arc::clone(&prev_session),
+            Arc::clone(&prev_usage_page),
+            Arc::clone(&prev_usage_query),
+            "已切换到上一页。",
+        );
+    });
+
+    let next_app = app.as_weak();
+    let next_config = Arc::clone(&config);
+    let next_session = Arc::clone(&auth_session);
+    let next_usage_page = Arc::clone(&usage_page);
+    let next_usage_query = Arc::clone(&usage_query);
+    app.on_usage_next_page_requested(move || {
+        let can_advance = next_usage_page
+            .lock()
+            .ok()
+            .and_then(|state| state.as_ref().map(|page| page.page < page.pages))
+            .unwrap_or(false);
+        if can_advance {
+            if let Ok(mut state) = next_usage_query.lock() {
+                state.page += 1;
+            }
+        }
+        bind_usage_loader(
+            next_app.clone(),
+            Arc::clone(&next_config),
+            Arc::clone(&next_session),
+            Arc::clone(&next_usage_page),
+            Arc::clone(&next_usage_query),
+            if can_advance { "已切换到下一页。" } else { "已经是最后一页。" },
+        );
+    });
+
+    let mode_app = app.as_weak();
+    let mode_config = Arc::clone(&config);
+    let mode_session = Arc::clone(&auth_session);
+    let mode_usage_page = Arc::clone(&usage_page);
+    let mode_usage_query = Arc::clone(&usage_query);
+    app.on_usage_view_mode_changed(move |index| {
+        if let Ok(mut state) = mode_usage_query.lock() {
+            state.view_mode = UsageViewMode::from_index(index);
+            state.page = 1;
+        }
+        bind_usage_loader(
+            mode_app.clone(),
+            Arc::clone(&mode_config),
+            Arc::clone(&mode_session),
+            Arc::clone(&mode_usage_page),
+            Arc::clone(&mode_usage_query),
+            "消费明细查看方式已更新。",
+        );
+    });
+
+    let export_app = app.as_weak();
+    let export_config = Arc::clone(&config);
+    let export_session = Arc::clone(&auth_session);
+    let export_usage_query = Arc::clone(&usage_query);
+    app.on_usage_export_excel_requested(move || {
+        if let Some(app) = export_app.upgrade() {
+            app.set_usage_status_text(SharedString::from("正在导出 Excel..."));
+        }
+        let app_handle = export_app.clone();
+        let config = Arc::clone(&export_config);
+        let auth_session = Arc::clone(&export_session);
+        let usage_query = Arc::clone(&export_usage_query);
+        thread::spawn(move || {
+            let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) else {
+                let _ = app_handle.upgrade_in_event_loop(move |app| {
+                    app.set_usage_status_text(SharedString::from("请先登录后再导出 Excel。"));
+                });
+                return;
+            };
+            let client = ApiClient::new(config.api_base_url.clone())
+                .with_access_token(Some(session.access_token));
+            match export_usage_excel(&client, &usage_query) {
+                Ok(path) => {
+                    let _ = open_external_target(path.to_string_lossy().as_ref());
+                    let _ = app_handle.upgrade_in_event_loop(move |app| {
+                        app.set_usage_status_text(SharedString::from(format!(
+                            "已导出 Excel：{}",
+                            path.display()
+                        )));
+                    });
+                }
+                Err(error) => {
+                    let _ = app_handle.upgrade_in_event_loop(move |app| {
+                        app.set_usage_status_text(SharedString::from(format!(
+                            "导出 Excel 失败：{error}"
+                        )));
+                    });
+                }
+            }
+        });
+    });
+}
+
+fn wire_use_key_callbacks(
+    app: &AppWindow,
+    config: Arc<AppConfig>,
+    auth_session: SharedAuthSession,
+    available_groups: SharedGroups,
+) {
+    let key_app = app.as_weak();
+    let key_config = Arc::clone(&config);
+    let key_session = Arc::clone(&auth_session);
+    let key_groups = Arc::clone(&available_groups);
+    app.on_view_usage_key_requested(move || {
+        let Some(app) = key_app.upgrade() else {
+            return;
+        };
+        let password = app.get_view_key_password().to_string();
+        if password.trim().is_empty() {
+            app.set_view_key_status_text(SharedString::from("请输入当前账户密码。"));
+            return;
+        }
+        app.set_view_key_status_text(SharedString::from("正在校验密码并生成 7 天使用密钥..."));
+
+        let ui_handle = key_app.clone();
+        let config = Arc::clone(&key_config);
+        let auth_session = Arc::clone(&key_session);
+        let available_groups = Arc::clone(&key_groups);
+        thread::spawn(move || {
+            let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) else {
+                let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                    app.set_view_key_status_text(SharedString::from("请先登录后再查看使用密钥。"));
+                });
+                return;
+            };
+            let email = session.user.email.clone();
+            let verify_client = ApiClient::new(config.api_base_url.clone());
+            match login_blocking(
+                &verify_client,
+                &sub2api_desktop::api::auth::LoginRequest::new(email.as_str(), password.as_str()),
+            ) {
+                Ok(LoginResponse::Authenticated(_)) => {
+                    let groups_snapshot = current_groups_snapshot(&available_groups);
+                    let Some(group) = first_openai_group(&groups_snapshot) else {
+                        let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                            app.set_view_key_status_text(SharedString::from(
+                                "当前账户没有可用的 OpenAI 分组，无法生成使用密钥。",
+                            ));
+                        });
+                        return;
+                    };
+
+                    let authed_client = ApiClient::new(config.api_base_url.clone())
+                        .with_access_token(Some(session.access_token));
+                    let key_name = format!(
+                        "desktop-view-key-{}",
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or(Duration::ZERO)
+                            .as_secs()
+                    );
+                    match create_api_key_blocking(
+                        &authed_client,
+                        &CreateAPIKeyRequest {
+                            name: key_name,
+                            group_id: group.id,
+                            expires_in_days: 7,
+                        },
+                    ) {
+                        Ok(api_key) => {
+                            match write_use_key_guide_page(
+                                &config.api_base_url,
+                                api_key.key.as_str(),
+                                api_key.expires_at.as_deref(),
+                            ) {
+                                Ok(path) => {
+                                    let _ = open_external_target(path.to_string_lossy().as_ref());
+                                    let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                                        app.set_view_key_password(SharedString::from(""));
+                                        app.set_view_key_status_text(SharedString::from(format!(
+                                            "已生成 7 天有效的使用密钥，并打开说明页：{}",
+                                            path.display()
+                                        )));
+                                    });
+                                }
+                                Err(error) => {
+                                    let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                                        app.set_view_key_status_text(SharedString::from(format!(
+                                            "已生成使用密钥，但创建说明页失败：{error}"
+                                        )));
+                                    });
+                                }
+                            }
+                        }
+                        Err(error) => {
+                            let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                                app.set_view_key_status_text(SharedString::from(format!(
+                                    "生成使用密钥失败：{error}"
+                                )));
+                            });
+                        }
+                    }
+                }
+                _ => {
+                    let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                        app.set_view_key_status_text(SharedString::from("密码校验失败，无法查看使用密钥。"));
+                    });
+                }
+            }
         });
     });
 }
@@ -1416,6 +1745,7 @@ fn restore_saved_session(
     checkout_info: SharedCheckoutInfo,
     pending_payment: SharedPendingPayment,
     usage_page: SharedUsagePage,
+    usage_query: SharedUsageQuery,
 ) {
     let app_handle = app.as_weak();
     if let Some(message) = config.packaged_local_debug_api_message() {
@@ -1473,11 +1803,17 @@ fn restore_saved_session(
                                         &redeem_history,
                                         &checkout_info,
                                         &usage_page,
+                                        &usage_query,
                                     );
                                 let checkout_snapshot = current_checkout_snapshot(&checkout_info);
                                 let usage_vm = current_usage_vm(&usage_page);
                                 let _ = app_handle.upgrade_in_event_loop(move |app| {
-                                    apply_authenticated_state(&app, &session, group_count);
+                                    apply_authenticated_state(
+                                        &app,
+                                        &session,
+                                        group_count,
+                                        first_openai_group(&groups_snapshot),
+                                    );
                                     apply_available_groups_state(&app, &groups_snapshot);
                                     apply_billing_state(&app, &billing_vm);
                                     apply_checkout_state(&app, checkout_snapshot.as_ref());
@@ -1519,6 +1855,7 @@ fn restore_saved_session(
                                                 &checkout_info,
                                                 &pending_payment,
                                                 &usage_page,
+                                                &usage_query,
                                                 email,
                                                 Some(password),
                                                 auth,
@@ -1540,7 +1877,12 @@ fn restore_saved_session(
                                                     .ok()
                                                     .and_then(|state| state.clone())
                                                 {
-                                                    apply_authenticated_state(&app, &session, group_count);
+                                                    apply_authenticated_state(
+                                                        &app,
+                                                        &session,
+                                                        group_count,
+                                                        first_openai_group(&groups_snapshot),
+                                                    );
                                                     apply_available_groups_state(&app, &groups_snapshot);
                                                     apply_billing_state(&app, &billing_vm);
                                                     apply_checkout_state(&app, checkout_snapshot.as_ref());
@@ -1610,6 +1952,7 @@ fn restore_saved_session(
                                 &checkout_info,
                                 &pending_payment,
                                 &usage_page,
+                                &usage_query,
                                 email,
                                 Some(password),
                                 auth,
@@ -1629,7 +1972,12 @@ fn restore_saved_session(
                                 if let Some(session) =
                                     auth_session.lock().ok().and_then(|state| state.clone())
                                 {
-                                    apply_authenticated_state(&app, &session, group_count);
+                                    apply_authenticated_state(
+                                        &app,
+                                        &session,
+                                        group_count,
+                                        first_openai_group(&groups_snapshot),
+                                    );
                                     apply_available_groups_state(&app, &groups_snapshot);
                                     apply_billing_state(&app, &billing_vm);
                                     apply_checkout_state(&app, checkout_snapshot.as_ref());
@@ -1673,6 +2021,7 @@ fn handle_auth_success(
     checkout_info: &SharedCheckoutInfo,
     pending_payment: &SharedPendingPayment,
     usage_page: &SharedUsagePage,
+    usage_query: &SharedUsageQuery,
     email: String,
     remembered_password: Option<String>,
     auth: AuthResponse,
@@ -1717,6 +2066,7 @@ fn handle_auth_success(
         redeem_history,
         checkout_info,
         usage_page,
+        usage_query,
     );
 }
 
@@ -1905,11 +2255,12 @@ fn sync_user_side_state(
     redeem_history: &SharedRedeemHistory,
     checkout_info: &SharedCheckoutInfo,
     usage_page: &SharedUsagePage,
+    usage_query: &SharedUsageQuery,
 ) -> (Option<usize>, Vec<GroupSummary>, BillingViewModel) {
     let group_count = refresh_available_groups_state(client, available_groups);
     refresh_billing_state(client, subscription_summary, recent_orders, redeem_history);
     refresh_checkout_info_state(client, checkout_info);
-    refresh_usage_page_state(client, usage_page);
+    refresh_usage_page_state(client, usage_page, usage_query);
     let groups_snapshot = current_groups_snapshot(available_groups);
     let billing_vm = current_billing_vm(
         auth_session,
@@ -1968,12 +2319,121 @@ fn refresh_checkout_info_state(client: &ApiClient, checkout_info: &SharedCheckou
     }
 }
 
-fn refresh_usage_page_state(client: &ApiClient, usage_page: &SharedUsagePage) {
-    if let Ok(page) = fetch_usage_logs_blocking(client, 1, 20) {
+fn refresh_usage_page_state(
+    client: &ApiClient,
+    usage_page: &SharedUsagePage,
+    usage_query: &SharedUsageQuery,
+) {
+    let query = build_usage_query(usage_query);
+    if let Ok(page) = fetch_usage_logs_blocking(client, &query) {
         if let Ok(mut state) = usage_page.lock() {
             *state = Some(page);
         }
     }
+}
+
+fn build_usage_query(usage_query: &SharedUsageQuery) -> UsageQuery {
+    usage_query
+        .lock()
+        .ok()
+        .map(|state| UsageQuery {
+            page: state.page,
+            page_size: state.page_size,
+            sort_by: state.view_mode.sort_by().to_string(),
+            sort_order: state.view_mode.sort_order().to_string(),
+        })
+        .unwrap_or_default()
+}
+
+fn current_usage_query_state(usage_query: &SharedUsageQuery) -> UsageQueryState {
+    usage_query
+        .lock()
+        .ok()
+        .map(|state| state.clone())
+        .unwrap_or_default()
+}
+
+fn fetch_and_store_usage_page(
+    client: &ApiClient,
+    usage_page: &SharedUsagePage,
+    usage_query: &SharedUsageQuery,
+) -> anyhow::Result<PaginatedUsageLogs> {
+    let query = build_usage_query(usage_query);
+    let page = fetch_usage_logs_blocking(client, &query)?;
+    if let Ok(mut state) = usage_page.lock() {
+        *state = Some(page.clone());
+    }
+    Ok(page)
+}
+
+fn export_usage_excel(
+    client: &ApiClient,
+    usage_query: &SharedUsageQuery,
+) -> anyhow::Result<PathBuf> {
+    let current = current_usage_query_state(usage_query);
+    let first_page = fetch_usage_logs_blocking(
+        client,
+        &UsageQuery {
+            page: 1,
+            page_size: current.page_size,
+            sort_by: current.view_mode.sort_by().to_string(),
+            sort_order: current.view_mode.sort_order().to_string(),
+        },
+    )?;
+
+    let mut all_items = first_page.items.clone();
+    for page_number in 2..=first_page.pages {
+        let next_page = fetch_usage_logs_blocking(
+            client,
+            &UsageQuery {
+                page: page_number,
+                page_size: current.page_size,
+                sort_by: current.view_mode.sort_by().to_string(),
+                sort_order: current.view_mode.sort_order().to_string(),
+            },
+        )?;
+        all_items.extend(next_page.items);
+    }
+
+    let output_dir = std::env::temp_dir().join("sub2api-desktop-exports");
+    std::fs::create_dir_all(&output_dir)?;
+    let filename = format!(
+        "usage-details-{}.xlsx",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or(Duration::ZERO)
+            .as_secs()
+    );
+    let path = output_dir.join(filename);
+
+    let mut workbook = rust_xlsxwriter::Workbook::new();
+    let worksheet = workbook.add_worksheet();
+    worksheet.write_string(0, 0, "模型")?;
+    worksheet.write_string(0, 1, "时间")?;
+    worksheet.write_string(0, 2, "输入（含缓存输入）")?;
+    worksheet.write_string(0, 3, "输出（含缓存输出）")?;
+    worksheet.write_string(0, 4, "费用")?;
+
+    for (index, item) in all_items.iter().enumerate() {
+        let row = (index + 1) as u32;
+        worksheet.write_string(row, 0, item.model.as_str())?;
+        worksheet.write_string(row, 1, item.created_at.as_str())?;
+        worksheet.write_number(row, 2, (item.input_tokens + item.cache_creation_tokens + item.cache_read_tokens) as f64)?;
+        worksheet.write_string(
+            row,
+            3,
+            if item.image_count > 0 && item.output_tokens == 0 {
+                format!("图片 {}", item.image_count)
+            } else {
+                item.output_tokens.to_string()
+            }
+            .as_str(),
+        )?;
+        worksheet.write_number(row, 4, item.actual_cost)?;
+    }
+
+    workbook.save(&path)?;
+    Ok(path)
 }
 
 fn current_groups_snapshot(available_groups: &SharedGroups) -> Vec<GroupSummary> {
@@ -2109,7 +2569,12 @@ fn apply_logged_out_state(app: &AppWindow) {
     app.set_usage_status_text(SharedString::from("登录后可查看消费明细。"));
 }
 
-fn apply_authenticated_state(app: &AppWindow, session: &AuthSession, group_count: Option<usize>) {
+fn apply_authenticated_state(
+    app: &AppWindow,
+    session: &AuthSession,
+    group_count: Option<usize>,
+    openai_group: Option<&GroupSummary>,
+) {
     app.set_session_active(true);
     app.set_auth_subview(0);
     app.set_show_login_totp(false);
@@ -2120,7 +2585,10 @@ fn apply_authenticated_state(app: &AppWindow, session: &AuthSession, group_count
         "当前账号：{}",
         session.user.display_name()
     )));
-    app.set_dashboard_balance_text(SharedString::from(dashboard.balance_text));
+    let balance_text = openai_group
+        .map(|group| format!("余额：{}", format_token_equivalent(session.user.balance, Some(group))))
+        .unwrap_or(dashboard.balance_text);
+    app.set_dashboard_balance_text(SharedString::from(balance_text));
     app.set_dashboard_usage_text(SharedString::from(dashboard.usage_text));
     app.set_dashboard_account_status_text(SharedString::from(format!(
         "账户状态：{}{}",
@@ -2376,6 +2844,10 @@ fn apply_available_groups_state(app: &AppWindow, groups: &[GroupSummary]) {
     app.set_launch_selected_group_index(0);
 }
 
+fn first_openai_group(groups: &[GroupSummary]) -> Option<&GroupSummary> {
+    groups.iter().find(|group| group.platform == GroupPlatform::OpenAI)
+}
+
 fn apply_billing_state(app: &AppWindow, billing: &BillingViewModel) {
     app.set_billing_plan_title(SharedString::from(billing.plan_title.clone()));
     app.set_billing_balance_headline(SharedString::from(billing.balance_headline.clone()));
@@ -2430,11 +2902,22 @@ fn apply_usage_state(app: &AppWindow, usage: &UsageDetailViewModel) {
     app.set_usage_total_requests_text(SharedString::from(usage.total_requests_text.clone()));
     app.set_usage_total_tokens_text(SharedString::from(usage.total_tokens_text.clone()));
     app.set_usage_total_actual_cost_text(SharedString::from(usage.total_actual_cost_text.clone()));
-    app.set_usage_lines(string_model(
-        usage
-            .lines
-            .iter()
-            .cloned()
+    app.set_usage_model_lines(string_model(
+        usage.model_lines.iter().cloned().map(SharedString::from).collect(),
+    ));
+    app.set_usage_time_lines(string_model(
+        usage.time_lines.iter().cloned().map(SharedString::from).collect(),
+    ));
+    app.set_usage_input_lines(string_model(
+        usage.input_lines.iter().cloned().map(SharedString::from).collect(),
+    ));
+    app.set_usage_output_lines(string_model(
+        usage.output_lines.iter().cloned().map(SharedString::from).collect(),
+    ));
+    app.set_usage_page_meta_text(SharedString::from(usage.page_meta_text.clone()));
+    app.set_usage_view_mode_options(string_model(
+        UsageViewMode::options()
+            .into_iter()
             .map(SharedString::from)
             .collect(),
     ));
@@ -2658,6 +3141,92 @@ fn write_payment_qr_page(
     Ok(file_path)
 }
 
+fn write_use_key_guide_page(
+    api_base_url: &str,
+    api_key: &str,
+    expires_at: Option<&str>,
+) -> anyhow::Result<PathBuf> {
+    let temp_dir = std::env::temp_dir().join("sub2api-desktop-use-key");
+    std::fs::create_dir_all(&temp_dir)?;
+    let file_path = temp_dir.join("use-key-guide.html");
+    let expires_text = expires_at.unwrap_or("7 天后自动过期");
+    let config_toml = format!(
+        r#"model_provider = "OpenAI"
+model = "gpt-5.4"
+review_model = "gpt-5.4"
+model_reasoning_effort = "xhigh"
+disable_response_storage = true
+network_access = "enabled"
+windows_wsl_setup_acknowledged = true
+model_context_window = 1000000
+model_auto_compact_token_limit = 900000
+
+[model_providers.OpenAI]
+name = "OpenAI"
+base_url = "{api_base_url}"
+wire_api = "responses"
+requires_openai_auth = true"#,
+    );
+    let auth_json = format!(
+        r#"{{
+  "OPENAI_API_KEY": "{api_key}"
+}}"#
+    );
+    let generic_example = format!(
+        r#"curl {api_base_url}/chat/completions \
+  -H "Authorization: Bearer {api_key}" \
+  -H "Content-Type: application/json" \
+  -d "{{\"model\":\"gpt-5.4\",\"messages\":[{{\"role\":\"user\",\"content\":\"hello\"}}]}}"#
+    );
+
+    let html = format!(
+        r#"<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>使用密钥说明</title>
+  <style>
+    body {{ font-family: "Inter", "Microsoft YaHei UI", sans-serif; background: #f7f9fb; color: #2c3437; margin: 0; padding: 32px; }}
+    .wrap {{ max-width: 960px; margin: 0 auto; }}
+    .card {{ background: #fff; border-radius: 18px; padding: 24px; margin-bottom: 20px; box-shadow: 0 20px 60px rgba(44,52,55,0.08); }}
+    pre {{ background: #0f172a; color: #e2e8f0; border-radius: 14px; padding: 18px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }}
+    h1,h2 {{ margin-top: 0; }}
+    .tip {{ color: #596064; line-height: 1.7; }}
+    .tag {{ display:inline-block; padding:6px 12px; border-radius:999px; background:#eef8ff; color:#006499; font-weight:700; font-size:12px; }}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <span class="tag">7 天有效</span>
+      <h1>查看使用密钥</h1>
+      <p class="tip">这是一个专门给第三方应用使用的短期 OpenAI 兼容 API Key。过期时间：{expires_text}</p>
+      <p class="tip">你可以把它用于 Codex、OpenCode，或任何支持 OpenAI 协议的第三方应用。为了安全，建议只在当前 7 天窗口内使用。</p>
+    </div>
+    <div class="card">
+      <h2>config.toml</h2>
+      <pre>{config_toml}</pre>
+    </div>
+    <div class="card">
+      <h2>auth.json</h2>
+      <pre>{auth_json}</pre>
+    </div>
+    <div class="card">
+      <h2>第三方应用直连示例</h2>
+      <pre>{generic_example}</pre>
+    </div>
+  </div>
+</body>
+</html>"#,
+        config_toml = escape_html(&config_toml),
+        auth_json = escape_html(&auth_json),
+        generic_example = escape_html(&generic_example),
+    );
+    std::fs::write(&file_path, html)?;
+    Ok(file_path)
+}
+
 fn escape_html(input: &str) -> String {
     input
         .replace('&', "&amp;")
@@ -2753,6 +3322,7 @@ mod tests {
             image_price_1k: None,
             image_price_2k: None,
             image_price_4k: None,
+            input_price_per_million_tokens: Some(1.5),
             claude_code_only: false,
             fallback_group_id: None,
             fallback_group_id_on_invalid_request: None,

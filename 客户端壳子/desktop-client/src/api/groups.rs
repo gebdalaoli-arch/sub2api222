@@ -37,6 +37,7 @@ pub struct GroupSummary {
     pub image_price_1k: Option<f64>,
     pub image_price_2k: Option<f64>,
     pub image_price_4k: Option<f64>,
+    pub input_price_per_million_tokens: Option<f64>,
     pub claude_code_only: bool,
     pub fallback_group_id: Option<i64>,
     pub fallback_group_id_on_invalid_request: Option<i64>,
@@ -78,6 +79,7 @@ mod tests {
                 "image_price_1k": null,
                 "image_price_2k": null,
                 "image_price_4k": null,
+                "input_price_per_million_tokens": 1.5,
                 "claude_code_only": false,
                 "fallback_group_id": null,
                 "fallback_group_id_on_invalid_request": null,
@@ -92,13 +94,14 @@ mod tests {
         assert_eq!(groups[0].id, 9);
         assert_eq!(groups[0].platform, GroupPlatform::OpenAI);
         assert_eq!(groups[0].subscription_type, SubscriptionType::Subscription);
+        assert_eq!(groups[0].input_price_per_million_tokens, Some(1.5));
     }
 
     #[test]
     fn fetch_available_groups_blocking_hits_groups_available() {
         let (base_url, path_rx) = spawn_api_server(
             "HTTP/1.1 200 OK",
-            "{\"code\":0,\"message\":\"success\",\"data\":[{\"id\":9,\"name\":\"OpenAI Pro\",\"description\":null,\"platform\":\"openai\",\"rate_multiplier\":1.0,\"is_exclusive\":false,\"status\":\"active\",\"subscription_type\":\"subscription\",\"daily_limit_usd\":null,\"weekly_limit_usd\":null,\"monthly_limit_usd\":null,\"image_price_1k\":null,\"image_price_2k\":null,\"image_price_4k\":null,\"claude_code_only\":false,\"fallback_group_id\":null,\"fallback_group_id_on_invalid_request\":null,\"require_oauth_only\":false,\"require_privacy_set\":false,\"created_at\":\"2025-01-02T15:04:05Z\",\"updated_at\":\"2025-01-02T15:04:05Z\"}]}",
+            "{\"code\":0,\"message\":\"success\",\"data\":[{\"id\":9,\"name\":\"OpenAI Pro\",\"description\":null,\"platform\":\"openai\",\"rate_multiplier\":1.0,\"is_exclusive\":false,\"status\":\"active\",\"subscription_type\":\"subscription\",\"daily_limit_usd\":null,\"weekly_limit_usd\":null,\"monthly_limit_usd\":null,\"image_price_1k\":null,\"image_price_2k\":null,\"image_price_4k\":null,\"input_price_per_million_tokens\":1.5,\"claude_code_only\":false,\"fallback_group_id\":null,\"fallback_group_id_on_invalid_request\":null,\"require_oauth_only\":false,\"require_privacy_set\":false,\"created_at\":\"2025-01-02T15:04:05Z\",\"updated_at\":\"2025-01-02T15:04:05Z\"}]}",
         );
         let client = ApiClient::new(format!("{base_url}/api/v1"));
 

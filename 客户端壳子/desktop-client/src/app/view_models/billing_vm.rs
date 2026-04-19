@@ -45,7 +45,7 @@ impl BillingViewModel {
 
         if let Some(user) = user {
             if let Some(group) = openai_group {
-                model.balance_headline = format_token_equivalent(user.balance, group.rate_multiplier);
+                model.balance_headline = format_token_equivalent(user.balance, Some(group));
                 model.usage_caption = format!(
                     "按 OpenAI 分组“{}”倍率 ×{:.2} 折算 · 账户状态：{} · 并发额度 {} 路",
                     group.name, group.rate_multiplier, user.status, user.concurrency
@@ -107,7 +107,7 @@ impl BillingViewModel {
             model.redeem_history_lines = history
                 .iter()
                 .take(6)
-                .map(history_detail_line)
+                .map(|item| history_detail_line(item, openai_group))
                 .collect();
         }
 
@@ -166,34 +166,37 @@ fn order_detail_line(order: &PaymentOrder) -> String {
     )
 }
 
-fn history_detail_line(item: &RedeemHistoryItem) -> String {
-    let group_text = item
-        .group
-        .as_ref()
-        .map(|group| group.name.as_str())
-        .or_else(|| item.notes.as_deref())
-        .unwrap_or("未绑定分组");
-    format!(
-        "{} · {} · {} · {}",
-        item.code, item.r#type, item.status, group_text
-    )
+fn history_detail_line(item: &RedeemHistoryItem, openai_group: Option<&GroupSummary>) -> String {
+    let redeemed_at = if item.used_at.trim().is_empty() {
+        item.created_at.as_str()
+    } else {
+        item.used_at.as_str()
+    };
+    let redeemed_at = redeemed_at.replace('T', " ").trim_end_matches('Z').to_string();
+    let token_text = format_token_equivalent(item.value, openai_group);
+    format!("{redeemed_at} · 兑换 {token_text}")
 }
 
 fn format_currency_yuan(value: f64) -> String {
     format!("¥{value:.2}")
 }
 
-fn format_token_equivalent(balance: f64, rate_multiplier: f64) -> String {
-    let effective_rate = if rate_multiplier > 0.0 { rate_multiplier } else { 1.0 };
-    let token_total = (balance / effective_rate) * 1_000_000.0;
+pub fn format_token_equivalent(balance: f64, group: Option<&GroupSummary>) -> String {
+    let price_per_million = group
+        .and_then(|item| item.input_price_per_million_tokens)
+        .filter(|price| *price > 0.0)
+        .unwrap_or_else(|| {
+            let multiplier = group
+                .map(|item| item.rate_multiplier)
+                .filter(|value| *value > 0.0)
+                .unwrap_or(1.0);
+            multiplier
+        });
+    let token_total = (balance / price_per_million) * 1_000_000.0;
     let (value, unit) = if token_total >= 1_000_000_000_000.0 {
         (token_total / 1_000_000_000_000.0, "万亿")
-    } else if token_total >= 10_000_000_000.0 {
-        (token_total / 10_000_000_000.0, "百亿")
     } else if token_total >= 100_000_000.0 {
         (token_total / 100_000_000.0, "亿")
-    } else if token_total >= 1_000_000.0 {
-        (token_total / 1_000_000.0, "百万")
     } else if token_total >= 10_000.0 {
         (token_total / 10_000.0, "万")
     } else {
@@ -311,6 +314,7 @@ mod tests {
             image_price_1k: None,
             image_price_2k: None,
             image_price_4k: None,
+            input_price_per_million_tokens: Some(1.5),
             claude_code_only: false,
             fallback_group_id: None,
             fallback_group_id_on_invalid_request: None,
@@ -331,8 +335,8 @@ mod tests {
         assert!(vm.subscription_detail_lines[0].contains("周 ¥4.00/¥30.00"));
         assert!(vm.order_lines[0].contains("ORD-1"));
         assert!(vm.order_detail_lines[0].contains("balance"));
-        assert!(vm.redeem_history_lines[0].contains("CDK-123"));
-        assert!(vm.redeem_history_lines[0].contains("OpenAI Pro"));
+        assert!(vm.redeem_history_lines[0].contains("2025-01-02 15:04:05"));
+        assert!(vm.redeem_history_lines[0].contains("兑换 2000万 Token"));
     }
 
     #[test]

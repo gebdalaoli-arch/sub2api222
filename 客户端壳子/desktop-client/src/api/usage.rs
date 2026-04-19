@@ -56,25 +56,43 @@ pub struct PaginatedUsageLogs {
     pub pages: i32,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UsageQuery {
+    pub page: i32,
+    pub page_size: i32,
+    pub sort_by: String,
+    pub sort_order: String,
+}
+
+impl Default for UsageQuery {
+    fn default() -> Self {
+        Self {
+            page: 1,
+            page_size: 20,
+            sort_by: "created_at".to_string(),
+            sort_order: "desc".to_string(),
+        }
+    }
+}
+
 pub fn fetch_usage_logs_blocking(
     client: &ApiClient,
-    page: i32,
-    page_size: i32,
+    query: &UsageQuery,
 ) -> anyhow::Result<PaginatedUsageLogs> {
     client.get_json_with_query_blocking(
         "/usage",
         &[
-            ("page", page.to_string()),
-            ("page_size", page_size.to_string()),
-            ("sort_by", "created_at".to_string()),
-            ("sort_order", "desc".to_string()),
+            ("page", query.page.to_string()),
+            ("page_size", query.page_size.to_string()),
+            ("sort_by", query.sort_by.clone()),
+            ("sort_order", query.sort_order.clone()),
         ],
     )
 }
 
 #[cfg(test)]
 mod tests {
-    use super::fetch_usage_logs_blocking;
+    use super::{fetch_usage_logs_blocking, UsageQuery};
     use crate::api::http::ApiClient;
     use std::io::{Read, Write};
     use std::net::TcpListener;
@@ -89,7 +107,16 @@ mod tests {
         );
         let client = ApiClient::new(format!("{base_url}/api/v1"));
 
-        let page = fetch_usage_logs_blocking(&client, 1, 20).unwrap();
+        let page = fetch_usage_logs_blocking(
+            &client,
+            &UsageQuery {
+                page: 1,
+                page_size: 20,
+                sort_by: "created_at".to_string(),
+                sort_order: "desc".to_string(),
+            },
+        )
+        .unwrap();
 
         assert_eq!(
             path_rx.recv().unwrap(),

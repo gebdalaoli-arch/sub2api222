@@ -61,8 +61,14 @@ export component AppWindow inherits Window {
     in-out property <string> usage-summary-title: "最近 0 条消费明细";
     in-out property <string> usage-total-requests-text: "0";
     in-out property <string> usage-total-tokens-text: "0";
-    in-out property <string> usage-total-actual-cost-text: "$0.000000";
-    in-out property <[string]> usage-lines: ["登录后可查看模型、Token、时间与费用明细。"];
+    in-out property <string> usage-total-actual-cost-text: "¥0.000000";
+    in-out property <[string]> usage-model-lines: ["暂无数据"];
+    in-out property <[string]> usage-time-lines: ["暂无数据"];
+    in-out property <[string]> usage-input-lines: ["0"];
+    in-out property <[string]> usage-output-lines: ["0"];
+    in-out property <string> usage-page-meta-text: "第 0 / 0 页";
+    in-out property <[string]> usage-view-mode-options: ["按时间", "按模型"];
+    in-out property <int> usage-selected-view-mode-index: 0;
     in-out property <string> usage-status-text: "登录后可查看消费明细。";
     in-out property <int> current-section: 0;
     in-out property <[string]> launch-group-options: ["登录后加载可用分组"];
@@ -79,6 +85,8 @@ export component AppWindow inherits Window {
     in-out property <string> announcement-hero-summary: "这里会展示系统更新、维护通知和使用提醒。";
     in-out property <[string]> announcement-version-lines: ["暂无版本动态"];
     in-out property <[string]> announcement-feed-lines: ["暂无系统公告"];
+    in-out property <string> view-key-password: "";
+    in-out property <string> view-key-status-text: "输入账户密码后，可生成一个 7 天有效的使用密钥并打开说明页。";
 
     callback refresh-installations-requested();
     callback launch-desktop-requested();
@@ -96,7 +104,12 @@ export component AppWindow inherits Window {
     callback billing-open-last-payment-requested();
     callback billing-refresh-requested();
     callback usage-refresh-requested();
+    callback usage-prev-page-requested();
+    callback usage-next-page-requested();
+    callback usage-view-mode-changed(int);
+    callback usage-export-excel-requested();
     callback manual-update-check-requested();
+    callback view-usage-key-requested();
     callback update-primary-requested();
     callback update-secondary-requested();
 
@@ -406,9 +419,19 @@ export component AppWindow inherits Window {
                 total-requests-text: root.usage-total-requests-text;
                 total-tokens-text: root.usage-total-tokens-text;
                 total-actual-cost-text: root.usage-total-actual-cost-text;
-                usage-lines: root.usage-lines;
+                model-lines: root.usage-model-lines;
+                time-lines: root.usage-time-lines;
+                input-lines: root.usage-input-lines;
+                output-lines: root.usage-output-lines;
+                page-meta-text: root.usage-page-meta-text;
+                view-mode-options: root.usage-view-mode-options;
+                selected-view-mode-index <=> root.usage-selected-view-mode-index;
                 status-text: root.usage-status-text;
                 refresh-requested => { root.usage-refresh-requested(); }
+                prev-page-requested => { root.usage-prev-page-requested(); }
+                next-page-requested => { root.usage-next-page-requested(); }
+                view-mode-changed(index) => { root.usage-view-mode-changed(index); }
+                export-excel-requested => { root.usage-export-excel-requested(); }
             }
         }
 
@@ -427,10 +450,13 @@ export component AppWindow inherits Window {
                 desktop-available: root.desktop-available;
                 cli-available: root.cli-available;
                 launch-status-text: root.launch-status-text;
+                view-key-password <=> root.view-key-password;
+                view-key-status-text: root.view-key-status-text;
                 manual-update-check-requested => { root.manual-update-check-requested(); }
                 refresh-installations-requested => { root.refresh-installations-requested(); }
                 launch-official-desktop-requested => { root.launch-desktop-requested(); }
                 launch-official-cli-requested => { root.launch-cli-requested(); }
+                view-usage-key-requested => { root.view-usage-key-requested(); }
             }
         }
 

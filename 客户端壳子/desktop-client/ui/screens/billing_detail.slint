@@ -14,7 +14,7 @@ export component BillingDetailScreen inherits Rectangle {
     in-out property <string> recharge-amount: "";
     in property <[string]> payment-method-options: ["暂无可用支付方式"];
     in-out property <int> selected-payment-method-index: 0;
-    in property <[string]> subscription-plan-options: ["暂无可用套餐"];
+    in property <[string]> subscription-plan-options: ["暂无可用 OpenAI 套餐"];
     in-out property <int> selected-subscription-plan-index: 0;
     in property <string> checkout-status-text: "支付创建后会在这里显示状态。";
 
@@ -30,8 +30,8 @@ export component BillingDetailScreen inherits Rectangle {
     border-width: 0px;
 
     property <length> content-width: self.width - 48px;
-    property <length> left-width: (root.content-width - 20px) * 0.58;
-    property <length> right-width: root.content-width - root.left-width - 20px;
+    property <length> left-width: self.width - 168px;
+    in-out property <bool> future-open: false;
 
     Text {
         x: 24px;
@@ -46,16 +46,38 @@ export component BillingDetailScreen inherits Rectangle {
         x: 24px;
         y: 56px;
         width: parent.width - 48px;
-        text: "当前以兑换 CDK 为主入口；充值、套餐与明细能力统一收纳在暂未开放区。";
+        text: "当前以兑换 CDK 为主入口；余额充值、套餐购买与明细能力统一折叠到未来功能。";
         color: #596064;
         font-size: 13px;
         wrap: word-wrap;
     }
 
     Rectangle {
+        x: parent.width - 128px;
+        y: 24px;
+        width: 96px;
+        height: 40px;
+        background: root.future-open ? #006499 : #f0f4f7;
+        border-radius: 20px;
+
+        TouchArea { clicked => { root.future-open = !root.future-open; } }
+
+        Text {
+            width: parent.width;
+            height: parent.height;
+            text: root.future-open ? "收起未来功能" : "未来功能";
+            color: root.future-open ? #f6f9ff : #51616b;
+            font-size: 11px;
+            font-weight: 700;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+
+    Rectangle {
         x: 24px;
         y: 102px;
-        width: root.left-width;
+        width: root.left-width - 36px;
         height: parent.height - 126px;
         background: @linear-gradient(135deg, #fafdff 0%, #eef7fc 100%);
         border-radius: 22px;
@@ -67,13 +89,13 @@ export component BillingDetailScreen inherits Rectangle {
             y: 22px;
             text: "兑换 CDK";
             color: #2c3437;
-            font-size: 26px;
+            font-size: 30px;
             font-weight: 800;
         }
 
         Text {
             x: 24px;
-            y: 58px;
+            y: 62px;
             width: parent.width - 48px;
             text: "输入兑换码后立即入账，是当前商业版默认开放的主要计费入口。";
             color: #596064;
@@ -83,98 +105,35 @@ export component BillingDetailScreen inherits Rectangle {
 
         Rectangle {
             x: 24px;
-            y: 104px;
-            width: (parent.width - 60px) / 2;
-            height: 84px;
-            background: #ffffff;
-            border-radius: 14px;
-
-            Text { x: 14px; y: 14px; text: "钱包余额"; color: #596064; font-size: 11px; font-weight: 700; }
-            Text { x: 14px; y: 38px; text: root.balance-headline; color: #2c3437; font-size: 22px; font-weight: 800; }
-        }
-
-        Rectangle {
-            x: 36px + (parent.width - 60px) / 2;
-            y: 104px;
-            width: (parent.width - 60px) / 2;
-            height: 84px;
-            background: #ffffff;
-            border-radius: 14px;
-
-            Text { x: 14px; y: 14px; text: "当前套餐"; color: #596064; font-size: 11px; font-weight: 700; }
-            Text {
-                x: 14px;
-                y: 34px;
-                width: parent.width - 28px;
-                text: root.plan-title;
-                color: #2c3437;
-                font-size: 16px;
-                font-weight: 800;
-                wrap: word-wrap;
-            }
-        }
-
-        Rectangle {
-            x: 24px;
-            y: 206px;
+            y: 112px;
             width: parent.width - 48px;
-            height: 94px;
+            height: 96px;
             background: #ffffff;
             border-radius: 18px;
 
             LineEdit {
-                x: 16px;
-                y: 18px;
-                width: parent.width - 148px;
-                height: 36px;
+                x: 18px;
+                y: 22px;
+                width: parent.width - 146px;
+                height: 40px;
                 text <=> root.redeem-code;
                 placeholder-text: "输入 CDK";
             }
 
             Button {
-                x: parent.width - 112px;
-                y: 18px;
-                width: 96px;
-                height: 36px;
+                x: parent.width - 110px;
+                y: 22px;
+                width: 92px;
+                height: 40px;
                 text: "兑换 CDK";
                 clicked => { root.redeem-requested(); }
             }
 
             Text {
-                x: 16px;
-                y: 64px;
-                width: parent.width - 32px;
+                x: 18px;
+                y: 70px;
+                width: parent.width - 36px;
                 text: root.redeem-status-text;
-                color: #596064;
-                font-size: 11px;
-                wrap: word-wrap;
-            }
-        }
-
-        Rectangle {
-            x: 24px;
-            y: 316px;
-            width: parent.width - 48px;
-            height: 64px;
-            background: #ffffff;
-            border-radius: 14px;
-
-            Text {
-                x: 16px;
-                y: 12px;
-                width: parent.width - 32px;
-                text: root.subscription-summary-text;
-                color: #2c3437;
-                font-size: 13px;
-                font-weight: 700;
-                wrap: word-wrap;
-            }
-
-            Text {
-                x: 16px;
-                y: 34px;
-                width: parent.width - 32px;
-                text: root.usage-caption;
                 color: #596064;
                 font-size: 11px;
                 wrap: word-wrap;
@@ -183,7 +142,7 @@ export component BillingDetailScreen inherits Rectangle {
 
         Text {
             x: 24px;
-            y: 398px;
+            y: 232px;
             text: "最近兑换记录";
             color: #2c3437;
             font-size: 18px;
@@ -192,28 +151,28 @@ export component BillingDetailScreen inherits Rectangle {
 
         for line[index] in root.history-lines : Rectangle {
             x: 24px;
-            y: 432px + index * 60px;
+            y: 266px + index * 68px;
             width: parent.width - 48px;
-            height: 48px;
+            height: 56px;
             background: #ffffff;
-            border-radius: 12px;
+            border-radius: 14px;
 
             Text {
-                x: 14px;
-                y: 8px;
-                width: parent.width - 28px;
+                x: 16px;
+                y: 12px;
+                width: parent.width - 32px;
                 text: line;
                 color: #596064;
-                font-size: 11px;
+                font-size: 12px;
                 wrap: word-wrap;
             }
         }
     }
 
-    Rectangle {
-        x: 24px + root.left-width + 20px;
+    if root.future-open: Rectangle {
+        x: root.left-width + 4px;
         y: 102px;
-        width: root.right-width;
+        width: parent.width - root.left-width - 28px;
         height: parent.height - 126px;
         background: #f7f9fb;
         border-radius: 22px;
@@ -227,7 +186,6 @@ export component BillingDetailScreen inherits Rectangle {
             height: 28px;
             background: #fff2e8;
             border-radius: 14px;
-
             Text {
                 width: parent.width;
                 height: parent.height;
@@ -242,8 +200,8 @@ export component BillingDetailScreen inherits Rectangle {
 
         Text {
             x: 20px;
-            y: 60px;
-            text: "预留能力";
+            y: 62px;
+            text: "未来功能";
             color: #2c3437;
             font-size: 22px;
             font-weight: 800;
@@ -251,9 +209,9 @@ export component BillingDetailScreen inherits Rectangle {
 
         Text {
             x: 20px;
-            y: 96px;
+            y: 98px;
             width: parent.width - 40px;
-            text: "余额充值、套餐购买、订阅明细和订单明细已接好桌面端数据与回调，但在当前版本统一收纳，不作为主入口展示。";
+            text: "余额充值、套餐购买、订阅明细和订单明细已接好桌面端数据与回调，当前统一折叠，避免干扰主入口。";
             color: #596064;
             font-size: 12px;
             wrap: word-wrap;
@@ -261,46 +219,46 @@ export component BillingDetailScreen inherits Rectangle {
 
         Rectangle {
             x: 20px;
-            y: 160px;
+            y: 162px;
             width: parent.width - 40px;
-            height: 84px;
+            height: 74px;
             background: #ffffff;
             border-radius: 14px;
-            Text { x: 16px; y: 16px; text: "余额充值"; color: #2c3437; font-size: 16px; font-weight: 700; }
-            Text { x: 16px; y: 42px; width: parent.width - 32px; text: "后续将恢复创建充值订单与支付方式选择。"; color: #8a949a; font-size: 11px; wrap: word-wrap; }
+            Text { x: 16px; y: 14px; text: "余额充值"; color: #2c3437; font-size: 16px; font-weight: 700; }
+            Text { x: 16px; y: 40px; width: parent.width - 32px; text: "后续恢复按 OpenAI 分组可用支付方式创建充值订单。"; color: #8a949a; font-size: 11px; wrap: word-wrap; }
         }
 
         Rectangle {
             x: 20px;
-            y: 256px;
+            y: 248px;
             width: parent.width - 40px;
-            height: 84px;
+            height: 74px;
             background: #ffffff;
             border-radius: 14px;
-            Text { x: 16px; y: 16px; text: "套餐购买"; color: #2c3437; font-size: 16px; font-weight: 700; }
-            Text { x: 16px; y: 42px; width: parent.width - 32px; text: "后续将恢复套餐选择、续费和付款页联动。"; color: #8a949a; font-size: 11px; wrap: word-wrap; }
+            Text { x: 16px; y: 14px; text: "套餐购买"; color: #2c3437; font-size: 16px; font-weight: 700; }
+            Text { x: 16px; y: 40px; width: parent.width - 32px; text: "后续恢复仅 OpenAI 套餐的选择、续费与付款页联动。"; color: #8a949a; font-size: 11px; wrap: word-wrap; }
         }
 
         Rectangle {
             x: 20px;
-            y: 352px;
+            y: 334px;
             width: parent.width - 40px;
-            height: 84px;
+            height: 74px;
             background: #ffffff;
             border-radius: 14px;
-            Text { x: 16px; y: 16px; text: "订阅明细"; color: #2c3437; font-size: 16px; font-weight: 700; }
-            Text { x: 16px; y: 42px; width: parent.width - 32px; text: "后续将展示分组额度、到期时间和订阅消耗。"; color: #8a949a; font-size: 11px; wrap: word-wrap; }
+            Text { x: 16px; y: 14px; text: "订阅明细"; color: #2c3437; font-size: 16px; font-weight: 700; }
+            Text { x: 16px; y: 40px; width: parent.width - 32px; text: "后续展示 OpenAI 套餐额度、到期时间和订阅消耗。"; color: #8a949a; font-size: 11px; wrap: word-wrap; }
         }
 
         Rectangle {
             x: 20px;
-            y: 448px;
+            y: 420px;
             width: parent.width - 40px;
-            height: 84px;
+            height: 74px;
             background: #ffffff;
             border-radius: 14px;
-            Text { x: 16px; y: 16px; text: "订单明细"; color: #2c3437; font-size: 16px; font-weight: 700; }
-            Text { x: 16px; y: 42px; width: parent.width - 32px; text: "后续将恢复订单列表、状态追踪和付款入口。"; color: #8a949a; font-size: 11px; wrap: word-wrap; }
+            Text { x: 16px; y: 14px; text: "订单明细"; color: #2c3437; font-size: 16px; font-weight: 700; }
+            Text { x: 16px; y: 40px; width: parent.width - 32px; text: "后续恢复订单列表、状态追踪和付款入口。"; color: #8a949a; font-size: 11px; wrap: word-wrap; }
         }
 
         Rectangle {
@@ -310,7 +268,6 @@ export component BillingDetailScreen inherits Rectangle {
             height: 64px;
             background: #ffffff;
             border-radius: 14px;
-
             Text {
                 x: 16px;
                 y: 12px;

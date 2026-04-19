@@ -1,14 +1,17 @@
-import { Button } from "std-widgets.slint";
+import { Button, LineEdit } from "std-widgets.slint";
 
 export component HelpDetailScreen inherits Rectangle {
     in property <bool> desktop-available: false;
     in property <bool> cli-available: false;
     in property <string> launch-status-text: "尚未检测 Codex 安装";
+    in-out property <string> view-key-password;
+    in property <string> view-key-status-text: "输入账户密码后，可生成一个 7 天有效的使用密钥并打开说明页。";
 
     callback manual-update-check-requested();
     callback refresh-installations-requested();
     callback launch-official-desktop-requested();
     callback launch-official-cli-requested();
+    callback view-usage-key-requested();
 
     background: #eaeff2;
     border-radius: 12px;
@@ -120,15 +123,34 @@ export component HelpDetailScreen inherits Rectangle {
         Text {
             x: 16px;
             y: 16px;
-            text: "安全边界";
+            text: "查看使用密钥";
             color: #2c3437;
             font-size: 16px;
             font-weight: 700;
         }
 
-        Text { x: 16px; y: 48px; text: "1. 不展示普通 API 凭据，也不要求手动复制网关地址。"; color: #596064; font-size: 12px; }
-        Text { x: 16px; y: 72px; text: "2. 官方模式与平台代理模式严格隔离，减少对原环境的污染。"; color: #596064; font-size: 12px; }
-        Text { x: 16px; y: 96px; text: "3. 更新弹窗属于系统级状态，强制更新时会直接拦住主界面。"; color: #596064; font-size: 12px; }
-        Text { x: 16px; y: 124px; width: parent.width - 32px; text: "最近启动状态：" + root.launch-status-text; color: #596064; font-size: 12px; wrap: word-wrap; }
+        Text { x: 16px; y: 46px; width: parent.width - 32px; text: "输入账户密码后，可生成一个仅供第三方应用使用的短期 API Key。当前桌面端固定生成 7 天有效的 OpenAI 使用密钥。"; color: #596064; font-size: 12px; wrap: word-wrap; }
+
+        LineEdit {
+            x: 16px;
+            y: 86px;
+            width: parent.width - 156px;
+            height: 34px;
+            text <=> root.view-key-password;
+            placeholder-text: "输入账户密码";
+            input-type: InputType.password;
+        }
+
+        Button {
+            x: parent.width - 124px;
+            y: 86px;
+            width: 100px;
+            height: 34px;
+            text: "查看使用密钥";
+            clicked => { root.view-usage-key-requested(); }
+        }
+
+        Text { x: 16px; y: 132px; width: parent.width - 32px; text: root.view-key-status-text; color: #596064; font-size: 12px; wrap: word-wrap; }
+        Text { x: 16px; y: 164px; width: parent.width - 32px; text: "最近启动状态：" + root.launch-status-text; color: #596064; font-size: 12px; wrap: word-wrap; }
     }
 }
