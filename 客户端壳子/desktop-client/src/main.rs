@@ -239,7 +239,6 @@ fn main() -> anyhow::Result<()> {
         Arc::clone(&config),
         Arc::clone(&auth_session),
         Arc::clone(&available_groups),
-        Arc::clone(&billing_summary),
         Arc::clone(&subscription_summary),
         Arc::clone(&redeem_history),
         Arc::clone(&recent_orders),
