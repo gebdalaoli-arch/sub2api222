@@ -13,6 +13,7 @@ export component LoginScene inherits Rectangle {
     in-out property <string> new-password;
     in-out property <bool> remember-password: true;
     in-out property <bool> auto-login: false;
+    in-out property <bool> auth-busy: false;
     in-out property <bool> show-totp-field: false;
     in-out property <int> auth-subview: 0;
     in-out property <bool> showing-announcements: false;
@@ -114,6 +115,7 @@ export component LoginScene inherits Rectangle {
         verification-code <=> root.verification-code;
         remember-password <=> root.remember-password;
         auto-login <=> root.auto-login;
+        busy: root.auth-busy;
         show-totp-field: root.show-totp-field;
         status-text: root.auth-status-text;
         login-requested => { root.login-requested(); }

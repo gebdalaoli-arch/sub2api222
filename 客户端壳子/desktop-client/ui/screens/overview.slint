@@ -76,9 +76,9 @@ export component OverviewScreen inherits Rectangle {
             x: parent.width - 168px;
             y: parent.height - 72px;
             width: 136px; height: 44px;
-            background: #006499;
+            launch-touch := TouchArea { clicked => { root.open-launch-requested(); } }
+            background: launch-touch.pressed ? #00527d : #006499;
             border-radius: 4px;
-            TouchArea { clicked => { root.open-launch-requested(); } }
             Text {
                 width: parent.width; height: parent.height;
                 text: "立即进入 →";
@@ -138,9 +138,9 @@ export component OverviewScreen inherits Rectangle {
             y: parent.height - 64px;
             width: (parent.width - 72px) / 2;
             height: 36px;
-            background: #bdece2; // secondary-container
+            billing-touch-primary := TouchArea { clicked => { root.open-billing-requested(); } }
+            background: billing-touch-primary.pressed ? #9fd8cc : #bdece2; // secondary-container
             border-radius: 4px;
-            TouchArea { clicked => { root.open-billing-requested(); } }
             Text {
                 width: parent.width; height: parent.height;
                 text: "兑换";
@@ -157,11 +157,11 @@ export component OverviewScreen inherits Rectangle {
             y: parent.height - 64px;
             width: (parent.width - 72px) / 2;
             height: 36px;
-            background: transparent;
+            billing-touch-secondary := TouchArea { clicked => { root.open-billing-requested(); } }
+            background: billing-touch-secondary.pressed ? #eef3f7 : transparent;
             border-radius: 4px;
             border-color: #acb3b74d; // outline-variant 30%
             border-width: 1px;
-            TouchArea { clicked => { root.open-billing-requested(); } }
             Text {
                 width: parent.width; height: parent.height;
                 text: "明细";
@@ -197,9 +197,9 @@ export component OverviewScreen inherits Rectangle {
         Rectangle {
             x: 24px; y: 60px;
             width: parent.item-w; height: 60px;
-            background: #f7f9fb;
+            help-touch-1 := TouchArea { clicked => { root.open-help-requested(); } }
+            background: help-touch-1.pressed ? #eaeff2 : #f7f9fb;
             border-radius: 8px;
-            TouchArea { clicked => { root.open-help-requested(); } }
             Text { x: 16px; y: 12px; text: "配置工作区"; color: #2c3437; font-size: 14px; font-weight: 600; }
             Text { x: 16px; y: 34px; text: "管理快捷键与界面偏好"; color: #596064; font-size: 12px; }
         }
@@ -207,9 +207,9 @@ export component OverviewScreen inherits Rectangle {
         Rectangle {
             x: 36px + parent.item-w; y: 60px;
             width: parent.item-w; height: 60px;
-            background: #f7f9fb;
+            help-touch-2 := TouchArea { clicked => { root.open-help-requested(); } }
+            background: help-touch-2.pressed ? #eaeff2 : #f7f9fb;
             border-radius: 8px;
-            TouchArea { clicked => { root.open-help-requested(); } }
             Text { x: 16px; y: 12px; text: "在线支持"; color: #2c3437; font-size: 14px; font-weight: 600; }
             Text { x: 16px; y: 34px; text: "联系技术顾问获取帮助"; color: #596064; font-size: 12px; }
         }
@@ -217,9 +217,9 @@ export component OverviewScreen inherits Rectangle {
         Rectangle {
             x: 48px + parent.item-w * 2; y: 60px;
             width: parent.item-w; height: 60px;
-            background: #f7f9fb;
+            help-touch-3 := TouchArea { clicked => { root.open-help-requested(); } }
+            background: help-touch-3.pressed ? #eaeff2 : #f7f9fb;
             border-radius: 8px;
-            TouchArea { clicked => { root.open-help-requested(); } }
             Text { x: 16px; y: 12px; text: "用户手册"; color: #2c3437; font-size: 14px; font-weight: 600; }
             Text { x: 16px; y: 34px; text: "查阅最新版本功能说明"; color: #596064; font-size: 12px; }
         }

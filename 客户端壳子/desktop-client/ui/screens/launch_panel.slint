@@ -74,9 +74,9 @@ export component LaunchPanel inherits Rectangle {
         Rectangle {
             x: 4px; y: 4px;
             width: 168px; height: 36px;
-            background: !root.cli-mode ? #ffffff : transparent;
+            desktop-mode-touch := TouchArea { clicked => { root.cli-mode = false; } }
+            background: desktop-mode-touch.pressed ? #eaeff2 : (!root.cli-mode ? #ffffff : transparent);
             border-radius: 4px;
-            TouchArea { clicked => { root.cli-mode = false; } }
             Text {
                 width: parent.width; height: parent.height;
                 text: "桌面版";
@@ -91,9 +91,9 @@ export component LaunchPanel inherits Rectangle {
         Rectangle {
             x: 176px; y: 4px;
             width: 120px; height: 36px;
-            background: root.cli-mode ? #ffffff : transparent;
+            cli-mode-touch := TouchArea { clicked => { root.cli-mode = true; } }
+            background: cli-mode-touch.pressed ? #eaeff2 : (root.cli-mode ? #ffffff : transparent);
             border-radius: 4px;
-            TouchArea { clicked => { root.cli-mode = true; } }
             Text {
                 width: parent.width; height: parent.height;
                 text: "CLI";
@@ -129,14 +129,14 @@ export component LaunchPanel inherits Rectangle {
         y: parent.height - 120px;
         width: parent.width - 80px;
         height: 52px;
-        background: #006499;
-        border-radius: 8px;
-        TouchArea {
+        launch-touch := TouchArea {
             clicked => {
                 if (root.cli-mode) { root.launch-platform-cli-requested(); }
                 else { root.launch-platform-desktop-requested(); }
             }
         }
+        background: launch-touch.pressed ? #00527d : #006499;
+        border-radius: 8px;
         Text {
             width: parent.width; height: parent.height;
             text: root.cli-mode ? "立即启动 CLI" : "立即启动桌面版";

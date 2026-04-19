@@ -1,5 +1,7 @@
 use anyhow::Result;
+use directories::ProjectDirs;
 use keyring::Entry;
+use std::path::PathBuf;
 
 const SERVICE_NAME: &str = "sub2api-desktop";
 
@@ -14,6 +16,7 @@ pub struct SystemCredentialStore {
     service_name: String,
     refresh_token_account_name: String,
     password_account_name: String,
+    fallback_root: PathBuf,
 }
 
 impl SystemCredentialStore {
@@ -23,6 +26,7 @@ impl SystemCredentialStore {
             service_name: SERVICE_NAME.to_string(),
             refresh_token_account_name: format!("refresh-token:{device_id}"),
             password_account_name: format!("password:{device_id}"),
+            fallback_root: fallback_root_for_device(&device_id),
         }
     }
 
@@ -43,57 +47,80 @@ impl SystemCredentialStore {
     }
 
     fn password_entry(&self) -> Result<Entry> {
-        Ok(Entry::new(self.service_name(), self.password_account_name())?)
+        Ok(Entry::new(
+            self.service_name(),
+            self.password_account_name(),
+        )?)
+    }
+
+    fn fallback_refresh_token_store(&self) -> FileCredentialStore {
+        FileCredentialStore::new(self.fallback_root.clone())
+    }
+
+    fn fallback_password_store(&self) -> FileCredentialStore {
+        FileCredentialStore::new(self.fallback_root.clone())
     }
 
     pub fn save_password(&self, password: &str) -> Result<()> {
-        Ok(self.password_entry()?.set_password(password)?)
+        match self.password_entry()?.set_password(password) {
+            Ok(()) => Ok(()),
+            Err(_) => self.fallback_password_store().save_password(password),
+        }
     }
 
     pub fn load_password(&self) -> Result<Option<String>> {
         match self.password_entry()?.get_password() {
             Ok(password) => Ok(Some(password)),
-            Err(keyring::Error::NoEntry) => Ok(None),
-            Err(error) => Err(error.into()),
+            Err(keyring::Error::NoEntry) => self.fallback_password_store().load_password(),
+            Err(_) => self.fallback_password_store().load_password(),
         }
     }
 
     pub fn clear_password(&self) -> Result<()> {
-        match self.password_entry()?.delete_credential() {
+        let keyring_result: Result<()> = match self.password_entry()?.delete_credential() {
             Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
             Err(error) => Err(error.into()),
-        }
+        };
+        let file_result = self.fallback_password_store().clear_password();
+        keyring_result.or(file_result)
     }
 }
 
 impl RefreshTokenStore for SystemCredentialStore {
     fn save_refresh_token(&self, token: &str) -> Result<()> {
-        Ok(self.refresh_token_entry()?.set_password(token)?)
+        match self.refresh_token_entry()?.set_password(token) {
+            Ok(()) => Ok(()),
+            Err(_) => self
+                .fallback_refresh_token_store()
+                .save_refresh_token(token),
+        }
     }
 
     fn load_refresh_token(&self) -> Result<Option<String>> {
         match self.refresh_token_entry()?.get_password() {
             Ok(token) => Ok(Some(token)),
-            Err(keyring::Error::NoEntry) => Ok(None),
-            Err(error) => Err(error.into()),
+            Err(keyring::Error::NoEntry) => {
+                self.fallback_refresh_token_store().load_refresh_token()
+            }
+            Err(_) => self.fallback_refresh_token_store().load_refresh_token(),
         }
     }
 
     fn clear_refresh_token(&self) -> Result<()> {
-        match self.refresh_token_entry()?.delete_credential() {
+        let keyring_result: Result<()> = match self.refresh_token_entry()?.delete_credential() {
             Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
             Err(error) => Err(error.into()),
-        }
+        };
+        let file_result = self.fallback_refresh_token_store().clear_refresh_token();
+        keyring_result.or(file_result)
     }
 }
 
-#[cfg(test)]
 #[derive(Debug, Clone)]
 pub struct FileCredentialStore {
     root: std::path::PathBuf,
 }
 
-#[cfg(test)]
 impl FileCredentialStore {
     pub fn new(root: std::path::PathBuf) -> Self {
         Self { root }
@@ -130,7 +157,6 @@ impl FileCredentialStore {
     }
 }
 
-#[cfg(test)]
 impl RefreshTokenStore for FileCredentialStore {
     fn save_refresh_token(&self, token: &str) -> Result<()> {
         std::fs::create_dir_all(&self.root)?;
@@ -153,6 +179,19 @@ impl RefreshTokenStore for FileCredentialStore {
         }
         Ok(())
     }
+}
+
+fn fallback_root_for_device(device_id: &str) -> PathBuf {
+    if let Some(dirs) = ProjectDirs::from("com", "sub2api", "TokenClient") {
+        return dirs
+            .data_local_dir()
+            .join("credentials")
+            .join(device_id.replace(':', "_"));
+    }
+    std::env::temp_dir()
+        .join("sub2api-desktop-client")
+        .join("credentials")
+        .join(device_id.replace(':', "_"))
 }
 
 #[cfg(test)]
@@ -191,7 +230,10 @@ mod tests {
         let store = FileCredentialStore::new(dir.path().to_path_buf());
 
         store.save_password("secret-123").unwrap();
-        assert_eq!(store.load_password().unwrap().as_deref(), Some("secret-123"));
+        assert_eq!(
+            store.load_password().unwrap().as_deref(),
+            Some("secret-123")
+        );
 
         store.clear_password().unwrap();
         assert_eq!(store.load_password().unwrap(), None);

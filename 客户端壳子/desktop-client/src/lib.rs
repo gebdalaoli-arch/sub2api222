@@ -47,14 +47,19 @@ mod tests {
         let app_window = std::fs::read_to_string(manifest_dir.join("ui/app-window.slint")).unwrap();
         let brand_panel =
             std::fs::read_to_string(manifest_dir.join("ui/components/brand_panel.slint")).unwrap();
+        let main_rs = std::fs::read_to_string(manifest_dir.join("src/main.rs")).unwrap();
 
         assert!(login.contains("账户登录"));
         assert!(login.contains("记住密码"));
-        assert!(login.contains("免登录"));
-        assert!(login.contains("text: \"登录\""));
+        assert!(login.contains("自动登录"));
+        assert!(login.contains("root.status-text"));
+        assert!(login.contains("登录中..."));
         assert!(login_scene.contains("欢迎王者归来"));
+        assert!(login_scene.contains("auth-busy"));
         assert!(app_window.contains("一键开整"));
+        assert!(app_window.contains("in-out property <bool> auth-busy"));
         assert!(brand_panel.contains("极简，极速，极度专注。"));
+        assert!(main_rs.contains("windows_subsystem = \"windows\""));
         assert!(!login.contains("登录与注册"));
         assert!(!app_window.contains("Sub2API Desktop Client"));
         assert!(!login_scene.contains("ETHEREAL"));

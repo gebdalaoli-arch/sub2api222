@@ -1,3 +1,8 @@
+#![cfg_attr(
+    all(target_os = "windows", not(debug_assertions)),
+    windows_subsystem = "windows"
+)]
+
 slint::include_modules!();
 
 use slint::{ModelRc, SharedString, VecModel};
@@ -634,15 +639,18 @@ fn wire_auth_callbacks(
         ) {
             Ok(submission) => submission,
             Err(message) => {
+                app.set_auth_busy(false);
                 app.set_auth_status_text(SharedString::from(message));
                 return;
             }
         };
         if let Some(message) = login_config.packaged_local_debug_api_message() {
+            app.set_auth_busy(false);
             app.set_auth_status_text(SharedString::from(message));
             return;
         }
 
+        app.set_auth_busy(true);
         app.set_auth_status_text(SharedString::from("正在处理登录请求..."));
         let ui_handle = login_app.clone();
         let config = Arc::clone(&login_config);
@@ -715,6 +723,7 @@ fn wire_auth_callbacks(
                     let usage_vm = current_usage_vm(&usage_page);
                     let group_count = Some(groups_snapshot.len());
                     let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                        app.set_auth_busy(false);
                         if let Some(session) =
                             auth_session.lock().ok().and_then(|state| state.clone())
                         {
@@ -746,12 +755,14 @@ fn wire_auth_callbacks(
                         None => "检测到二步验证，请在“验证码 / 2FA”输入框填写 6 位动态码后再次点击登录。".to_string(),
                     };
                     let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                        app.set_auth_busy(false);
                         app.set_auth_status_text(SharedString::from(message));
                         app.set_show_login_totp(true);
                     });
                 }
                 Err(error) => {
                     let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                        app.set_auth_busy(false);
                         app.set_auth_status_text(SharedString::from(format!("登录失败：{error}")))
                     });
                 }
@@ -788,13 +799,16 @@ fn wire_auth_callbacks(
         }
         .sanitized();
         if email.trim().is_empty() || password.is_empty() {
+            app.set_auth_busy(false);
             app.set_auth_status_text(SharedString::from("注册前请填写邮箱、密码和邮箱验证码。"));
             return;
         }
         if let Some(message) = register_config.packaged_local_debug_api_message() {
+            app.set_auth_busy(false);
             app.set_auth_status_text(SharedString::from(message));
             return;
         }
+        app.set_auth_busy(true);
         app.set_auth_status_text(SharedString::from("正在提交注册请求..."));
 
         let ui_handle = register_app.clone();
@@ -854,6 +868,7 @@ fn wire_auth_callbacks(
                     let usage_vm = current_usage_vm(&usage_page);
                     let group_count = Some(groups_snapshot.len());
                     let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                        app.set_auth_busy(false);
                         if let Some(session) =
                             auth_session.lock().ok().and_then(|state| state.clone())
                         {
@@ -877,6 +892,7 @@ fn wire_auth_callbacks(
                 }
                 Err(error) => {
                     let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                        app.set_auth_busy(false);
                         app.set_auth_status_text(SharedString::from(format!("注册失败：{error}")))
                     });
                 }
@@ -892,13 +908,16 @@ fn wire_auth_callbacks(
         };
         let email = app.get_email().to_string();
         if email.trim().is_empty() {
+            app.set_auth_busy(false);
             app.set_auth_status_text(SharedString::from("发送验证码前请先填写邮箱。"));
             return;
         }
         if let Some(message) = verify_config.packaged_local_debug_api_message() {
+            app.set_auth_busy(false);
             app.set_auth_status_text(SharedString::from(message));
             return;
         }
+        app.set_auth_busy(true);
         app.set_auth_status_text(SharedString::from("正在发送验证码..."));
 
         let ui_handle = verify_app.clone();
@@ -909,11 +928,13 @@ fn wire_auth_callbacks(
                 Ok(response) => {
                     let message = format!("验证码已发送，{} 秒后可再次发送。", response.countdown);
                     let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                        app.set_auth_busy(false);
                         app.set_auth_status_text(SharedString::from(message))
                     });
                 }
                 Err(error) => {
                     let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                        app.set_auth_busy(false);
                         app.set_auth_status_text(SharedString::from(format!(
                             "发送验证码失败：{error}"
                         )))
@@ -931,13 +952,16 @@ fn wire_auth_callbacks(
         };
         let email = app.get_email().to_string();
         if email.trim().is_empty() {
+            app.set_auth_busy(false);
             app.set_reset_status_text(SharedString::from("请先填写重置邮箱。"));
             return;
         }
         if let Some(message) = forgot_config.packaged_local_debug_api_message() {
+            app.set_auth_busy(false);
             app.set_reset_status_text(SharedString::from(message));
             return;
         }
+        app.set_auth_busy(true);
         app.set_reset_status_text(SharedString::from("正在发送重置邮件..."));
 
         let ui_handle = forgot_app.clone();
@@ -950,11 +974,13 @@ fn wire_auth_callbacks(
             ) {
                 Ok(response) => {
                     let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                        app.set_auth_busy(false);
                         app.set_reset_status_text(SharedString::from(response.message))
                     });
                 }
                 Err(error) => {
                     let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                        app.set_auth_busy(false);
                         app.set_reset_status_text(SharedString::from(format!(
                             "发送重置邮件失败：{error}"
                         )))
@@ -974,13 +1000,16 @@ fn wire_auth_callbacks(
         let reset_token = app.get_reset_token().to_string();
         let new_password = app.get_new_password().to_string();
         if email.trim().is_empty() || reset_token.trim().is_empty() || new_password.is_empty() {
+            app.set_auth_busy(false);
             app.set_reset_status_text(SharedString::from("请填写邮箱、邮件重置码和新密码。"));
             return;
         }
         if let Some(message) = reset_config.packaged_local_debug_api_message() {
+            app.set_auth_busy(false);
             app.set_reset_status_text(SharedString::from(message));
             return;
         }
+        app.set_auth_busy(true);
         app.set_reset_status_text(SharedString::from("正在重置密码..."));
 
         let ui_handle = reset_app.clone();
@@ -992,11 +1021,13 @@ fn wire_auth_callbacks(
             match reset_password_blocking(&client, &request) {
                 Ok(response) => {
                     let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                        app.set_auth_busy(false);
                         app.set_reset_status_text(SharedString::from(response.message))
                     });
                 }
                 Err(error) => {
                     let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                        app.set_auth_busy(false);
                         app.set_reset_status_text(SharedString::from(format!(
                             "重置密码失败：{error}"
                         )))
@@ -2692,6 +2723,7 @@ fn apply_launch_state(app: &AppWindow, targets: &[InstalledTarget]) {
 
 fn apply_logged_out_state(app: &AppWindow) {
     app.set_session_active(false);
+    app.set_auth_busy(false);
     app.set_auth_subview(0);
     app.set_show_login_totp(false);
     app.set_current_section(0);
@@ -2719,6 +2751,7 @@ fn apply_authenticated_state(
     billing_summary: Option<&BillingSummary>,
 ) {
     app.set_session_active(true);
+    app.set_auth_busy(false);
     app.set_auth_subview(0);
     app.set_show_login_totp(false);
     app.set_current_section(0);

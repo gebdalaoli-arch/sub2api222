@@ -37,6 +37,7 @@ export component AppWindow inherits Window {
     in-out property <string> dashboard-notice-text: "计费中心已支持余额、套餐、订单与兑换记录的统一查看。";
     in-out property <bool> remember-password: true;
     in-out property <bool> auto-login: false;
+    in-out property <bool> auth-busy: false;
     in-out property <bool> show-login-totp: false;
     in-out property <bool> session-active: false;
     in-out property <int> auth-subview: 0;
@@ -163,9 +164,9 @@ export component AppWindow inherits Window {
             Rectangle {
                 x: 24px; y: 96px;
                 width: 208px; height: 44px;
-                background: root.current-section == 0 ? #ffffff : transparent;
+                nav-touch-0 := TouchArea { clicked => { root.current-section = 0; } }
+                background: nav-touch-0.pressed ? #eaeff2 : (root.current-section == 0 ? #ffffff : transparent);
                 border-radius: 8px;
-                TouchArea { clicked => { root.current-section = 0; } }
                 Text {
                     x: 44px; y: 12px;
                     text: "总览";
@@ -179,9 +180,9 @@ export component AppWindow inherits Window {
             Rectangle {
                 x: 24px; y: 144px;
                 width: 208px; height: 44px;
-                background: root.current-section == 1 ? #ffffff : transparent;
+                nav-touch-1 := TouchArea { clicked => { root.current-section = 1; } }
+                background: nav-touch-1.pressed ? #eaeff2 : (root.current-section == 1 ? #ffffff : transparent);
                 border-radius: 8px;
-                TouchArea { clicked => { root.current-section = 1; } }
                 Text {
                     x: 44px; y: 12px;
                     text: "启动 Codex";
@@ -195,9 +196,9 @@ export component AppWindow inherits Window {
             Rectangle {
                 x: 24px; y: 192px;
                 width: 208px; height: 44px;
-                background: root.current-section == 2 ? #ffffff : transparent;
+                nav-touch-2 := TouchArea { clicked => { root.current-section = 2; } }
+                background: nav-touch-2.pressed ? #eaeff2 : (root.current-section == 2 ? #ffffff : transparent);
                 border-radius: 8px;
-                TouchArea { clicked => { root.current-section = 2; } }
                 Text {
                     x: 44px; y: 12px;
                     text: "计费中心";
@@ -211,9 +212,9 @@ export component AppWindow inherits Window {
             Rectangle {
                 x: 24px; y: 240px;
                 width: 208px; height: 44px;
-                background: root.current-section == 3 ? #ffffff : transparent;
+                nav-touch-3 := TouchArea { clicked => { root.current-section = 3; } }
+                background: nav-touch-3.pressed ? #eaeff2 : (root.current-section == 3 ? #ffffff : transparent);
                 border-radius: 8px;
-                TouchArea { clicked => { root.current-section = 3; } }
                 Text {
                     x: 44px; y: 12px;
                     text: "消费明细";
@@ -227,9 +228,9 @@ export component AppWindow inherits Window {
             Rectangle {
                 x: 24px; y: 288px;
                 width: 208px; height: 44px;
-                background: root.current-section == 4 ? #ffffff : transparent;
+                nav-touch-4 := TouchArea { clicked => { root.current-section = 4; } }
+                background: nav-touch-4.pressed ? #eaeff2 : (root.current-section == 4 ? #ffffff : transparent);
                 border-radius: 8px;
-                TouchArea { clicked => { root.current-section = 4; } }
                 Text {
                     x: 44px; y: 12px;
                     text: "设置与帮助";
@@ -492,6 +493,7 @@ export component AppWindow inherits Window {
             new-password <=> root.new-password;
             remember-password <=> root.remember-password;
             auto-login <=> root.auto-login;
+            auth-busy <=> root.auth-busy;
             show-totp-field <=> root.show-login-totp;
             auth-subview <=> root.auth-subview;
             showing-announcements: root.current-section == 5;

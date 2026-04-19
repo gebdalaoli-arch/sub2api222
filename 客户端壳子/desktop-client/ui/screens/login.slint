@@ -8,6 +8,7 @@ export component LoginScreen inherits Rectangle {
     in-out property <bool> auto-login: false;
     in property <bool> show-totp-field: false;
     in property <string> status-text: "请输入邮箱和密码。";
+    in property <bool> busy: false;
 
     callback login-requested();
     callback open-register-requested();
@@ -88,9 +89,15 @@ export component LoginScreen inherits Rectangle {
         y: root.opts-y;
         width: 92px;
         height: 32px;
-        background: root.remember-password ? #eaeff2 : #f7f9fb;
+        remember-touch := TouchArea {
+            enabled: !root.busy;
+            clicked => {
+                root.remember-password = !root.remember-password;
+                if (!root.remember-password) { root.auto-login = false; }
+            }
+        }
+        background: remember-touch.pressed ? #d7e4f0 : (root.remember-password ? #eaeff2 : #f7f9fb);
         border-radius: 4px;
-        TouchArea { clicked => { root.remember-password = !root.remember-password; if (!root.remember-password) { root.auto-login = false; } } }
         Text {
             x: 12px; y: 8px;
             text: "记住密码";
@@ -103,14 +110,17 @@ export component LoginScreen inherits Rectangle {
     Rectangle {
         x: 148px;
         y: root.opts-y;
-        width: 92px;
+        width: 108px;
         height: 32px;
-        background: root.remember-password && root.auto-login ? #eaeff2 : #f7f9fb;
+        auto-touch := TouchArea {
+            enabled: root.remember-password && !root.busy;
+            clicked => { if (root.remember-password) { root.auto-login = !root.auto-login; } }
+        }
+        background: auto-touch.pressed ? #d7e4f0 : (root.remember-password && root.auto-login ? #eaeff2 : #f7f9fb);
         border-radius: 4px;
-        TouchArea { clicked => { if (root.remember-password) { root.auto-login = !root.auto-login; } } }
         Text {
             x: 12px; y: 8px;
-            text: "免登录";
+            text: "自动登录";
             color: root.remember-password ? (root.auto-login ? #2c3437 : #596064) : #596064;
             font-size: 14px;
             font-weight: 500;
@@ -125,12 +135,15 @@ export component LoginScreen inherits Rectangle {
         y: root.btn-y;
         width: parent.width - 80px;
         height: 48px;
-        background: #006499;
+        login-touch := TouchArea {
+            enabled: !root.busy;
+            clicked => { root.login-requested(); }
+        }
+        background: login-touch.pressed ? #00527d : #006499;
         border-radius: 4px;
-        TouchArea { clicked => { root.login-requested(); } }
         Text {
             width: parent.width; height: parent.height;
-            text: "登录";
+            text: root.busy ? "登录中..." : "登录";
             color: #f6f9ff;
             font-size: 14px;
             font-weight: 500;
@@ -139,18 +152,28 @@ export component LoginScreen inherits Rectangle {
         }
     }
 
+    Text {
+        x: 40px;
+        y: root.btn-y + 60px;
+        width: parent.width - 80px;
+        text: root.status-text;
+        color: root.busy ? #006499 : #596064;
+        font-size: 12px;
+        wrap: word-wrap;
+    }
+
     // ─── Secondary links ───
-    property <length> links-y: root.show-totp-field ? 476px : 394px;
+    property <length> links-y: root.show-totp-field ? 500px : 418px;
 
     Rectangle {
         x: 40px;
         y: root.links-y;
         width: 64px; height: 20px;
         background: transparent;
-        TouchArea { clicked => { root.open-register-requested(); } }
+        register-touch := TouchArea { enabled: !root.busy; clicked => { root.open-register-requested(); } }
         Text {
             text: "立即注册";
-            color: #006499;
+            color: register-touch.pressed ? #00527d : #006499;
             font-size: 11px;
             font-weight: 500;
         }
@@ -161,10 +184,10 @@ export component LoginScreen inherits Rectangle {
         y: root.links-y;
         width: 72px; height: 20px;
         background: transparent;
-        TouchArea { clicked => { root.open-forgot-password-requested(); } }
+        forgot-touch := TouchArea { enabled: !root.busy; clicked => { root.open-forgot-password-requested(); } }
         Text {
             text: "忘记密码？";
-            color: #596064;
+            color: forgot-touch.pressed ? #2c3437 : #596064;
             font-size: 11px;
             font-weight: 500;
         }
