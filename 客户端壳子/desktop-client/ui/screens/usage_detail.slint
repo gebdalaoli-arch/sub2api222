@@ -1,0 +1,124 @@
+import { Button } from "std-widgets.slint";
+
+export component UsageDetailScreen inherits Rectangle {
+    in property <string> summary-title: "最近 0 条消费明细";
+    in property <string> total-requests-text: "0";
+    in property <string> total-tokens-text: "0";
+    in property <string> total-actual-cost-text: "$0.000000";
+    in property <[string]> usage-lines: ["登录后可查看模型、Token、时间与费用明细。"];
+    in property <string> status-text: "登录后可查看消费明细。";
+
+    callback refresh-requested();
+
+    background: #ffffff;
+    border-radius: 12px;
+    border-color: #d7e4f0;
+    border-width: 0px;
+
+    Text {
+        x: 24px;
+        y: 20px;
+        text: "消费明细";
+        color: #2c3437;
+        font-size: 28px;
+        font-weight: 800;
+    }
+
+    Text {
+        x: 24px;
+        y: 58px;
+        width: parent.width - 160px;
+        text: "按时间倒序查看每次调用的模型、Token 消耗、请求时间与费用。";
+        color: #596064;
+        font-size: 13px;
+        wrap: word-wrap;
+    }
+
+    Button {
+        x: parent.width - 120px;
+        y: 22px;
+        width: 96px;
+        height: 36px;
+        text: "刷新";
+        clicked => { root.refresh-requested(); }
+    }
+
+    Rectangle {
+        x: 24px;
+        y: 108px;
+        width: (parent.width - 64px) / 3;
+        height: 88px;
+        background: #f7f9fb;
+        border-radius: 12px;
+        Text { x: 16px; y: 16px; text: "当前页请求数"; color: #596064; font-size: 12px; font-weight: 700; }
+        Text { x: 16px; y: 42px; text: root.total-requests-text; color: #2c3437; font-size: 24px; font-weight: 800; }
+    }
+
+    Rectangle {
+        x: 32px + (parent.width - 64px) / 3;
+        y: 108px;
+        width: (parent.width - 64px) / 3;
+        height: 88px;
+        background: #f7f9fb;
+        border-radius: 12px;
+        Text { x: 16px; y: 16px; text: "当前页总 Token"; color: #596064; font-size: 12px; font-weight: 700; }
+        Text { x: 16px; y: 42px; text: root.total-tokens-text; color: #2c3437; font-size: 24px; font-weight: 800; }
+    }
+
+    Rectangle {
+        x: 40px + ((parent.width - 64px) / 3) * 2;
+        y: 108px;
+        width: (parent.width - 64px) / 3;
+        height: 88px;
+        background: #f7f9fb;
+        border-radius: 12px;
+        Text { x: 16px; y: 16px; text: "当前页费用"; color: #596064; font-size: 12px; font-weight: 700; }
+        Text { x: 16px; y: 42px; text: root.total-actual-cost-text; color: #2c3437; font-size: 24px; font-weight: 800; }
+    }
+
+    Rectangle {
+        x: 24px;
+        y: 214px;
+        width: parent.width - 48px;
+        height: 48px;
+        background: #eef8ff;
+        border-radius: 10px;
+        Text {
+            x: 16px;
+            y: 14px;
+            width: parent.width - 32px;
+            text: root.summary-title + " · " + root.status-text;
+            color: #596064;
+            font-size: 12px;
+            wrap: word-wrap;
+        }
+    }
+
+    Rectangle {
+        x: 24px;
+        y: 278px;
+        width: parent.width - 48px;
+        height: parent.height - 302px;
+        background: #eaeff2;
+        border-radius: 20px;
+
+        for line[index] in root.usage-lines : Rectangle {
+            x: 18px;
+            y: 18px + index * 88px;
+            width: parent.width - 36px;
+            height: 76px;
+            background: #ffffff;
+            border-radius: 12px;
+
+            Text {
+                x: 14px;
+                y: 12px;
+                width: parent.width - 28px;
+                text: line;
+                color: #596064;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
+        }
+    }
+}

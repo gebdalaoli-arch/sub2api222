@@ -81,7 +81,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\sign-desktop-installer.ps1
 
 ## 当前边界
 
-- 已有：亮色桌面应用壳、基础路由枚举、账号认证 JSON 契约、2FA 登录响应契约、`/auth/me`、`/groups/available`、`/redeem`、`/redeem/history`、`/subscriptions/summary`、`/payment/checkout-info`、`/payment/orders`、`/payment/orders/my`、desktop session create/refresh/revoke 调用层、HTTP 错误保真、系统凭据存储接口、登录/注册/邮箱验证码/忘记密码/CDK 兑换 UI 与主程序接线、Codex Desktop/CLI 安装检测、官方模式启动、平台代理模式启动、受管 home/runtime 元数据、平台会话自动续期与退出回收、真实计费详情页、桌面端充值/套餐下单入口、设置页更新检查与官方模式保底入口、Windows 安装包脚本与 SHA256 输出。
+- 已有：亮色桌面应用壳、基础路由枚举、账号认证 JSON 契约、2FA 登录响应契约、`/auth/me`、`/groups/available`、`/redeem`、`/redeem/history`、`/subscriptions/summary`、`/payment/checkout-info`、`/payment/orders`、`/payment/orders/my`、`/usage`、desktop session create/refresh/revoke 调用层、HTTP 错误保真、系统凭据存储接口、登录/注册/邮箱验证码/忘记密码/CDK 兑换 UI 与主程序接线、Codex Desktop/CLI 安装检测、官方模式启动、平台代理模式启动、受管 home/runtime 元数据、平台会话自动续期与退出回收、真实计费详情页、桌面端充值/套餐下单入口、消费明细页、设置页更新检查与官方模式保底入口、Windows 安装包脚本与 SHA256 输出。
 - Windows 边界：Windows Store 安装的 Codex Desktop 官方模式仍使用 `shell:AppsFolder`；平台代理模式当前直接写入用户 `~/.codex` 的受管契约并走 shell 启动路径，用于绕开 VMware 客机中直接执行 `WindowsApps\...\app\Codex.exe` 触发的 `os error 5`。
 - 未接入：真实证书签名执行、生产 API 地址固化后的最终发布包、服务端尚未落地的桌面支付增强接口。
 - 安全约束：后续 UI 仍不展示连接密钥、服务地址或 runtime 凭证；refresh token 默认走系统凭据存储，文件实现仅作为测试替身。

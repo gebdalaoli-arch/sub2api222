@@ -10,6 +10,7 @@ import { LoginScreen } from "screens/login.slint";
 import { OverviewScreen } from "screens/overview.slint";
 import { RegisterPanel } from "screens/register_panel.slint";
 import { UpdateDialog } from "screens/update_dialog.slint";
+import { UsageDetailScreen } from "screens/usage_detail.slint";
 
 export component AppWindow inherits Window {
     width: 1280px;
@@ -57,6 +58,12 @@ export component AppWindow inherits Window {
     in-out property <[string]> billing-subscription-plan-options: ["暂无可用套餐"];
     in-out property <int> billing-selected-subscription-plan-index: 0;
     in-out property <string> billing-checkout-status-text: "支付创建后会在这里显示状态。";
+    in-out property <string> usage-summary-title: "最近 0 条消费明细";
+    in-out property <string> usage-total-requests-text: "0";
+    in-out property <string> usage-total-tokens-text: "0";
+    in-out property <string> usage-total-actual-cost-text: "$0.000000";
+    in-out property <[string]> usage-lines: ["登录后可查看模型、Token、时间与费用明细。"];
+    in-out property <string> usage-status-text: "登录后可查看消费明细。";
     in-out property <int> current-section: 0;
     in-out property <[string]> launch-group-options: ["登录后加载可用分组"];
     in-out property <int> launch-selected-group-index: 0;
@@ -88,6 +95,7 @@ export component AppWindow inherits Window {
     callback billing-subscription-requested();
     callback billing-open-last-payment-requested();
     callback billing-refresh-requested();
+    callback usage-refresh-requested();
     callback manual-update-check-requested();
     callback update-primary-requested();
     callback update-secondary-requested();
@@ -186,7 +194,7 @@ export component AppWindow inherits Window {
                 }
             }
 
-            // Nav 3: 设置与帮助
+            // Nav 3: 消费明细
             Rectangle {
                 x: 24px; y: 240px;
                 width: 208px; height: 44px;
@@ -195,10 +203,26 @@ export component AppWindow inherits Window {
                 TouchArea { clicked => { root.current-section = 3; } }
                 Text {
                     x: 44px; y: 12px;
-                    text: "设置与帮助";
+                    text: "消费明细";
                     color: root.current-section == 3 ? #006499 : #51616b;
                     font-size: 14px;
                     font-weight: root.current-section == 3 ? 700 : 400;
+                }
+            }
+
+            // Nav 4: 设置与帮助
+            Rectangle {
+                x: 24px; y: 288px;
+                width: 208px; height: 44px;
+                background: root.current-section == 4 ? #ffffff : transparent;
+                border-radius: 8px;
+                TouchArea { clicked => { root.current-section = 4; } }
+                Text {
+                    x: 44px; y: 12px;
+                    text: "设置与帮助";
+                    color: root.current-section == 4 ? #006499 : #51616b;
+                    font-size: 14px;
+                    font-weight: root.current-section == 4 ? 700 : 400;
                 }
             }
         }
@@ -224,7 +248,7 @@ export component AppWindow inherits Window {
                 width: 32px; height: 32px;
                 background: transparent;
                 border-radius: 16px;
-                TouchArea { clicked => { root.current-section = 4; } }
+                TouchArea { clicked => { root.current-section = 5; } }
                 Text { x: 6px; y: 6px; text: "🔔"; font-size: 16px; }
             }
         }
@@ -366,8 +390,30 @@ export component AppWindow inherits Window {
             }
         }
 
-        // ═══ Section 3: 设置与帮助 ═══
+        // ═══ Section 3: 消费明细 ═══
         if root.current-section == 3: Rectangle {
+            x: 256px + 48px;
+            y: 64px + 48px;
+            width: parent.width - 256px - 96px;
+            height: parent.height - 64px - 96px;
+            background: transparent;
+
+            UsageDetailScreen {
+                x: 0px; y: 0px;
+                width: parent.width;
+                height: parent.height;
+                summary-title: root.usage-summary-title;
+                total-requests-text: root.usage-total-requests-text;
+                total-tokens-text: root.usage-total-tokens-text;
+                total-actual-cost-text: root.usage-total-actual-cost-text;
+                usage-lines: root.usage-lines;
+                status-text: root.usage-status-text;
+                refresh-requested => { root.usage-refresh-requested(); }
+            }
+        }
+
+        // ═══ Section 4: 设置与帮助 ═══
+        if root.current-section == 4: Rectangle {
             x: 256px + 48px;
             y: 64px + 48px;
             width: parent.width - 256px - 96px;
@@ -388,8 +434,8 @@ export component AppWindow inherits Window {
             }
         }
 
-        // ═══ Section 4: 公告中心 ═══
-        if root.current-section == 4: Rectangle {
+        // ═══ Section 5: 公告中心 ═══
+        if root.current-section == 5: Rectangle {
             x: 256px + 48px;
             y: 64px + 48px;
             width: parent.width - 256px - 96px;
@@ -422,7 +468,7 @@ export component AppWindow inherits Window {
             auto-login <=> root.auto-login;
             show-totp-field <=> root.show-login-totp;
             auth-subview <=> root.auth-subview;
-            showing-announcements: root.current-section == 4;
+            showing-announcements: root.current-section == 5;
             auth-status-text: root.auth-status-text;
             reset-status-text: root.reset-status-text;
             brand-status-copy: root.brand-status-copy;

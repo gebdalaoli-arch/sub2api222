@@ -7,3 +7,4 @@ pub mod payment;
 pub mod redeem;
 pub mod subscriptions;
 pub mod update;
+pub mod usage;

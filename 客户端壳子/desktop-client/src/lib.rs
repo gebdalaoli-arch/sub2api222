@@ -68,6 +68,8 @@ mod tests {
             std::fs::read_to_string(manifest_dir.join("ui/screens/overview.slint")).unwrap();
         let help_detail =
             std::fs::read_to_string(manifest_dir.join("ui/screens/help_detail.slint")).unwrap();
+        let usage_detail =
+            std::fs::read_to_string(manifest_dir.join("ui/screens/usage_detail.slint")).unwrap();
         let update_dialog =
             std::fs::read_to_string(manifest_dir.join("ui/screens/update_dialog.slint")).unwrap();
 
@@ -78,6 +80,8 @@ mod tests {
         assert!(help_detail.contains("设置与帮助"));
         assert!(help_detail.contains("安全边界"));
         assert!(help_detail.contains("检查更新"));
+        assert!(usage_detail.contains("消费明细"));
+        assert!(usage_detail.contains("模型、Token、时间与费用"));
         assert!(update_dialog.contains("发现新版本"));
         assert!(update_dialog.contains("立即更新"));
     }
@@ -93,6 +97,7 @@ mod tests {
 
         assert!(app_window.contains("公告中心"));
         assert!(app_window.contains("设置与帮助"));
+        assert!(app_window.contains("消费明细"));
         assert!(launch.contains("环境状态"));
         assert!(launch.contains("启动方式"));
         assert!(launch.contains("桌面版"));

@@ -3,3 +3,4 @@ pub mod billing_vm;
 pub mod dashboard_vm;
 pub mod launch_vm;
 pub mod update_vm;
+pub mod usage_vm;

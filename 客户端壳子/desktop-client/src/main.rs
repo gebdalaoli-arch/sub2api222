@@ -38,6 +38,7 @@ use sub2api_desktop::{
             check_desktop_update_blocking, list_desktop_announcements_blocking,
             resolve_desktop_download_url, DesktopAnnouncementItem, DesktopUpdateCheckResponse,
         },
+        usage::{fetch_usage_logs_blocking, PaginatedUsageLogs},
     },
     app::{
         auth_flow::{build_login_submission, should_restore_session, LoginSubmission},
@@ -47,6 +48,7 @@ use sub2api_desktop::{
             dashboard_vm::DashboardViewModel,
             launch_vm::LaunchViewModel,
             update_vm::{UpdateDialogState, UpdateViewModel},
+            usage_vm::UsageDetailViewModel,
         },
     },
     config::{app_config, AppConfig},
@@ -83,6 +85,7 @@ type SharedRedeemHistory = Arc<Mutex<Vec<RedeemHistoryItem>>>;
 type SharedOrders = Arc<Mutex<Vec<PaymentOrder>>>;
 type SharedCheckoutInfo = Arc<Mutex<Option<CheckoutInfo>>>;
 type SharedPendingPayment = Arc<Mutex<Option<PendingPaymentState>>>;
+type SharedUsagePage = Arc<Mutex<Option<PaginatedUsageLogs>>>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct PendingPaymentState {
@@ -117,6 +120,7 @@ fn main() -> anyhow::Result<()> {
     let recent_orders: SharedOrders = Arc::new(Mutex::new(Vec::new()));
     let checkout_info: SharedCheckoutInfo = Arc::new(Mutex::new(None));
     let pending_payment: SharedPendingPayment = Arc::new(Mutex::new(None));
+    let usage_page: SharedUsagePage = Arc::new(Mutex::new(None));
 
     apply_launch_state(&app, &targets.borrow());
     apply_logged_out_state(&app);
@@ -149,6 +153,7 @@ fn main() -> anyhow::Result<()> {
         Arc::clone(&recent_orders),
         Arc::clone(&checkout_info),
         Arc::clone(&pending_payment),
+        Arc::clone(&usage_page),
     );
     wire_billing_callbacks(
         &app,
@@ -160,6 +165,18 @@ fn main() -> anyhow::Result<()> {
         Arc::clone(&recent_orders),
         Arc::clone(&checkout_info),
         Arc::clone(&pending_payment),
+        Arc::clone(&usage_page),
+    );
+    wire_usage_callbacks(
+        &app,
+        Arc::clone(&config),
+        Arc::clone(&auth_session),
+        Arc::clone(&available_groups),
+        Arc::clone(&subscription_summary),
+        Arc::clone(&redeem_history),
+        Arc::clone(&recent_orders),
+        Arc::clone(&checkout_info),
+        Arc::clone(&usage_page),
     );
     wire_update_callbacks(&app, Arc::clone(&config));
     restore_saved_session(
@@ -175,6 +192,7 @@ fn main() -> anyhow::Result<()> {
         Arc::clone(&recent_orders),
         Arc::clone(&checkout_info),
         Arc::clone(&pending_payment),
+        Arc::clone(&usage_page),
     );
 
     startup_diagnostics.log(format!(
@@ -489,6 +507,7 @@ fn wire_auth_callbacks(
     recent_orders: SharedOrders,
     checkout_info: SharedCheckoutInfo,
     pending_payment: SharedPendingPayment,
+    usage_page: SharedUsagePage,
 ) {
     let login_app = app.as_weak();
     let login_config = Arc::clone(&config);
@@ -502,6 +521,7 @@ fn wire_auth_callbacks(
     let login_orders = Arc::clone(&recent_orders);
     let login_checkout = Arc::clone(&checkout_info);
     let login_pending_payment = Arc::clone(&pending_payment);
+    let login_usage_page = Arc::clone(&usage_page);
     app.on_login_requested(move || {
         let Some(app) = login_app.upgrade() else {
             return;
@@ -547,6 +567,7 @@ fn wire_auth_callbacks(
         let recent_orders = Arc::clone(&login_orders);
         let checkout_info = Arc::clone(&login_checkout);
         let pending_payment = Arc::clone(&login_pending_payment);
+        let usage_page = Arc::clone(&login_usage_page);
         thread::spawn(move || {
             let client = ApiClient::new(config.api_base_url.clone());
             let result = match submission {
@@ -579,6 +600,7 @@ fn wire_auth_callbacks(
                         &recent_orders,
                         &checkout_info,
                         &pending_payment,
+                        &usage_page,
                         email,
                         auth,
                     );
@@ -586,6 +608,7 @@ fn wire_auth_callbacks(
                     let billing_vm =
                         current_billing_vm(&auth_session, &subscription_summary, &recent_orders, &redeem_history);
                     let checkout_snapshot = current_checkout_snapshot(&checkout_info);
+                    let usage_vm = current_usage_vm(&usage_page);
                     let group_count = Some(groups_snapshot.len());
                     let _ = ui_handle.upgrade_in_event_loop(move |app| {
                         if let Some(session) =
@@ -595,6 +618,7 @@ fn wire_auth_callbacks(
                             apply_available_groups_state(&app, &groups_snapshot);
                             apply_billing_state(&app, &billing_vm);
                             apply_checkout_state(&app, checkout_snapshot.as_ref());
+                            apply_usage_state(&app, &usage_vm);
                         }
                     });
                 }
@@ -637,6 +661,7 @@ fn wire_auth_callbacks(
     let register_orders = Arc::clone(&recent_orders);
     let register_checkout = Arc::clone(&checkout_info);
     let register_pending_payment = Arc::clone(&pending_payment);
+    let register_usage_page = Arc::clone(&usage_page);
     app.on_register_requested(move || {
         let Some(app) = register_app.upgrade() else {
             return;
@@ -672,6 +697,7 @@ fn wire_auth_callbacks(
         let recent_orders = Arc::clone(&register_orders);
         let checkout_info = Arc::clone(&register_checkout);
         let pending_payment = Arc::clone(&register_pending_payment);
+        let usage_page = Arc::clone(&register_usage_page);
         thread::spawn(move || {
             let client = ApiClient::new(config.api_base_url.clone());
             let request = RegisterRequest::new(email.trim(), password)
@@ -691,6 +717,7 @@ fn wire_auth_callbacks(
                         &recent_orders,
                         &checkout_info,
                         &pending_payment,
+                        &usage_page,
                         email,
                         auth,
                     );
@@ -698,6 +725,7 @@ fn wire_auth_callbacks(
                     let billing_vm =
                         current_billing_vm(&auth_session, &subscription_summary, &recent_orders, &redeem_history);
                     let checkout_snapshot = current_checkout_snapshot(&checkout_info);
+                    let usage_vm = current_usage_vm(&usage_page);
                     let group_count = Some(groups_snapshot.len());
                     let _ = ui_handle.upgrade_in_event_loop(move |app| {
                         if let Some(session) =
@@ -707,6 +735,7 @@ fn wire_auth_callbacks(
                             apply_available_groups_state(&app, &groups_snapshot);
                             apply_billing_state(&app, &billing_vm);
                             apply_checkout_state(&app, checkout_snapshot.as_ref());
+                            apply_usage_state(&app, &usage_vm);
                             app.set_auth_status_text(SharedString::from(
                                 "注册成功，已自动登录当前账户。",
                             ));
@@ -856,6 +885,7 @@ fn wire_billing_callbacks(
     recent_orders: SharedOrders,
     checkout_info: SharedCheckoutInfo,
     pending_payment: SharedPendingPayment,
+    usage_page: SharedUsagePage,
 ) {
     let redeem_app = app.as_weak();
     let redeem_config = Arc::clone(&config);
@@ -865,6 +895,7 @@ fn wire_billing_callbacks(
     let redeem_history_store = Arc::clone(&redeem_history);
     let redeem_orders = Arc::clone(&recent_orders);
     let redeem_checkout = Arc::clone(&checkout_info);
+    let redeem_usage_page = Arc::clone(&usage_page);
     app.on_redeem_requested(move || {
         let Some(app) = redeem_app.upgrade() else {
             return;
@@ -884,6 +915,7 @@ fn wire_billing_callbacks(
         let redeem_history_store = Arc::clone(&redeem_history_store);
         let recent_orders = Arc::clone(&redeem_orders);
         let checkout_info = Arc::clone(&redeem_checkout);
+        let usage_page = Arc::clone(&redeem_usage_page);
         thread::spawn(move || {
             let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) else {
                 let _ = ui_handle.upgrade_in_event_loop(move |app| {
@@ -905,8 +937,10 @@ fn wire_billing_callbacks(
                         &recent_orders,
                         &redeem_history_store,
                         &checkout_info,
+                        &usage_page,
                     );
                     let checkout_snapshot = current_checkout_snapshot(&checkout_info);
+                    let usage_vm = current_usage_vm(&usage_page);
 
                     if let Some(user) = updated_user {
                         if let Ok(mut state) = auth_session.lock() {
@@ -927,6 +961,7 @@ fn wire_billing_callbacks(
                         apply_available_groups_state(&app, &groups_snapshot);
                         apply_billing_state(&app, &billing_vm);
                         apply_checkout_state(&app, checkout_snapshot.as_ref());
+                        apply_usage_state(&app, &usage_vm);
                         app.set_redeem_status_text(SharedString::from(status_message));
                         app.set_redeem_code(SharedString::from(""));
                     });
@@ -949,6 +984,7 @@ fn wire_billing_callbacks(
     let recharge_groups = Arc::clone(&available_groups);
     let recharge_checkout = Arc::clone(&checkout_info);
     let recharge_pending = Arc::clone(&pending_payment);
+    let recharge_usage_page = Arc::clone(&usage_page);
     app.on_billing_recharge_requested(move || {
         let Some(app) = recharge_app.upgrade() else {
             return;
@@ -970,6 +1006,7 @@ fn wire_billing_callbacks(
         let available_groups = Arc::clone(&recharge_groups);
         let checkout_info = Arc::clone(&recharge_checkout);
         let pending_payment = Arc::clone(&recharge_pending);
+        let usage_page = Arc::clone(&recharge_usage_page);
         let selected_method_index = app.get_billing_selected_payment_method_index() as usize;
         thread::spawn(move || {
             let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) else {
@@ -1029,8 +1066,10 @@ fn wire_billing_callbacks(
                         &recent_orders,
                         &redeem_history,
                         &checkout_info,
+                        &usage_page,
                     );
                     let checkout_snapshot = current_checkout_snapshot(&checkout_info);
+                    let usage_vm = current_usage_vm(&usage_page);
                     let message = format!(
                         "充值订单 #{} 已创建，已为你打开支付入口；可在桌面端继续刷新订单状态。",
                         result.order_id
@@ -1039,6 +1078,7 @@ fn wire_billing_callbacks(
                         apply_available_groups_state(&app, &groups_snapshot);
                         apply_billing_state(&app, &billing_vm);
                         apply_checkout_state(&app, checkout_snapshot.as_ref());
+                        apply_usage_state(&app, &usage_vm);
                         app.set_billing_checkout_status_text(SharedString::from(message));
                         app.set_billing_recharge_amount(SharedString::from(""));
                     });
@@ -1063,6 +1103,7 @@ fn wire_billing_callbacks(
     let subscribe_groups = Arc::clone(&available_groups);
     let subscribe_checkout = Arc::clone(&checkout_info);
     let subscribe_pending = Arc::clone(&pending_payment);
+    let subscribe_usage_page = Arc::clone(&usage_page);
     app.on_billing_subscription_requested(move || {
         let Some(app) = subscribe_app.upgrade() else {
             return;
@@ -1078,6 +1119,7 @@ fn wire_billing_callbacks(
         let available_groups = Arc::clone(&subscribe_groups);
         let checkout_info = Arc::clone(&subscribe_checkout);
         let pending_payment = Arc::clone(&subscribe_pending);
+        let usage_page = Arc::clone(&subscribe_usage_page);
         let selected_method_index = app.get_billing_selected_payment_method_index() as usize;
         let selected_plan_index = app.get_billing_selected_subscription_plan_index() as usize;
         thread::spawn(move || {
@@ -1145,8 +1187,10 @@ fn wire_billing_callbacks(
                         &recent_orders,
                         &redeem_history,
                         &checkout_info,
+                        &usage_page,
                     );
                     let checkout_snapshot = current_checkout_snapshot(&checkout_info);
+                    let usage_vm = current_usage_vm(&usage_page);
                     let message = format!(
                         "订阅订单 #{}（{}）已创建，已打开支付入口。",
                         result.order_id, plan.name
@@ -1155,6 +1199,7 @@ fn wire_billing_callbacks(
                         apply_available_groups_state(&app, &groups_snapshot);
                         apply_billing_state(&app, &billing_vm);
                         apply_checkout_state(&app, checkout_snapshot.as_ref());
+                        apply_usage_state(&app, &usage_vm);
                         app.set_billing_checkout_status_text(SharedString::from(message));
                     });
                 }
@@ -1199,6 +1244,7 @@ fn wire_billing_callbacks(
     let refresh_billing_orders = Arc::clone(&recent_orders);
     let refresh_billing_checkout = Arc::clone(&checkout_info);
     let refresh_billing_pending = Arc::clone(&pending_payment);
+    let refresh_billing_usage_page = Arc::clone(&usage_page);
     app.on_billing_refresh_requested(move || {
         let Some(app) = refresh_billing_app.upgrade() else {
             return;
@@ -1214,6 +1260,7 @@ fn wire_billing_callbacks(
         let recent_orders = Arc::clone(&refresh_billing_orders);
         let checkout_info = Arc::clone(&refresh_billing_checkout);
         let pending_payment = Arc::clone(&refresh_billing_pending);
+        let usage_page = Arc::clone(&refresh_billing_usage_page);
         thread::spawn(move || {
             let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) else {
                 let _ = ui_handle.upgrade_in_event_loop(move |app| {
@@ -1243,8 +1290,10 @@ fn wire_billing_callbacks(
                 &recent_orders,
                 &redeem_history,
                 &checkout_info,
+                &usage_page,
             );
             let checkout_snapshot = current_checkout_snapshot(&checkout_info);
+            let usage_vm = current_usage_vm(&usage_page);
             let status_message = pending_order_status
                 .unwrap_or_else(|| "计费数据已刷新，可继续创建或追踪订单。".to_string());
             let _ = ui_handle.upgrade_in_event_loop(move |app| {
@@ -1254,7 +1303,79 @@ fn wire_billing_callbacks(
                 apply_available_groups_state(&app, &groups_snapshot);
                 apply_billing_state(&app, &billing_vm);
                 apply_checkout_state(&app, checkout_snapshot.as_ref());
+                apply_usage_state(&app, &usage_vm);
                 app.set_billing_checkout_status_text(SharedString::from(status_message));
+            });
+        });
+    });
+}
+
+fn wire_usage_callbacks(
+    app: &AppWindow,
+    config: Arc<AppConfig>,
+    auth_session: SharedAuthSession,
+    available_groups: SharedGroups,
+    subscription_summary: SharedSubscriptionSummary,
+    redeem_history: SharedRedeemHistory,
+    recent_orders: SharedOrders,
+    checkout_info: SharedCheckoutInfo,
+    usage_page: SharedUsagePage,
+) {
+    let usage_app = app.as_weak();
+    let usage_config = Arc::clone(&config);
+    let usage_session = Arc::clone(&auth_session);
+    let usage_groups = Arc::clone(&available_groups);
+    let usage_summary = Arc::clone(&subscription_summary);
+    let usage_history = Arc::clone(&redeem_history);
+    let usage_orders = Arc::clone(&recent_orders);
+    let usage_checkout = Arc::clone(&checkout_info);
+    let usage_page_state = Arc::clone(&usage_page);
+    app.on_usage_refresh_requested(move || {
+        let Some(app) = usage_app.upgrade() else {
+            return;
+        };
+        app.set_usage_status_text(SharedString::from("正在刷新消费明细..."));
+
+        let ui_handle = usage_app.clone();
+        let config = Arc::clone(&usage_config);
+        let auth_session = Arc::clone(&usage_session);
+        let available_groups = Arc::clone(&usage_groups);
+        let subscription_summary = Arc::clone(&usage_summary);
+        let redeem_history = Arc::clone(&usage_history);
+        let recent_orders = Arc::clone(&usage_orders);
+        let checkout_info = Arc::clone(&usage_checkout);
+        let usage_page = Arc::clone(&usage_page_state);
+        thread::spawn(move || {
+            let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) else {
+                let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                    app.set_usage_status_text(SharedString::from("请先登录后再查看消费明细。"));
+                });
+                return;
+            };
+
+            let client = ApiClient::new(config.api_base_url.clone())
+                .with_access_token(Some(session.access_token));
+            let (group_count, groups_snapshot, billing_vm) = sync_user_side_state(
+                &client,
+                &auth_session,
+                &available_groups,
+                &subscription_summary,
+                &recent_orders,
+                &redeem_history,
+                &checkout_info,
+                &usage_page,
+            );
+            let usage_vm = current_usage_vm(&usage_page);
+            let checkout_snapshot = current_checkout_snapshot(&checkout_info);
+            let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                if let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) {
+                    apply_authenticated_state(&app, &session, group_count);
+                }
+                apply_available_groups_state(&app, &groups_snapshot);
+                apply_billing_state(&app, &billing_vm);
+                apply_checkout_state(&app, checkout_snapshot.as_ref());
+                apply_usage_state(&app, &usage_vm);
+                app.set_usage_status_text(SharedString::from("消费明细已刷新。"));
             });
         });
     });
@@ -1273,6 +1394,7 @@ fn restore_saved_session(
     recent_orders: SharedOrders,
     checkout_info: SharedCheckoutInfo,
     pending_payment: SharedPendingPayment,
+    usage_page: SharedUsagePage,
 ) {
     let app_handle = app.as_weak();
     if let Some(message) = config.packaged_local_debug_api_message() {
@@ -1321,13 +1443,16 @@ fn restore_saved_session(
                                         &recent_orders,
                                         &redeem_history,
                                         &checkout_info,
+                                        &usage_page,
                                     );
                                 let checkout_snapshot = current_checkout_snapshot(&checkout_info);
+                                let usage_vm = current_usage_vm(&usage_page);
                                 let _ = app_handle.upgrade_in_event_loop(move |app| {
                                     apply_authenticated_state(&app, &session, group_count);
                                     apply_available_groups_state(&app, &groups_snapshot);
                                     apply_billing_state(&app, &billing_vm);
                                     apply_checkout_state(&app, checkout_snapshot.as_ref());
+                                    apply_usage_state(&app, &usage_vm);
                                     app.set_auth_status_text(SharedString::from(
                                         "已恢复上次登录状态。",
                                     ));
@@ -1377,6 +1502,7 @@ fn handle_auth_success(
     recent_orders: &SharedOrders,
     checkout_info: &SharedCheckoutInfo,
     pending_payment: &SharedPendingPayment,
+    usage_page: &SharedUsagePage,
     email: String,
     auth: AuthResponse,
 ) {
@@ -1415,6 +1541,7 @@ fn handle_auth_success(
         recent_orders,
         redeem_history,
         checkout_info,
+        usage_page,
     );
 }
 
@@ -1602,10 +1729,12 @@ fn sync_user_side_state(
     recent_orders: &SharedOrders,
     redeem_history: &SharedRedeemHistory,
     checkout_info: &SharedCheckoutInfo,
+    usage_page: &SharedUsagePage,
 ) -> (Option<usize>, Vec<GroupSummary>, BillingViewModel) {
     let group_count = refresh_available_groups_state(client, available_groups);
     refresh_billing_state(client, subscription_summary, recent_orders, redeem_history);
     refresh_checkout_info_state(client, checkout_info);
+    refresh_usage_page_state(client, usage_page);
     let groups_snapshot = current_groups_snapshot(available_groups);
     let billing_vm = current_billing_vm(auth_session, subscription_summary, recent_orders, redeem_history);
     (group_count, groups_snapshot, billing_vm)
@@ -1658,6 +1787,14 @@ fn refresh_checkout_info_state(client: &ApiClient, checkout_info: &SharedCheckou
     }
 }
 
+fn refresh_usage_page_state(client: &ApiClient, usage_page: &SharedUsagePage) {
+    if let Ok(page) = fetch_usage_logs_blocking(client, 1, 20) {
+        if let Ok(mut state) = usage_page.lock() {
+            *state = Some(page);
+        }
+    }
+}
+
 fn current_groups_snapshot(available_groups: &SharedGroups) -> Vec<GroupSummary> {
     available_groups
         .lock()
@@ -1683,6 +1820,14 @@ fn current_checkout_snapshot(checkout_info: &SharedCheckoutInfo) -> Option<Check
         .lock()
         .ok()
         .and_then(|state| state.clone())
+}
+
+fn current_usage_vm(usage_page: &SharedUsagePage) -> UsageDetailViewModel {
+    let page = usage_page
+        .lock()
+        .ok()
+        .and_then(|state| state.clone());
+    UsageDetailViewModel::from_page(page.as_ref())
 }
 
 fn current_billing_vm(
@@ -1737,6 +1882,8 @@ fn apply_logged_out_state(app: &AppWindow) {
     apply_billing_state(app, &BillingViewModel::empty());
     apply_checkout_state(app, None);
     app.set_billing_checkout_status_text(SharedString::from("登录后可创建充值或订阅订单。"));
+    apply_usage_state(app, &UsageDetailViewModel::empty());
+    app.set_usage_status_text(SharedString::from("登录后可查看消费明细。"));
 }
 
 fn apply_authenticated_state(app: &AppWindow, session: &AuthSession, group_count: Option<usize>) {
@@ -2048,6 +2195,21 @@ fn apply_billing_state(app: &AppWindow, billing: &BillingViewModel) {
     app.set_redeem_history_lines(string_model(
         billing
             .redeem_history_lines
+            .iter()
+            .cloned()
+            .map(SharedString::from)
+            .collect(),
+    ));
+}
+
+fn apply_usage_state(app: &AppWindow, usage: &UsageDetailViewModel) {
+    app.set_usage_summary_title(SharedString::from(usage.summary_title.clone()));
+    app.set_usage_total_requests_text(SharedString::from(usage.total_requests_text.clone()));
+    app.set_usage_total_tokens_text(SharedString::from(usage.total_tokens_text.clone()));
+    app.set_usage_total_actual_cost_text(SharedString::from(usage.total_actual_cost_text.clone()));
+    app.set_usage_lines(string_model(
+        usage
+            .lines
             .iter()
             .cloned()
             .map(SharedString::from)
