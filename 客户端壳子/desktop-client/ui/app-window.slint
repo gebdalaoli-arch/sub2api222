@@ -1,14 +1,10 @@
 import { Button } from "std-widgets.slint";
-import { BrandPanel } from "components/brand_panel.slint";
 import { AnnouncementCenterScreen } from "screens/announcements.slint";
 import { BillingDetailScreen } from "screens/billing_detail.slint";
-import { ForgotPasswordScreen } from "screens/forgot_password.slint";
 import { HelpDetailScreen } from "screens/help_detail.slint";
 import { LaunchPanel } from "screens/launch_panel.slint";
 import { LoginScene } from "screens/login_scene.slint";
-import { LoginScreen } from "screens/login.slint";
 import { OverviewScreen } from "screens/overview.slint";
-import { RegisterPanel } from "screens/register_panel.slint";
 import { UpdateDialog } from "screens/update_dialog.slint";
 import { UsageDetailScreen } from "screens/usage_detail.slint";
 
@@ -260,9 +256,9 @@ export component AppWindow inherits Window {
             Rectangle {
                 x: parent.width - 56px; y: 16px;
                 width: 32px; height: 32px;
-                background: transparent;
+                announcement-touch := TouchArea { clicked => { root.current-section = 5; } }
+                background: announcement-touch.pressed ? #e2edf5 : transparent;
                 border-radius: 16px;
-                TouchArea { clicked => { root.current-section = 5; } }
                 Text { x: 6px; y: 6px; text: "🔔"; font-size: 16px; }
             }
         }
@@ -289,57 +285,7 @@ export component AppWindow inherits Window {
                 notice-text: root.dashboard-notice-text;
                 open-launch-requested => { root.current-section = 1; }
                 open-billing-requested => { root.current-section = 2; }
-                open-help-requested => { root.current-section = 3; }
-            }
-
-            // ── Login flow (when not session-active, inline) ──
-            if !root.session-active: BrandPanel {
-                x: 0px; y: 0px;
-                width: 320px;
-                height: parent.height;
-                product-name: "一键开整";
-                status-copy: root.brand-status-copy;
-            }
-
-            if !root.session-active: LoginScreen {
-                x: 360px; y: 0px;
-                width: parent.width - 360px;
-                email <=> root.email;
-                password <=> root.password;
-                verification-code <=> root.verification-code;
-                remember-password <=> root.remember-password;
-                auto-login <=> root.auto-login;
-                show-totp-field: root.show-login-totp;
-                status-text: root.auth-status-text;
-                login-requested => { root.login-requested(); }
-                open-register-requested => { root.auth-subview = 1; }
-                open-forgot-password-requested => { root.auth-subview = 2; }
-            }
-
-            if !root.session-active && root.auth-subview == 1: RegisterPanel {
-                x: 400px; y: 60px;
-                width: parent.width - 420px;
-                height: 480px;
-                email <=> root.email;
-                password <=> root.password;
-                verification-code <=> root.verification-code;
-                status-text: root.auth-status-text;
-                register-submit-requested => { root.register-requested(); }
-                verify-code-requested => { root.verify-code-requested(); }
-                back-requested => { root.auth-subview = 0; }
-            }
-
-            if !root.session-active && root.auth-subview == 2: ForgotPasswordScreen {
-                x: 400px; y: 60px;
-                width: parent.width - 420px;
-                height: 480px;
-                email <=> root.email;
-                reset-token <=> root.reset-token;
-                new-password <=> root.new-password;
-                status-text: root.reset-status-text;
-                forgot-password-requested => { root.forgot-password-requested(); }
-                reset-password-requested => { root.reset-password-requested(); }
-                back-requested => { root.auth-subview = 0; }
+                open-help-requested => { root.current-section = 4; }
             }
         }
 

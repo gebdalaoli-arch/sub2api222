@@ -53,14 +53,15 @@ export component BillingDetailScreen inherits Rectangle {
     }
 
     Rectangle {
-        x: parent.width - 128px;
+        x: parent.width - 156px;
         y: 24px;
-        width: 96px;
+        width: 124px;
         height: 40px;
-        background: root.future-open ? #006499 : #f0f4f7;
+        future-touch := TouchArea { clicked => { root.future-open = !root.future-open; } }
+        background: future-touch.pressed
+            ? (root.future-open ? #00527d : #e2e8ed)
+            : (root.future-open ? #006499 : #f0f4f7);
         border-radius: 20px;
-
-        TouchArea { clicked => { root.future-open = !root.future-open; } }
 
         Text {
             width: parent.width;

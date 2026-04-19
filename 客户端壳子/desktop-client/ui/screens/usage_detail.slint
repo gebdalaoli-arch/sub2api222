@@ -24,6 +24,11 @@ export component UsageDetailScreen inherits Rectangle {
     border-radius: 12px;
     border-color: #d7e4f0;
     border-width: 0px;
+    property <length> list-y: 318px;
+    property <length> footer-y: self.height - 54px;
+    property <length> list-height: root.footer-y - root.list-y - 12px;
+    property <length> row-height: 64px;
+    property <length> row-gap: 12px;
 
     Text {
         x: 24px;
@@ -133,23 +138,24 @@ export component UsageDetailScreen inherits Rectangle {
 
     Rectangle {
         x: 24px;
-        y: 318px;
+        y: root.list-y;
         width: parent.width - 48px;
-        height: parent.height - 384px;
+        height: root.list-height;
         background: #eaeff2;
         border-radius: 20px;
+        clip: true;
 
         for text[index] in root.model-lines : Rectangle {
             x: 18px;
-            y: 18px + index * 88px;
+            y: 18px + index * (root.row-height + root.row-gap);
             width: parent.width - 36px;
-            height: 76px;
+            height: root.row-height;
             background: #ffffff;
             border-radius: 14px;
 
             Rectangle {
                 x: 14px;
-                y: 12px;
+                y: 10px;
                 width: 144px;
                 height: 24px;
                 background: #eef6ff;
@@ -159,7 +165,7 @@ export component UsageDetailScreen inherits Rectangle {
 
             Rectangle {
                 x: 170px;
-                y: 12px;
+                y: 10px;
                 width: 220px;
                 height: 24px;
                 background: #f3f1ff;
@@ -169,7 +175,7 @@ export component UsageDetailScreen inherits Rectangle {
 
             Rectangle {
                 x: 402px;
-                y: 12px;
+                y: 10px;
                 width: 180px;
                 height: 24px;
                 background: #edf9f0;
@@ -179,7 +185,7 @@ export component UsageDetailScreen inherits Rectangle {
 
             Rectangle {
                 x: 594px;
-                y: 12px;
+                y: 10px;
                 width: parent.width - 608px;
                 height: 24px;
                 background: #fff3e8;

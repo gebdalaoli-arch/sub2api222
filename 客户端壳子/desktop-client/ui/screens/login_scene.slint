@@ -49,37 +49,22 @@ export component LoginScene inherits Rectangle {
             font-weight: 900;
         }
 
-        // Window control: notifications
+        // Announcement entry
         Rectangle {
             x: parent.width - 148px; y: 16px;
-            width: 32px; height: 32px;
-            background: transparent;
+            width: 116px; height: 32px;
+            announcement-touch := TouchArea { clicked => { root.showing-announcements = true; } }
+            background: announcement-touch.pressed ? #d7e4f0 : #eef6ff;
             border-radius: 16px;
-            TouchArea { clicked => { root.showing-announcements = true; } }
-            Text { x: 6px; y: 6px; text: "🔔"; font-size: 16px; }
-        }
-
-        // Divider
-        Rectangle {
-            x: parent.width - 108px; y: 24px;
-            width: 1px; height: 16px;
-            background: #acb3b74d; // outline-variant 30%
-        }
-
-        // Window: minimize
-        Rectangle {
-            x: parent.width - 96px; y: 16px;
-            width: 32px; height: 32px;
-            background: transparent; border-radius: 16px;
-            Text { x: 10px; y: 4px; text: "—"; color: #51616b; font-size: 16px; }
-        }
-
-        // Window: close
-        Rectangle {
-            x: parent.width - 52px; y: 16px;
-            width: 32px; height: 32px;
-            background: transparent; border-radius: 16px;
-            Text { x: 9px; y: 4px; text: "×"; color: #51616b; font-size: 16px; }
+            Text {
+                width: parent.width; height: parent.height;
+                text: "🔔 公告中心";
+                color: #006499;
+                font-size: 13px;
+                font-weight: 700;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
         }
     }
 

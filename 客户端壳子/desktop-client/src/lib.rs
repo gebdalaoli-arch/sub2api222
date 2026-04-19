@@ -126,6 +126,31 @@ mod tests {
     }
 
     #[test]
+    fn desktop_shell_routes_help_correctly_and_avoids_duplicate_window_controls() {
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let app_window = std::fs::read_to_string(manifest_dir.join("ui/app-window.slint")).unwrap();
+        let login_scene =
+            std::fs::read_to_string(manifest_dir.join("ui/screens/login_scene.slint")).unwrap();
+        let billing_detail =
+            std::fs::read_to_string(manifest_dir.join("ui/screens/billing_detail.slint")).unwrap();
+        let usage_detail =
+            std::fs::read_to_string(manifest_dir.join("ui/screens/usage_detail.slint")).unwrap();
+
+        assert!(app_window.contains("open-help-requested => { root.current-section = 4; }"));
+        assert!(app_window.contains("announcement-touch"));
+        assert!(login_scene.contains("announcement-touch"));
+        assert!(!login_scene.contains("// Window: minimize"));
+        assert!(!login_scene.contains("// Window: close"));
+        assert!(!app_window.contains("if !root.session-active: BrandPanel {"));
+        assert!(!app_window.contains("if !root.session-active: LoginScreen {"));
+        assert!(!app_window.contains("if !root.session-active && root.auth-subview == 1: RegisterPanel {"));
+        assert!(!app_window.contains("if !root.session-active && root.auth-subview == 2: ForgotPasswordScreen {"));
+        assert!(billing_detail.contains("future-touch"));
+        assert!(usage_detail.contains("property <length> list-height"));
+        assert!(!usage_detail.contains("height: parent.height - 384px"));
+    }
+
+    #[test]
     fn desktop_update_copy_guard_uses_new_dialog_labels() {
         let _type_guard = std::any::type_name::<crate::api::update::DesktopUpdateCheckResponse>();
         let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
