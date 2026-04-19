@@ -1,5 +1,6 @@
 use crate::api::{
     account::UserProfile,
+    billing_summary::BillingSummary,
     groups::GroupSummary,
     payment::PaymentOrder,
     redeem::RedeemHistoryItem,
@@ -19,14 +20,12 @@ pub struct BillingViewModel {
     pub redeem_history_lines: Vec<String>,
 }
 
-const OPENAI_FALLBACK_INPUT_PRICE_PER_MILLION_TOKENS: f64 = 0.2;
-
 impl BillingViewModel {
     pub fn empty() -> Self {
         Self {
             plan_title: "暂未开通订阅".to_string(),
-            balance_headline: "¥--".to_string(),
-            usage_caption: "登录后可查看余额、套餐与订单明细。".to_string(),
+            balance_headline: "-- Token".to_string(),
+            usage_caption: "登录后可查看剩余 Token、累计充值与累计消费。".to_string(),
             subscription_summary_text: "暂无订阅摘要".to_string(),
             subscription_lines: vec!["登录后可查看当前订阅额度和到期时间。".to_string()],
             subscription_detail_lines: vec!["暂无订阅明细。".to_string()],
@@ -38,6 +37,7 @@ impl BillingViewModel {
 
     pub fn from_account_state(
         user: Option<&UserProfile>,
+        token_summary: Option<&BillingSummary>,
         summary: Option<&SubscriptionSummary>,
         orders: &[PaymentOrder],
         history: &[RedeemHistoryItem],
@@ -46,16 +46,28 @@ impl BillingViewModel {
         let mut model = Self::empty();
 
         if let Some(user) = user {
-            if let Some(group) = openai_group {
-                model.balance_headline = format_token_equivalent(user.balance, Some(group));
+            if let Some(summary) = token_summary {
+                model.balance_headline = format_token_count(summary.remaining_tokens);
                 model.usage_caption = format!(
-                    "按 OpenAI 分组“{}”倍率 ×{:.2} 折算 · 账户状态：{} · 并发额度 {} 路",
-                    group.name, group.rate_multiplier, user.status, user.concurrency
+                    "累计充值 {} · 累计消费 {} · 账户状态：{} · 并发额度 {} 路",
+                    format_token_count(summary.recharged_tokens),
+                    format_token_count(summary.consumed_tokens),
+                    user.status,
+                    user.concurrency
+                );
+            } else if let Some(group) = openai_group {
+                let _ = group;
+                model.balance_headline = "-- Token".to_string();
+                model.usage_caption = format!(
+                    "账户状态：{} · 并发额度 {} 路",
+                    user.status, user.concurrency
                 );
             } else {
-                model.balance_headline = format_currency_yuan(user.balance);
-                model.usage_caption =
-                    format!("账户状态：{} · 并发额度 {} 路", user.status, user.concurrency);
+                model.balance_headline = "-- Token".to_string();
+                model.usage_caption = format!(
+                    "账户状态：{} · 并发额度 {} 路",
+                    user.status, user.concurrency
+                );
             }
         }
 
@@ -93,16 +105,8 @@ impl BillingViewModel {
         }
 
         if !orders.is_empty() {
-            model.order_lines = orders
-                .iter()
-                .take(4)
-                .map(order_summary_line)
-                .collect();
-            model.order_detail_lines = orders
-                .iter()
-                .take(6)
-                .map(order_detail_line)
-                .collect();
+            model.order_lines = orders.iter().take(4).map(order_summary_line).collect();
+            model.order_detail_lines = orders.iter().take(6).map(order_detail_line).collect();
         }
 
         if !history.is_empty() {
@@ -119,7 +123,10 @@ impl BillingViewModel {
 
 fn subscription_summary_line(item: &SubscriptionSummaryItem) -> String {
     match item.expires_at.as_deref() {
-        Some(expires_at) => format!("{} · {} · 到期 {}", item.group_name, item.status, expires_at),
+        Some(expires_at) => format!(
+            "{} · {} · 到期 {}",
+            item.group_name, item.status, expires_at
+        ),
         None => format!("{} · {}", item.group_name, item.status),
     }
 }
@@ -174,8 +181,14 @@ fn history_detail_line(item: &RedeemHistoryItem, openai_group: Option<&GroupSumm
     } else {
         item.used_at.as_str()
     };
-    let redeemed_at = redeemed_at.replace('T', " ").trim_end_matches('Z').to_string();
-    let token_text = format_token_equivalent(item.value, openai_group);
+    let redeemed_at = redeemed_at
+        .replace('T', " ")
+        .trim_end_matches('Z')
+        .to_string();
+    let token_text = item
+        .token_amount
+        .map(format_token_count)
+        .unwrap_or_else(|| format_token_equivalent(item.value, openai_group));
     format!("{redeemed_at} · 兑换 {token_text}")
 }
 
@@ -184,21 +197,11 @@ fn format_currency_yuan(value: f64) -> String {
 }
 
 pub fn format_token_equivalent(balance: f64, group: Option<&GroupSummary>) -> String {
-    let price_per_million = group
-        .and_then(|item| item.input_price_per_million_tokens)
-        .filter(|price| *price > 0.0)
-        .unwrap_or_else(|| {
-            match group.map(|item| item.platform) {
-                Some(crate::api::groups::GroupPlatform::OpenAI) | None => {
-                    OPENAI_FALLBACK_INPUT_PRICE_PER_MILLION_TOKENS
-                }
-                _ => group
-                    .map(|item| item.rate_multiplier)
-                    .filter(|value| *value > 0.0)
-                    .unwrap_or(1.0),
-            }
-        });
-    let token_total = (balance / price_per_million) * 1_000_000.0;
+    let _ = group;
+    format_token_count(balance)
+}
+
+pub fn format_token_count(token_total: f64) -> String {
     let (value, unit) = if token_total >= 1_000_000_000_000.0 {
         (token_total / 1_000_000_000_000.0, "万亿")
     } else if token_total >= 100_000_000.0 {
@@ -231,6 +234,7 @@ mod tests {
     use super::BillingViewModel;
     use crate::api::{
         account::UserProfile,
+        billing_summary::BillingSummary,
         groups::{GroupPlatform, GroupSummary, SubscriptionType},
         payment::PaymentOrder,
         redeem::RedeemHistoryItem,
@@ -272,6 +276,7 @@ mod tests {
             code: "CDK-123".to_string(),
             r#type: "subscription".to_string(),
             value: 30.0,
+            token_amount: Some(100_000_000.0),
             status: "used".to_string(),
             used_at: "2025-01-02T15:04:05Z".to_string(),
             created_at: "2025-01-01T15:04:05Z".to_string(),
@@ -330,28 +335,48 @@ mod tests {
             updated_at: "2025-01-02T15:04:05Z".to_string(),
         };
 
-        let vm =
-            BillingViewModel::from_account_state(Some(&user), Some(&summary), &orders, &history, Some(&group));
+        let token_summary = BillingSummary {
+            remaining_milli_tokens: 123_450_000_000,
+            recharged_milli_tokens: 200_000_000_000,
+            consumed_milli_tokens: 76_550_000_000,
+            remaining_tokens: 123_450_000.0,
+            recharged_tokens: 200_000_000.0,
+            consumed_tokens: 76_550_000.0,
+            token_unit: "token".to_string(),
+        };
+
+        let vm = BillingViewModel::from_account_state(
+            Some(&user),
+            Some(&token_summary),
+            Some(&summary),
+            &orders,
+            &history,
+            Some(&group),
+        );
 
         assert_eq!(vm.plan_title, "OpenAI Pro");
-        assert_eq!(vm.balance_headline, "1.25亿 Token");
-        assert!(vm.usage_caption.contains("OpenAI 分组“OpenAI Pro”倍率 ×1.50"));
+        assert_eq!(vm.balance_headline, "1.23亿 Token");
+        assert!(vm.usage_caption.contains("累计充值 2亿 Token"));
+        assert!(vm.usage_caption.contains("累计消费 7655万 Token"));
         assert!(vm.subscription_summary_text.contains("活跃订阅 1 个"));
         assert!(vm.subscription_detail_lines[0].contains("日 ¥2.00/¥10.00"));
         assert!(vm.subscription_detail_lines[0].contains("周 ¥4.00/¥30.00"));
         assert!(vm.order_lines[0].contains("ORD-1"));
         assert!(vm.order_detail_lines[0].contains("balance"));
         assert!(vm.redeem_history_lines[0].contains("2025-01-02 15:04:05"));
-        assert!(vm.redeem_history_lines[0].contains("兑换 2000万 Token"));
+        assert!(vm.redeem_history_lines[0].contains("兑换 1亿 Token"));
     }
 
     #[test]
     fn billing_view_model_uses_safe_defaults_without_data() {
-        let vm = BillingViewModel::from_account_state(None, None, &[], &[], None);
+        let vm = BillingViewModel::from_account_state(None, None, None, &[], &[], None);
 
         assert_eq!(vm.plan_title, "暂未开通订阅");
-        assert_eq!(vm.balance_headline, "¥--");
-        assert_eq!(vm.subscription_detail_lines, vec!["暂无订阅明细。".to_string()]);
+        assert_eq!(vm.balance_headline, "-- Token");
+        assert_eq!(
+            vm.subscription_detail_lines,
+            vec!["暂无订阅明细。".to_string()]
+        );
         assert_eq!(vm.order_detail_lines, vec!["暂无订单明细。".to_string()]);
     }
 }

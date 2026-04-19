@@ -3,8 +3,8 @@ import { Button } from "std-widgets.slint";
 export component OverviewScreen inherits Rectangle {
     in property <string> welcome-text: "准备开整";
     in property <string> user-label: "当前账号：未登录";
-    in property <string> balance-text: "余额：--";
-    in property <string> usage-text: "并发额度：--";
+    in property <string> balance-text: "剩余 Token：--";
+    in property <string> usage-text: "累计消费：--";
     in property <string> account-status-text: "账户状态：待登录";
     in property <string> notice-text: "一键开整";
 
@@ -111,7 +111,7 @@ export component OverviewScreen inherits Rectangle {
         // Balance label
         Text {
             x: 24px; y: 72px;
-            text: "当前余额";
+            text: "剩余 Token";
             color: #51616b;
             font-size: 11px;
             font-weight: 600;
@@ -143,7 +143,7 @@ export component OverviewScreen inherits Rectangle {
             TouchArea { clicked => { root.open-billing-requested(); } }
             Text {
                 width: parent.width; height: parent.height;
-                text: "充值";
+                text: "兑换";
                 color: #2e5952;
                 font-size: 14px;
                 font-weight: 500;

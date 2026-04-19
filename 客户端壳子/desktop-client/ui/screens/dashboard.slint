@@ -1,9 +1,9 @@
 import { Button } from "std-widgets.slint";
 
 export component DashboardScreen inherits Rectangle {
-    in property <string> balance-text: "余额：--";
-    in property <string> usage-text: "并发额度：--";
-    in property <string> recharge-notice: "充值页面暂作为公告页，首版仅支持 CDK 兑换。";
+    in property <string> balance-text: "剩余 Token：--";
+    in property <string> usage-text: "累计消费：--";
+    in property <string> recharge-notice: "兑换 Token CDK 后，可在计费中心查看剩余、充值与消费明细。";
     in property <string> user-label: "未登录";
     in property <string> account-status-text: "账户状态：待登录";
 
@@ -43,7 +43,7 @@ export component DashboardScreen inherits Rectangle {
         border-color: #d7e4f0;
         border-width: 0px;
 
-        Text { x: 16px; y: 14px; text: "余额"; color: #596064; font-size: 12px; font-weight: 700; }
+        Text { x: 16px; y: 14px; text: "剩余"; color: #596064; font-size: 12px; font-weight: 700; }
         Text { x: 16px; y: 38px; text: root.balance-text; color: #2c3437; font-size: 18px; font-weight: 800; }
     }
 
@@ -57,7 +57,7 @@ export component DashboardScreen inherits Rectangle {
         border-color: #d7e4f0;
         border-width: 0px;
 
-        Text { x: 16px; y: 14px; text: "并发"; color: #596064; font-size: 12px; font-weight: 700; }
+        Text { x: 16px; y: 14px; text: "消费"; color: #596064; font-size: 12px; font-weight: 700; }
         Text { x: 16px; y: 38px; text: root.usage-text; color: #2c3437; font-size: 18px; font-weight: 800; }
     }
 

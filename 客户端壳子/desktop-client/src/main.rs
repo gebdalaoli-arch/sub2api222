@@ -19,6 +19,7 @@ use sub2api_desktop::{
             LoginResponse, RefreshTokenRequest, RegisterRequest, ResetPasswordRequest,
             SendVerifyCodeRequest,
         },
+        billing_summary::{fetch_billing_summary_blocking, BillingSummary},
         desktop_sessions::{
             create_desktop_session_blocking, refresh_desktop_session_blocking,
             revoke_desktop_session_blocking, DesktopSessionCreateRequest, DesktopSessionTarget,
@@ -45,7 +46,7 @@ use sub2api_desktop::{
         auth_flow::{build_login_submission, should_restore_session, LoginSubmission},
         launch_errors::describe_platform_launch_error,
         view_models::{
-            billing_vm::{format_token_equivalent, BillingViewModel},
+            billing_vm::BillingViewModel,
             dashboard_vm::DashboardViewModel,
             launch_vm::LaunchViewModel,
             update_vm::{UpdateDialogState, UpdateViewModel},
@@ -81,6 +82,7 @@ struct AuthSession {
 
 type SharedAuthSession = Arc<Mutex<Option<AuthSession>>>;
 type SharedGroups = Arc<Mutex<Vec<GroupSummary>>>;
+type SharedBillingSummary = Arc<Mutex<Option<BillingSummary>>>;
 type SharedSubscriptionSummary = Arc<Mutex<Option<SubscriptionSummary>>>;
 type SharedRedeemHistory = Arc<Mutex<Vec<RedeemHistoryItem>>>;
 type SharedOrders = Arc<Mutex<Vec<PaymentOrder>>>;
@@ -174,6 +176,7 @@ fn main() -> anyhow::Result<()> {
     let auth_session: SharedAuthSession = Arc::new(Mutex::new(None));
     let pending_totp_token = Arc::new(Mutex::new(None::<String>));
     let available_groups: SharedGroups = Arc::new(Mutex::new(Vec::new()));
+    let billing_summary: SharedBillingSummary = Arc::new(Mutex::new(None));
     let subscription_summary: SharedSubscriptionSummary = Arc::new(Mutex::new(None));
     let redeem_history: SharedRedeemHistory = Arc::new(Mutex::new(Vec::new()));
     let recent_orders: SharedOrders = Arc::new(Mutex::new(Vec::new()));
@@ -208,6 +211,7 @@ fn main() -> anyhow::Result<()> {
         Arc::clone(&auth_session),
         Arc::clone(&pending_totp_token),
         Arc::clone(&available_groups),
+        Arc::clone(&billing_summary),
         Arc::clone(&subscription_summary),
         Arc::clone(&redeem_history),
         Arc::clone(&recent_orders),
@@ -221,6 +225,7 @@ fn main() -> anyhow::Result<()> {
         Arc::clone(&config),
         Arc::clone(&auth_session),
         Arc::clone(&available_groups),
+        Arc::clone(&billing_summary),
         Arc::clone(&subscription_summary),
         Arc::clone(&redeem_history),
         Arc::clone(&recent_orders),
@@ -234,6 +239,7 @@ fn main() -> anyhow::Result<()> {
         Arc::clone(&config),
         Arc::clone(&auth_session),
         Arc::clone(&available_groups),
+        Arc::clone(&billing_summary),
         Arc::clone(&subscription_summary),
         Arc::clone(&redeem_history),
         Arc::clone(&recent_orders),
@@ -256,6 +262,7 @@ fn main() -> anyhow::Result<()> {
         Arc::clone(&auth_session),
         Arc::clone(&pending_totp_token),
         Arc::clone(&available_groups),
+        Arc::clone(&billing_summary),
         Arc::clone(&subscription_summary),
         Arc::clone(&redeem_history),
         Arc::clone(&recent_orders),
@@ -581,6 +588,7 @@ fn wire_auth_callbacks(
     auth_session: SharedAuthSession,
     pending_totp_token: Arc<Mutex<Option<String>>>,
     available_groups: SharedGroups,
+    billing_summary: SharedBillingSummary,
     subscription_summary: SharedSubscriptionSummary,
     redeem_history: SharedRedeemHistory,
     recent_orders: SharedOrders,
@@ -596,6 +604,7 @@ fn wire_auth_callbacks(
     let login_session = Arc::clone(&auth_session);
     let login_totp = Arc::clone(&pending_totp_token);
     let login_groups = Arc::clone(&available_groups);
+    let login_billing_summary = Arc::clone(&billing_summary);
     let login_summary = Arc::clone(&subscription_summary);
     let login_history = Arc::clone(&redeem_history);
     let login_orders = Arc::clone(&recent_orders);
@@ -643,6 +652,7 @@ fn wire_auth_callbacks(
         let auth_session = Arc::clone(&login_session);
         let pending_totp_token = Arc::clone(&login_totp);
         let available_groups = Arc::clone(&login_groups);
+        let billing_summary = Arc::clone(&login_billing_summary);
         let subscription_summary = Arc::clone(&login_summary);
         let redeem_history = Arc::clone(&login_history);
         let recent_orders = Arc::clone(&login_orders);
@@ -677,6 +687,7 @@ fn wire_auth_callbacks(
                         &auth_session,
                         &pending_totp_token,
                         &available_groups,
+                        &billing_summary,
                         &subscription_summary,
                         &redeem_history,
                         &recent_orders,
@@ -689,13 +700,18 @@ fn wire_auth_callbacks(
                         auth,
                     );
                     let groups_snapshot = current_groups_snapshot(&available_groups);
+                    let billing_summary_snapshot =
+                        current_billing_summary_snapshot(&billing_summary);
                     let billing_vm = current_billing_vm(
                         &auth_session,
                         &available_groups,
+                        &billing_summary,
                         &subscription_summary,
                         &recent_orders,
                         &redeem_history,
                     );
+                    let dashboard_vm =
+                        current_dashboard_vm(&auth_session, &billing_summary);
                     let checkout_snapshot = current_checkout_snapshot(&checkout_info);
                     let usage_vm = current_usage_vm(&usage_page);
                     let group_count = Some(groups_snapshot.len());
@@ -707,8 +723,9 @@ fn wire_auth_callbacks(
                                 &app,
                                 &session,
                                 group_count,
-                                first_openai_group(&groups_snapshot),
+                                billing_summary_snapshot.as_ref(),
                             );
+                            apply_dashboard_state(&app, &dashboard_vm);
                             apply_available_groups_state(&app, &groups_snapshot);
                             apply_billing_state(&app, &billing_vm);
                             apply_checkout_state(&app, checkout_snapshot.as_ref());
@@ -750,6 +767,7 @@ fn wire_auth_callbacks(
     let register_session = Arc::clone(&auth_session);
     let register_totp = Arc::clone(&pending_totp_token);
     let register_groups = Arc::clone(&available_groups);
+    let register_billing_summary = Arc::clone(&billing_summary);
     let register_summary = Arc::clone(&subscription_summary);
     let register_history = Arc::clone(&redeem_history);
     let register_orders = Arc::clone(&recent_orders);
@@ -787,6 +805,7 @@ fn wire_auth_callbacks(
         let auth_session = Arc::clone(&register_session);
         let pending_totp_token = Arc::clone(&register_totp);
         let available_groups = Arc::clone(&register_groups);
+        let billing_summary = Arc::clone(&register_billing_summary);
         let subscription_summary = Arc::clone(&register_summary);
         let redeem_history = Arc::clone(&register_history);
         let recent_orders = Arc::clone(&register_orders);
@@ -808,6 +827,7 @@ fn wire_auth_callbacks(
                         &auth_session,
                         &pending_totp_token,
                         &available_groups,
+                        &billing_summary,
                         &subscription_summary,
                         &redeem_history,
                         &recent_orders,
@@ -820,13 +840,17 @@ fn wire_auth_callbacks(
                         auth,
                     );
                     let groups_snapshot = current_groups_snapshot(&available_groups);
+                    let billing_summary_snapshot =
+                        current_billing_summary_snapshot(&billing_summary);
                     let billing_vm = current_billing_vm(
                         &auth_session,
                         &available_groups,
+                        &billing_summary,
                         &subscription_summary,
                         &recent_orders,
                         &redeem_history,
                     );
+                    let dashboard_vm = current_dashboard_vm(&auth_session, &billing_summary);
                     let checkout_snapshot = current_checkout_snapshot(&checkout_info);
                     let usage_vm = current_usage_vm(&usage_page);
                     let group_count = Some(groups_snapshot.len());
@@ -838,8 +862,9 @@ fn wire_auth_callbacks(
                                 &app,
                                 &session,
                                 group_count,
-                                first_openai_group(&groups_snapshot),
+                                billing_summary_snapshot.as_ref(),
                             );
+                            apply_dashboard_state(&app, &dashboard_vm);
                             apply_available_groups_state(&app, &groups_snapshot);
                             apply_billing_state(&app, &billing_vm);
                             apply_checkout_state(&app, checkout_snapshot.as_ref());
@@ -988,6 +1013,7 @@ fn wire_billing_callbacks(
     config: Arc<AppConfig>,
     auth_session: SharedAuthSession,
     available_groups: SharedGroups,
+    billing_summary: SharedBillingSummary,
     subscription_summary: SharedSubscriptionSummary,
     redeem_history: SharedRedeemHistory,
     recent_orders: SharedOrders,
@@ -1000,6 +1026,7 @@ fn wire_billing_callbacks(
     let redeem_config = Arc::clone(&config);
     let redeem_session = Arc::clone(&auth_session);
     let redeem_groups = Arc::clone(&available_groups);
+    let redeem_billing_summary = Arc::clone(&billing_summary);
     let redeem_summary = Arc::clone(&subscription_summary);
     let redeem_history_store = Arc::clone(&redeem_history);
     let redeem_orders = Arc::clone(&recent_orders);
@@ -1021,6 +1048,7 @@ fn wire_billing_callbacks(
         let config = Arc::clone(&redeem_config);
         let auth_session = Arc::clone(&redeem_session);
         let available_groups = Arc::clone(&redeem_groups);
+        let billing_summary = Arc::clone(&redeem_billing_summary);
         let subscription_summary = Arc::clone(&redeem_summary);
         let redeem_history_store = Arc::clone(&redeem_history_store);
         let recent_orders = Arc::clone(&redeem_orders);
@@ -1044,6 +1072,7 @@ fn wire_billing_callbacks(
                         &client,
                         &auth_session,
                         &available_groups,
+                        &billing_summary,
                         &subscription_summary,
                         &recent_orders,
                         &redeem_history_store,
@@ -1052,6 +1081,9 @@ fn wire_billing_callbacks(
                         &usage_query,
                     );
                     let checkout_snapshot = current_checkout_snapshot(&checkout_info);
+                    let billing_summary_snapshot =
+                        current_billing_summary_snapshot(&billing_summary);
+                    let dashboard_vm = current_dashboard_vm(&auth_session, &billing_summary);
                     let usage_vm = current_usage_vm(&usage_page);
 
                     if let Some(user) = updated_user {
@@ -1072,8 +1104,9 @@ fn wire_billing_callbacks(
                                 &app,
                                 &session,
                                 group_count,
-                                first_openai_group(&groups_snapshot),
+                                billing_summary_snapshot.as_ref(),
                             );
+                            apply_dashboard_state(&app, &dashboard_vm);
                         }
                         apply_available_groups_state(&app, &groups_snapshot);
                         apply_billing_state(&app, &billing_vm);
@@ -1095,6 +1128,7 @@ fn wire_billing_callbacks(
     let recharge_app = app.as_weak();
     let recharge_config = Arc::clone(&config);
     let recharge_session = Arc::clone(&auth_session);
+    let recharge_billing = Arc::clone(&billing_summary);
     let recharge_summary = Arc::clone(&subscription_summary);
     let recharge_history = Arc::clone(&redeem_history);
     let recharge_orders = Arc::clone(&recent_orders);
@@ -1118,6 +1152,7 @@ fn wire_billing_callbacks(
         let ui_handle = recharge_app.clone();
         let config = Arc::clone(&recharge_config);
         let auth_session = Arc::clone(&recharge_session);
+        let billing_summary = Arc::clone(&recharge_billing);
         let subscription_summary = Arc::clone(&recharge_summary);
         let redeem_history = Arc::clone(&recharge_history);
         let recent_orders = Arc::clone(&recharge_orders);
@@ -1130,14 +1165,18 @@ fn wire_billing_callbacks(
         thread::spawn(move || {
             let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) else {
                 let _ = ui_handle.upgrade_in_event_loop(move |app| {
-                    app.set_billing_checkout_status_text(SharedString::from("请先登录后再创建充值订单。"))
+                    app.set_billing_checkout_status_text(SharedString::from(
+                        "请先登录后再创建充值订单。",
+                    ))
                 });
                 return;
             };
             let checkout_snapshot = current_checkout_snapshot(&checkout_info);
             let Some(checkout) = checkout_snapshot.as_ref() else {
                 let _ = ui_handle.upgrade_in_event_loop(move |app| {
-                    app.set_billing_checkout_status_text(SharedString::from("当前支付配置尚未加载，请先刷新计费数据。"))
+                    app.set_billing_checkout_status_text(SharedString::from(
+                        "当前支付配置尚未加载，请先刷新计费数据。",
+                    ))
                 });
                 return;
             };
@@ -1181,6 +1220,7 @@ fn wire_billing_callbacks(
                         &client,
                         &auth_session,
                         &available_groups,
+                        &billing_summary,
                         &subscription_summary,
                         &recent_orders,
                         &redeem_history,
@@ -1217,6 +1257,7 @@ fn wire_billing_callbacks(
     let subscribe_app = app.as_weak();
     let subscribe_config = Arc::clone(&config);
     let subscribe_session = Arc::clone(&auth_session);
+    let subscribe_billing = Arc::clone(&billing_summary);
     let subscribe_summary = Arc::clone(&subscription_summary);
     let subscribe_history = Arc::clone(&redeem_history);
     let subscribe_orders = Arc::clone(&recent_orders);
@@ -1234,6 +1275,7 @@ fn wire_billing_callbacks(
         let ui_handle = subscribe_app.clone();
         let config = Arc::clone(&subscribe_config);
         let auth_session = Arc::clone(&subscribe_session);
+        let billing_summary = Arc::clone(&subscribe_billing);
         let subscription_summary = Arc::clone(&subscribe_summary);
         let redeem_history = Arc::clone(&subscribe_history);
         let recent_orders = Arc::clone(&subscribe_orders);
@@ -1247,14 +1289,18 @@ fn wire_billing_callbacks(
         thread::spawn(move || {
             let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) else {
                 let _ = ui_handle.upgrade_in_event_loop(move |app| {
-                    app.set_billing_checkout_status_text(SharedString::from("请先登录后再创建订阅订单。"))
+                    app.set_billing_checkout_status_text(SharedString::from(
+                        "请先登录后再创建订阅订单。",
+                    ))
                 });
                 return;
             };
             let checkout_snapshot = current_checkout_snapshot(&checkout_info);
             let Some(checkout) = checkout_snapshot.as_ref() else {
                 let _ = ui_handle.upgrade_in_event_loop(move |app| {
-                    app.set_billing_checkout_status_text(SharedString::from("当前支付配置尚未加载，请先刷新计费数据。"))
+                    app.set_billing_checkout_status_text(SharedString::from(
+                        "当前支付配置尚未加载，请先刷新计费数据。",
+                    ))
                 });
                 return;
             };
@@ -1305,6 +1351,7 @@ fn wire_billing_callbacks(
                         &client,
                         &auth_session,
                         &available_groups,
+                        &billing_summary,
                         &subscription_summary,
                         &recent_orders,
                         &redeem_history,
@@ -1343,8 +1390,14 @@ fn wire_billing_callbacks(
         let Some(app) = reopen_payment_app.upgrade() else {
             return;
         };
-        let Some(pending) = reopen_pending_payment.lock().ok().and_then(|state| state.clone()) else {
-            app.set_billing_checkout_status_text(SharedString::from("当前没有可重新打开的待支付订单。"));
+        let Some(pending) = reopen_pending_payment
+            .lock()
+            .ok()
+            .and_then(|state| state.clone())
+        else {
+            app.set_billing_checkout_status_text(SharedString::from(
+                "当前没有可重新打开的待支付订单。",
+            ));
             return;
         };
         match open_external_target(&pending.open_target) {
@@ -1362,6 +1415,7 @@ fn wire_billing_callbacks(
     let refresh_billing_config = Arc::clone(&config);
     let refresh_billing_session = Arc::clone(&auth_session);
     let refresh_billing_groups = Arc::clone(&available_groups);
+    let refresh_billing_token_summary = Arc::clone(&billing_summary);
     let refresh_billing_summary = Arc::clone(&subscription_summary);
     let refresh_billing_history = Arc::clone(&redeem_history);
     let refresh_billing_orders = Arc::clone(&recent_orders);
@@ -1379,6 +1433,7 @@ fn wire_billing_callbacks(
         let config = Arc::clone(&refresh_billing_config);
         let auth_session = Arc::clone(&refresh_billing_session);
         let available_groups = Arc::clone(&refresh_billing_groups);
+        let billing_summary = Arc::clone(&refresh_billing_token_summary);
         let subscription_summary = Arc::clone(&refresh_billing_summary);
         let redeem_history = Arc::clone(&refresh_billing_history);
         let recent_orders = Arc::clone(&refresh_billing_orders);
@@ -1390,7 +1445,9 @@ fn wire_billing_callbacks(
             let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) else {
                 let _ = ui_handle.upgrade_in_event_loop(move |app| {
                     apply_checkout_state(&app, None);
-                    app.set_billing_checkout_status_text(SharedString::from("请先登录后再刷新计费数据。"))
+                    app.set_billing_checkout_status_text(SharedString::from(
+                        "请先登录后再刷新计费数据。",
+                    ))
                 });
                 return;
             };
@@ -1404,13 +1461,16 @@ fn wire_billing_callbacks(
                 .and_then(|pending| {
                     fetch_order_blocking(&client, pending.order_id)
                         .ok()
-                        .map(|order| format!("最近订单 #{} 当前状态：{}", pending.order_id, order.status))
+                        .map(|order| {
+                            format!("最近订单 #{} 当前状态：{}", pending.order_id, order.status)
+                        })
                 });
 
             let (group_count, groups_snapshot, billing_vm) = sync_user_side_state(
                 &client,
                 &auth_session,
                 &available_groups,
+                &billing_summary,
                 &subscription_summary,
                 &recent_orders,
                 &redeem_history,
@@ -1419,6 +1479,8 @@ fn wire_billing_callbacks(
                 &usage_query,
             );
             let checkout_snapshot = current_checkout_snapshot(&checkout_info);
+            let billing_summary_snapshot = current_billing_summary_snapshot(&billing_summary);
+            let dashboard_vm = current_dashboard_vm(&auth_session, &billing_summary);
             let usage_vm = current_usage_vm(&usage_page);
             let status_message = pending_order_status
                 .unwrap_or_else(|| "计费数据已刷新，可继续创建或追踪订单。".to_string());
@@ -1428,8 +1490,9 @@ fn wire_billing_callbacks(
                         &app,
                         &session,
                         group_count,
-                        first_openai_group(&groups_snapshot),
+                        billing_summary_snapshot.as_ref(),
                     );
+                    apply_dashboard_state(&app, &dashboard_vm);
                 }
                 apply_available_groups_state(&app, &groups_snapshot);
                 apply_billing_state(&app, &billing_vm);
@@ -1453,14 +1516,12 @@ fn wire_usage_callbacks(
     usage_page: SharedUsagePage,
     usage_query: SharedUsageQuery,
 ) {
-    let bind_usage_loader = |
-        app_handle: slint::Weak<AppWindow>,
-        config: Arc<AppConfig>,
-        auth_session: SharedAuthSession,
-        usage_page: SharedUsagePage,
-        usage_query: SharedUsageQuery,
-        status_text: &'static str,
-    | {
+    let bind_usage_loader = |app_handle: slint::Weak<AppWindow>,
+                             config: Arc<AppConfig>,
+                             auth_session: SharedAuthSession,
+                             usage_page: SharedUsagePage,
+                             usage_query: SharedUsageQuery,
+                             status_text: &'static str| {
         thread::spawn(move || {
             let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) else {
                 let _ = app_handle.upgrade_in_event_loop(move |app| {
@@ -1474,7 +1535,8 @@ fn wire_usage_callbacks(
             match fetch_and_store_usage_page(&client, &usage_page, &usage_query) {
                 Ok(_) => {
                     let usage_vm = current_usage_vm(&usage_page);
-                    let selected_index = current_usage_query_state(&usage_query).view_mode.to_index();
+                    let selected_index =
+                        current_usage_query_state(&usage_query).view_mode.to_index();
                     let _ = app_handle.upgrade_in_event_loop(move |app| {
                         apply_usage_state(&app, &usage_vm);
                         app.set_usage_selected_view_mode_index(selected_index);
@@ -1554,7 +1616,11 @@ fn wire_usage_callbacks(
             Arc::clone(&next_session),
             Arc::clone(&next_usage_page),
             Arc::clone(&next_usage_query),
-            if can_advance { "已切换到下一页。" } else { "已经是最后一页。" },
+            if can_advance {
+                "已切换到下一页。"
+            } else {
+                "已经是最后一页。"
+            },
         );
     });
 
@@ -1723,7 +1789,9 @@ fn wire_use_key_callbacks(
                 }
                 _ => {
                     let _ = ui_handle.upgrade_in_event_loop(move |app| {
-                        app.set_view_key_status_text(SharedString::from("密码校验失败，无法查看使用密钥。"));
+                        app.set_view_key_status_text(SharedString::from(
+                            "密码校验失败，无法查看使用密钥。",
+                        ));
                     });
                 }
             }
@@ -1739,6 +1807,7 @@ fn restore_saved_session(
     auth_session: SharedAuthSession,
     pending_totp_token: Arc<Mutex<Option<String>>>,
     available_groups: SharedGroups,
+    billing_summary: SharedBillingSummary,
     subscription_summary: SharedSubscriptionSummary,
     redeem_history: SharedRedeemHistory,
     recent_orders: SharedOrders,
@@ -1798,6 +1867,7 @@ fn restore_saved_session(
                                         &user_client,
                                         &auth_session,
                                         &available_groups,
+                                        &billing_summary,
                                         &subscription_summary,
                                         &recent_orders,
                                         &redeem_history,
@@ -1806,14 +1876,19 @@ fn restore_saved_session(
                                         &usage_query,
                                     );
                                 let checkout_snapshot = current_checkout_snapshot(&checkout_info);
+                                let billing_summary_snapshot =
+                                    current_billing_summary_snapshot(&billing_summary);
+                                let dashboard_vm =
+                                    current_dashboard_vm(&auth_session, &billing_summary);
                                 let usage_vm = current_usage_vm(&usage_page);
                                 let _ = app_handle.upgrade_in_event_loop(move |app| {
                                     apply_authenticated_state(
                                         &app,
                                         &session,
                                         group_count,
-                                        first_openai_group(&groups_snapshot),
+                                        billing_summary_snapshot.as_ref(),
                                     );
+                                    apply_dashboard_state(&app, &dashboard_vm);
                                     apply_available_groups_state(&app, &groups_snapshot);
                                     apply_billing_state(&app, &billing_vm);
                                     apply_checkout_state(&app, checkout_snapshot.as_ref());
@@ -1849,6 +1924,7 @@ fn restore_saved_session(
                                                 &auth_session,
                                                 &pending_totp_token,
                                                 &available_groups,
+                                                &billing_summary,
                                                 &subscription_summary,
                                                 &redeem_history,
                                                 &recent_orders,
@@ -1860,15 +1936,24 @@ fn restore_saved_session(
                                                 Some(password),
                                                 auth,
                                             );
-                                            let groups_snapshot = current_groups_snapshot(&available_groups);
+                                            let groups_snapshot =
+                                                current_groups_snapshot(&available_groups);
+                                            let billing_summary_snapshot =
+                                                current_billing_summary_snapshot(&billing_summary);
                                             let billing_vm = current_billing_vm(
                                                 &auth_session,
                                                 &available_groups,
+                                                &billing_summary,
                                                 &subscription_summary,
                                                 &recent_orders,
                                                 &redeem_history,
                                             );
-                                            let checkout_snapshot = current_checkout_snapshot(&checkout_info);
+                                            let dashboard_vm = current_dashboard_vm(
+                                                &auth_session,
+                                                &billing_summary,
+                                            );
+                                            let checkout_snapshot =
+                                                current_checkout_snapshot(&checkout_info);
                                             let usage_vm = current_usage_vm(&usage_page);
                                             let group_count = Some(groups_snapshot.len());
                                             let _ = app_handle.upgrade_in_event_loop(move |app| {
@@ -1881,11 +1966,18 @@ fn restore_saved_session(
                                                         &app,
                                                         &session,
                                                         group_count,
-                                                        first_openai_group(&groups_snapshot),
+                                                        billing_summary_snapshot.as_ref(),
                                                     );
-                                                    apply_available_groups_state(&app, &groups_snapshot);
+                                                    apply_dashboard_state(&app, &dashboard_vm);
+                                                    apply_available_groups_state(
+                                                        &app,
+                                                        &groups_snapshot,
+                                                    );
                                                     apply_billing_state(&app, &billing_vm);
-                                                    apply_checkout_state(&app, checkout_snapshot.as_ref());
+                                                    apply_checkout_state(
+                                                        &app,
+                                                        checkout_snapshot.as_ref(),
+                                                    );
                                                     apply_usage_state(&app, &usage_vm);
                                                     app.set_auth_status_text(SharedString::from(
                                                         "已用保存的账号密码恢复登录状态。",
@@ -1896,9 +1988,9 @@ fn restore_saved_session(
                                         Ok(LoginResponse::TotpRequired { .. }) | Err(_) => {
                                             let _ = app_handle.upgrade_in_event_loop(move |app| {
                                                 apply_logged_out_state(&app);
-                                                app.set_auth_status_text(SharedString::from(format!(
-                                                    "恢复登录失败：{error}，请重新登录。"
-                                                )));
+                                                app.set_auth_status_text(SharedString::from(
+                                                    format!("恢复登录失败：{error}，请重新登录。"),
+                                                ));
                                             });
                                         }
                                     }
@@ -1927,7 +2019,9 @@ fn restore_saved_session(
         }
         None => {
             if let (Some(email), Some(password)) = (saved_email, saved_password) {
-                app.set_auth_status_text(SharedString::from("正在使用保存的账号密码恢复登录状态..."));
+                app.set_auth_status_text(SharedString::from(
+                    "正在使用保存的账号密码恢复登录状态...",
+                ));
                 thread::spawn(move || {
                     let client = ApiClient::new(config.api_base_url.clone());
                     match login_blocking(
@@ -1946,6 +2040,7 @@ fn restore_saved_session(
                                 &auth_session,
                                 &pending_totp_token,
                                 &available_groups,
+                                &billing_summary,
                                 &subscription_summary,
                                 &redeem_history,
                                 &recent_orders,
@@ -1958,13 +2053,18 @@ fn restore_saved_session(
                                 auth,
                             );
                             let groups_snapshot = current_groups_snapshot(&available_groups);
+                            let billing_summary_snapshot =
+                                current_billing_summary_snapshot(&billing_summary);
                             let billing_vm = current_billing_vm(
                                 &auth_session,
                                 &available_groups,
+                                &billing_summary,
                                 &subscription_summary,
                                 &recent_orders,
                                 &redeem_history,
                             );
+                            let dashboard_vm =
+                                current_dashboard_vm(&auth_session, &billing_summary);
                             let checkout_snapshot = current_checkout_snapshot(&checkout_info);
                             let usage_vm = current_usage_vm(&usage_page);
                             let group_count = Some(groups_snapshot.len());
@@ -1976,8 +2076,9 @@ fn restore_saved_session(
                                         &app,
                                         &session,
                                         group_count,
-                                        first_openai_group(&groups_snapshot),
+                                        billing_summary_snapshot.as_ref(),
                                     );
+                                    apply_dashboard_state(&app, &dashboard_vm);
                                     apply_available_groups_state(&app, &groups_snapshot);
                                     apply_billing_state(&app, &billing_vm);
                                     apply_checkout_state(&app, checkout_snapshot.as_ref());
@@ -2015,6 +2116,7 @@ fn handle_auth_success(
     auth_session: &SharedAuthSession,
     pending_totp_token: &Arc<Mutex<Option<String>>>,
     available_groups: &SharedGroups,
+    billing_summary: &SharedBillingSummary,
     subscription_summary: &SharedSubscriptionSummary,
     redeem_history: &SharedRedeemHistory,
     recent_orders: &SharedOrders,
@@ -2061,6 +2163,7 @@ fn handle_auth_success(
         &client,
         auth_session,
         available_groups,
+        billing_summary,
         subscription_summary,
         recent_orders,
         redeem_history,
@@ -2250,6 +2353,7 @@ fn sync_user_side_state(
     client: &ApiClient,
     auth_session: &SharedAuthSession,
     available_groups: &SharedGroups,
+    billing_summary: &SharedBillingSummary,
     subscription_summary: &SharedSubscriptionSummary,
     recent_orders: &SharedOrders,
     redeem_history: &SharedRedeemHistory,
@@ -2258,13 +2362,20 @@ fn sync_user_side_state(
     usage_query: &SharedUsageQuery,
 ) -> (Option<usize>, Vec<GroupSummary>, BillingViewModel) {
     let group_count = refresh_available_groups_state(client, available_groups);
-    refresh_billing_state(client, subscription_summary, recent_orders, redeem_history);
+    refresh_billing_state(
+        client,
+        billing_summary,
+        subscription_summary,
+        recent_orders,
+        redeem_history,
+    );
     refresh_checkout_info_state(client, checkout_info);
     refresh_usage_page_state(client, usage_page, usage_query);
     let groups_snapshot = current_groups_snapshot(available_groups);
     let billing_vm = current_billing_vm(
         auth_session,
         available_groups,
+        billing_summary,
         subscription_summary,
         recent_orders,
         redeem_history,
@@ -2290,10 +2401,16 @@ fn refresh_available_groups_state(
 
 fn refresh_billing_state(
     client: &ApiClient,
+    billing_summary: &SharedBillingSummary,
     subscription_summary: &SharedSubscriptionSummary,
     recent_orders: &SharedOrders,
     redeem_history: &SharedRedeemHistory,
 ) {
+    if let Ok(summary) = fetch_billing_summary_blocking(client) {
+        if let Ok(mut state) = billing_summary.lock() {
+            *state = Some(summary);
+        }
+    }
     if let Ok(summary) = fetch_subscription_summary_blocking(client) {
         if let Ok(mut state) = subscription_summary.lock() {
             *state = Some(summary);
@@ -2418,7 +2535,11 @@ fn export_usage_excel(
         let row = (index + 1) as u32;
         worksheet.write_string(row, 0, item.model.as_str())?;
         worksheet.write_string(row, 1, item.created_at.as_str())?;
-        worksheet.write_number(row, 2, (item.input_tokens + item.cache_creation_tokens + item.cache_read_tokens) as f64)?;
+        worksheet.write_number(
+            row,
+            2,
+            (item.input_tokens + item.cache_creation_tokens + item.cache_read_tokens) as f64,
+        )?;
         worksheet.write_string(
             row,
             3,
@@ -2457,23 +2578,37 @@ fn platform_launch_groups(groups: &[GroupSummary]) -> Vec<GroupSummary> {
 }
 
 fn current_checkout_snapshot(checkout_info: &SharedCheckoutInfo) -> Option<CheckoutInfo> {
-    checkout_info
-        .lock()
-        .ok()
-        .and_then(|state| state.clone())
+    checkout_info.lock().ok().and_then(|state| state.clone())
 }
 
 fn current_usage_vm(usage_page: &SharedUsagePage) -> UsageDetailViewModel {
-    let page = usage_page
+    let page = usage_page.lock().ok().and_then(|state| state.clone());
+    UsageDetailViewModel::from_page(page.as_ref())
+}
+
+fn current_billing_summary_snapshot(
+    billing_summary: &SharedBillingSummary,
+) -> Option<BillingSummary> {
+    billing_summary.lock().ok().and_then(|state| state.clone())
+}
+
+fn current_dashboard_vm(
+    auth_session: &SharedAuthSession,
+    billing_summary: &SharedBillingSummary,
+) -> DashboardViewModel {
+    let user = auth_session
         .lock()
         .ok()
-        .and_then(|state| state.clone());
-    UsageDetailViewModel::from_page(page.as_ref())
+        .and_then(|state| state.as_ref().map(|session| session.user.clone()));
+    let summary = current_billing_summary_snapshot(billing_summary);
+    user.map(|user| DashboardViewModel::from_user_and_billing(&user, summary.as_ref()))
+        .unwrap_or_else(DashboardViewModel::empty)
 }
 
 fn current_billing_vm(
     auth_session: &SharedAuthSession,
     available_groups: &SharedGroups,
+    billing_summary: &SharedBillingSummary,
     subscription_summary: &SharedSubscriptionSummary,
     recent_orders: &SharedOrders,
     redeem_history: &SharedRedeemHistory,
@@ -2482,6 +2617,7 @@ fn current_billing_vm(
         .lock()
         .ok()
         .and_then(|state| state.as_ref().map(|session| session.user.clone()));
+    let token_summary = current_billing_summary_snapshot(billing_summary);
     let summary = subscription_summary
         .lock()
         .ok()
@@ -2506,7 +2642,10 @@ fn current_billing_vm(
         .filter(|group| group.platform == GroupPlatform::OpenAI)
         .cloned()
         .collect::<Vec<_>>();
-    let openai_group_ids = openai_groups.iter().map(|group| group.id).collect::<Vec<_>>();
+    let openai_group_ids = openai_groups
+        .iter()
+        .map(|group| group.id)
+        .collect::<Vec<_>>();
     let filtered_summary = summary.map(|current| SubscriptionSummary {
         active_count: current
             .subscriptions
@@ -2529,10 +2668,15 @@ fn current_billing_vm(
     let active_openai_group = filtered_summary
         .as_ref()
         .and_then(|current| current.subscriptions.first())
-        .and_then(|subscription| openai_groups.iter().find(|group| group.id == subscription.group_id))
+        .and_then(|subscription| {
+            openai_groups
+                .iter()
+                .find(|group| group.id == subscription.group_id)
+        })
         .or_else(|| openai_groups.first());
     BillingViewModel::from_account_state(
         user.as_ref(),
+        token_summary.as_ref(),
         filtered_summary.as_ref(),
         &orders,
         &history,
@@ -2554,8 +2698,8 @@ fn apply_logged_out_state(app: &AppWindow) {
     app.set_current_section(0);
     app.set_brand_status_copy(SharedString::from("你的电子牛马已就位。"));
     app.set_dashboard_user_label(SharedString::from("当前账号：未登录"));
-    app.set_dashboard_balance_text(SharedString::from("余额：--"));
-    app.set_dashboard_usage_text(SharedString::from("并发额度：--"));
+    app.set_dashboard_balance_text(SharedString::from("剩余 Token：--"));
+    app.set_dashboard_usage_text(SharedString::from("累计消费：--"));
     app.set_dashboard_account_status_text(SharedString::from("账户状态：待登录"));
     app.set_dashboard_notice_text(SharedString::from(
         "登录后可直接查看余额、套餐、订单与兑换记录，并在需要时切换到官方模式。",
@@ -2573,22 +2717,19 @@ fn apply_authenticated_state(
     app: &AppWindow,
     session: &AuthSession,
     group_count: Option<usize>,
-    openai_group: Option<&GroupSummary>,
+    billing_summary: Option<&BillingSummary>,
 ) {
     app.set_session_active(true);
     app.set_auth_subview(0);
     app.set_show_login_totp(false);
     app.set_current_section(0);
     app.set_brand_status_copy(SharedString::from("电子牛马已经把你的工作台准备好了。"));
-    let dashboard = DashboardViewModel::from_user(&session.user);
+    let dashboard = DashboardViewModel::from_user_and_billing(&session.user, billing_summary);
     app.set_dashboard_user_label(SharedString::from(format!(
         "当前账号：{}",
         session.user.display_name()
     )));
-    let balance_text = openai_group
-        .map(|group| format!("余额：{}", format_token_equivalent(session.user.balance, Some(group))))
-        .unwrap_or(dashboard.balance_text);
-    app.set_dashboard_balance_text(SharedString::from(balance_text));
+    app.set_dashboard_balance_text(SharedString::from(dashboard.balance_text));
     app.set_dashboard_usage_text(SharedString::from(dashboard.usage_text));
     app.set_dashboard_account_status_text(SharedString::from(format!(
         "账户状态：{}{}",
@@ -2607,6 +2748,11 @@ fn apply_authenticated_state(
         None => "已登录，但暂未拉到可用分组列表；可稍后重试或继续使用官方模式。".to_string(),
     }));
     app.set_auth_status_text(SharedString::from("登录成功，可继续进入启动中心。"));
+}
+
+fn apply_dashboard_state(app: &AppWindow, dashboard: &DashboardViewModel) {
+    app.set_dashboard_balance_text(SharedString::from(dashboard.balance_text.clone()));
+    app.set_dashboard_usage_text(SharedString::from(dashboard.usage_text.clone()));
 }
 
 fn wire_update_callbacks(app: &AppWindow, config: Arc<AppConfig>) {
@@ -2764,12 +2910,7 @@ fn apply_update_view_model(app: &AppWindow, vm: &UpdateViewModel) {
     app.set_update_summary(SharedString::from(vm.summary.clone()));
 }
 
-fn apply_announcement_highlight(
-    app: &AppWindow,
-    latest_version: &str,
-    title: &str,
-    summary: &str,
-) {
+fn apply_announcement_highlight(app: &AppWindow, latest_version: &str, title: &str, summary: &str) {
     app.set_announcement_hero_version(SharedString::from(latest_version.to_string()));
     app.set_announcement_hero_title(SharedString::from(title.to_string()));
     app.set_announcement_hero_summary(SharedString::from(summary.to_string()));
@@ -2803,13 +2944,7 @@ fn apply_desktop_announcements(app: &AppWindow, items: &[DesktopAnnouncementItem
     let feed_lines = items
         .iter()
         .take(6)
-        .map(|item| {
-            SharedString::from(format!(
-                "{}\n{}",
-                item.title,
-                item.content.trim()
-            ))
-        })
+        .map(|item| SharedString::from(format!("{}\n{}", item.title, item.content.trim())))
         .collect::<Vec<_>>();
     app.set_announcement_feed_lines(string_model(feed_lines));
 }
@@ -2845,7 +2980,9 @@ fn apply_available_groups_state(app: &AppWindow, groups: &[GroupSummary]) {
 }
 
 fn first_openai_group(groups: &[GroupSummary]) -> Option<&GroupSummary> {
-    groups.iter().find(|group| group.platform == GroupPlatform::OpenAI)
+    groups
+        .iter()
+        .find(|group| group.platform == GroupPlatform::OpenAI)
 }
 
 fn apply_billing_state(app: &AppWindow, billing: &BillingViewModel) {
@@ -2903,16 +3040,36 @@ fn apply_usage_state(app: &AppWindow, usage: &UsageDetailViewModel) {
     app.set_usage_total_tokens_text(SharedString::from(usage.total_tokens_text.clone()));
     app.set_usage_total_actual_cost_text(SharedString::from(usage.total_actual_cost_text.clone()));
     app.set_usage_model_lines(string_model(
-        usage.model_lines.iter().cloned().map(SharedString::from).collect(),
+        usage
+            .model_lines
+            .iter()
+            .cloned()
+            .map(SharedString::from)
+            .collect(),
     ));
     app.set_usage_time_lines(string_model(
-        usage.time_lines.iter().cloned().map(SharedString::from).collect(),
+        usage
+            .time_lines
+            .iter()
+            .cloned()
+            .map(SharedString::from)
+            .collect(),
     ));
     app.set_usage_input_lines(string_model(
-        usage.input_lines.iter().cloned().map(SharedString::from).collect(),
+        usage
+            .input_lines
+            .iter()
+            .cloned()
+            .map(SharedString::from)
+            .collect(),
     ));
     app.set_usage_output_lines(string_model(
-        usage.output_lines.iter().cloned().map(SharedString::from).collect(),
+        usage
+            .output_lines
+            .iter()
+            .cloned()
+            .map(SharedString::from)
+            .collect(),
     ));
     app.set_usage_page_meta_text(SharedString::from(usage.page_meta_text.clone()));
     app.set_usage_view_mode_options(string_model(
@@ -3011,9 +3168,11 @@ fn ordered_subscription_plans(checkout: &CheckoutInfo) -> Vec<SubscriptionPlan> 
         .cloned()
         .collect::<Vec<_>>();
     plans.sort_by(|left, right| {
-        left.sort_order
-            .cmp(&right.sort_order)
-            .then_with(|| left.price.partial_cmp(&right.price).unwrap_or(std::cmp::Ordering::Equal))
+        left.sort_order.cmp(&right.sort_order).then_with(|| {
+            left.price
+                .partial_cmp(&right.price)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
     });
     plans
 }
@@ -3021,7 +3180,12 @@ fn ordered_subscription_plans(checkout: &CheckoutInfo) -> Vec<SubscriptionPlan> 
 fn ordered_subscription_plan_labels(checkout: &CheckoutInfo) -> Vec<String> {
     ordered_subscription_plans(checkout)
         .into_iter()
-        .map(|plan| format!("{} · ￥{:.2} / {}{}", plan.name, plan.price, plan.validity_days, plan.validity_unit))
+        .map(|plan| {
+            format!(
+                "{} · ￥{:.2} / {}{}",
+                plan.name, plan.price, plan.validity_days, plan.validity_unit
+            )
+        })
         .collect()
 }
 
@@ -3029,11 +3193,19 @@ fn create_payment_open_target(
     result: &sub2api_desktop::api::payment::CreateOrderResult,
     request: &CreateOrderRequest,
 ) -> anyhow::Result<String> {
-    if let Some(pay_url) = result.pay_url.as_deref().filter(|url| !url.trim().is_empty()) {
+    if let Some(pay_url) = result
+        .pay_url
+        .as_deref()
+        .filter(|url| !url.trim().is_empty())
+    {
         return Ok(pay_url.to_string());
     }
 
-    if let Some(qr_code) = result.qr_code.as_deref().filter(|code| !code.trim().is_empty()) {
+    if let Some(qr_code) = result
+        .qr_code
+        .as_deref()
+        .filter(|code| !code.trim().is_empty())
+    {
         let path = write_payment_qr_page(
             result.order_id,
             qr_code,
@@ -3239,7 +3411,9 @@ fn escape_html(input: &str) -> String {
 fn open_external_target(target: &str) -> anyhow::Result<()> {
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new("explorer.exe").arg(target).spawn()?;
+        std::process::Command::new("explorer.exe")
+            .arg(target)
+            .spawn()?;
         return Ok(());
     }
 

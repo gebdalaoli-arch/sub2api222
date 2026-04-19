@@ -1,5 +1,6 @@
 pub mod account;
 pub mod auth;
+pub mod billing_summary;
 pub mod desktop_sessions;
 pub mod groups;
 pub mod http;

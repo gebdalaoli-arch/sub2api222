@@ -35,6 +35,7 @@ pub struct RedeemHistoryItem {
     #[serde(rename = "type")]
     pub r#type: String,
     pub value: f64,
+    pub token_amount: Option<f64>,
     pub status: String,
     pub used_at: String,
     pub created_at: String,
@@ -83,13 +84,14 @@ mod tests {
     fn fetch_redeem_history_blocking_hits_history_endpoint() {
         let (base_url, path_rx) = spawn_api_server(
             "HTTP/1.1 200 OK",
-            "{\"code\":0,\"message\":\"success\",\"data\":[{\"id\":1,\"code\":\"CDK-123\",\"type\":\"subscription\",\"value\":30,\"status\":\"used\",\"used_at\":\"2025-01-02T15:04:05Z\",\"created_at\":\"2025-01-01T15:04:05Z\",\"group_id\":9,\"validity_days\":30,\"group\":{\"id\":9,\"name\":\"OpenAI Pro\"}}]}",
+            "{\"code\":0,\"message\":\"success\",\"data\":[{\"id\":1,\"code\":\"CDK-123\",\"type\":\"token\",\"value\":100000000,\"token_amount\":100000000,\"status\":\"used\",\"used_at\":\"2025-01-02T15:04:05Z\",\"created_at\":\"2025-01-01T15:04:05Z\",\"group_id\":9,\"validity_days\":30,\"group\":{\"id\":9,\"name\":\"OpenAI Pro\"}}]}",
         );
         let client = ApiClient::new(format!("{base_url}/api/v1"));
 
         let history = fetch_redeem_history_blocking(&client).unwrap();
 
         assert_eq!(path_rx.recv().unwrap(), "/api/v1/redeem/history");
+        assert_eq!(history[0].token_amount, Some(100000000.0));
         assert_eq!(
             history[0].group.as_ref().map(|group| group.name.as_str()),
             Some("OpenAI Pro")

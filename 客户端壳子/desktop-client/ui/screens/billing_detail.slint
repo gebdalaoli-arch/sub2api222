@@ -2,8 +2,8 @@ import { Button, LineEdit } from "std-widgets.slint";
 
 export component BillingDetailScreen inherits Rectangle {
     in property <string> plan-title: "暂未开通订阅";
-    in property <string> balance-headline: "¥--";
-    in property <string> usage-caption: "登录后可查看余额与订单明细。";
+    in property <string> balance-headline: "-- Token";
+    in property <string> usage-caption: "登录后可查看剩余 Token、累计充值和累计消费。";
     in property <string> subscription-summary-text: "暂无订阅摘要";
     in property <[string]> subscription-lines: ["登录后可查看当前订阅额度和到期时间。"];
     in property <[string]> subscription-detail-lines: ["暂无订阅明细。"];

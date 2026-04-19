@@ -1,4 +1,6 @@
+use super::billing_vm::format_token_count;
 use crate::api::account::UserProfile;
+use crate::api::billing_summary::BillingSummary;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DashboardViewModel {
@@ -16,13 +18,18 @@ impl DashboardViewModel {
         }
     }
 
-    pub fn from_user(user: &UserProfile) -> Self {
+    pub fn from_user_and_billing(user: &UserProfile, summary: Option<&BillingSummary>) -> Self {
+        let balance_text = summary
+            .map(|item| format!("剩余 Token：{}", format_token_count(item.remaining_tokens)))
+            .unwrap_or_else(|| "剩余 Token：--".to_string());
+        let usage_text = summary
+            .map(|item| format!("累计消费：{}", format_token_count(item.consumed_tokens)))
+            .unwrap_or_else(|| format!("并发额度：{} 路", user.concurrency));
         Self {
-            balance_text: format!("余额：¥{:.2}", user.balance),
-            usage_text: format!("并发额度：{} 路", user.concurrency),
-            recharge_notice:
-                "可在计费中心兑换 CDK，并在需要时查看消费明细、套餐与订单状态。"
-                    .to_string(),
+            balance_text,
+            usage_text,
+            recharge_notice: "可在计费中心兑换 Token CDK，并查看消费明细与 Token 账本。"
+                .to_string(),
         }
     }
 }
@@ -30,7 +37,7 @@ impl DashboardViewModel {
 #[cfg(test)]
 mod tests {
     use super::DashboardViewModel;
-    use crate::api::account::UserProfile;
+    use crate::api::{account::UserProfile, billing_summary::BillingSummary};
 
     #[test]
     fn dashboard_view_model_formats_user_account_without_api_details() {
@@ -46,11 +53,20 @@ mod tests {
             run_mode: Some("simple".to_string()),
         };
 
-        let vm = DashboardViewModel::from_user(&user);
+        let summary = BillingSummary {
+            remaining_milli_tokens: 100_000_000_000,
+            recharged_milli_tokens: 120_000_000_000,
+            consumed_milli_tokens: 20_000_000_000,
+            remaining_tokens: 100_000_000.0,
+            recharged_tokens: 120_000_000.0,
+            consumed_tokens: 20_000_000.0,
+            token_unit: "token".to_string(),
+        };
+        let vm = DashboardViewModel::from_user_and_billing(&user, Some(&summary));
 
-        assert_eq!(vm.balance_text, "余额：¥20.00");
-        assert_eq!(vm.usage_text, "并发额度：3 路");
-        assert!(vm.recharge_notice.contains("兑换 CDK"));
+        assert_eq!(vm.balance_text, "剩余 Token：1亿 Token");
+        assert_eq!(vm.usage_text, "累计消费：2000万 Token");
+        assert!(vm.recharge_notice.contains("Token CDK"));
         assert!(!vm.recharge_notice.contains("API Key"));
     }
 }
