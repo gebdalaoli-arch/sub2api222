@@ -19,6 +19,8 @@ pub struct BillingViewModel {
     pub redeem_history_lines: Vec<String>,
 }
 
+const OPENAI_FALLBACK_INPUT_PRICE_PER_MILLION_TOKENS: f64 = 0.2;
+
 impl BillingViewModel {
     pub fn empty() -> Self {
         Self {
@@ -186,11 +188,15 @@ pub fn format_token_equivalent(balance: f64, group: Option<&GroupSummary>) -> St
         .and_then(|item| item.input_price_per_million_tokens)
         .filter(|price| *price > 0.0)
         .unwrap_or_else(|| {
-            let multiplier = group
-                .map(|item| item.rate_multiplier)
-                .filter(|value| *value > 0.0)
-                .unwrap_or(1.0);
-            multiplier
+            match group.map(|item| item.platform) {
+                Some(crate::api::groups::GroupPlatform::OpenAI) | None => {
+                    OPENAI_FALLBACK_INPUT_PRICE_PER_MILLION_TOKENS
+                }
+                _ => group
+                    .map(|item| item.rate_multiplier)
+                    .filter(|value| *value > 0.0)
+                    .unwrap_or(1.0),
+            }
         });
     let token_total = (balance / price_per_million) * 1_000_000.0;
     let (value, unit) = if token_total >= 1_000_000_000_000.0 {

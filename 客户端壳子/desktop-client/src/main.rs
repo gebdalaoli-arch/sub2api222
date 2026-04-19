@@ -106,7 +106,7 @@ impl Default for UsageQueryState {
     fn default() -> Self {
         Self {
             page: 1,
-            page_size: 20,
+            page_size: 4,
             view_mode: UsageViewMode::ByTime,
         }
     }
