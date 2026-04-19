@@ -97,16 +97,15 @@
             </span>
           </template>
 
-          <template #cell-value="{ value, row }">
+          <template #cell-value="{ row }">
             <span class="text-sm font-medium text-gray-900 dark:text-white">
-              <template v-if="row.type === 'balance'">${{ value.toFixed(2) }}</template>
-              <template v-else-if="row.type === 'subscription'">
-                {{ row.validity_days || 30 }} {{ t('admin.redeem.days') }}
+              <template v-if="row.type === 'subscription' || row.type === 'token'">
+                {{ renderRedeemValue(row) }}
                 <span v-if="row.group" class="ml-1 text-xs text-gray-500 dark:text-gray-400"
                   >({{ row.group.name }})</span
                 >
               </template>
-              <template v-else>{{ value }}</template>
+              <template v-else>{{ renderRedeemValue(row) }}</template>
             </span>
           </template>
 
@@ -220,18 +219,12 @@
             </div>
             <!-- 余额/并发类型：显示数值输入 -->
             <div v-if="generateForm.type !== 'subscription' && generateForm.type !== 'invitation'">
-              <label class="input-label">
-                {{
-                  generateForm.type === 'balance'
-                    ? t('admin.redeem.amount')
-                    : t('admin.redeem.columns.value')
-                }}
-              </label>
+              <label class="input-label">{{ valueLabel }}</label>
               <input
                 v-model.number="generateForm.value"
                 type="number"
-                :step="generateForm.type === 'balance' ? '0.01' : '1'"
-                :min="generateForm.type === 'balance' ? '0.01' : '1'"
+                :step="valueStep"
+                :min="valueMin"
                 required
                 class="input"
               />
@@ -242,14 +235,14 @@
                 {{ t('admin.redeem.invitationHint') }}
               </p>
             </div>
-            <!-- 订阅类型：显示分组选择和有效天数 -->
-            <template v-if="generateForm.type === 'subscription'">
+            <!-- 分组绑定类型：显示分组选择，订阅类型额外显示有效天数 -->
+            <template v-if="redeemTypeNeedsGroup(generateForm.type)">
               <div>
-                <label class="input-label">{{ t('admin.redeem.selectGroup') }}</label>
+                <label class="input-label">{{ groupLabel }}</label>
                 <Select
                   v-model="generateForm.group_id"
-                  :options="subscriptionGroupOptions"
-                  :placeholder="t('admin.redeem.selectGroupPlaceholder')"
+                  :options="currentGroupOptions"
+                  :placeholder="groupPlaceholder"
                 >
                   <template #selected="{ option }">
                     <GroupBadge
@@ -259,9 +252,7 @@
                       :subscription-type="(option as unknown as GroupOption).subscriptionType"
                       :rate-multiplier="(option as unknown as GroupOption).rate"
                     />
-                    <span v-else class="text-gray-400">{{
-                      t('admin.redeem.selectGroupPlaceholder')
-                    }}</span>
+                    <span v-else class="text-gray-400">{{ groupPlaceholder }}</span>
                   </template>
                   <template #option="{ option, selected }">
                     <GroupOptionItem
@@ -275,7 +266,7 @@
                   </template>
                 </Select>
               </div>
-              <div>
+              <div v-if="redeemTypeUsesValidityDays(generateForm.type)">
                 <label class="input-label">{{ t('admin.redeem.validityDays') }}</label>
                 <input
                   v-model.number="generateForm.validity_days"
@@ -407,6 +398,12 @@ import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { adminAPI } from '@/api/admin'
 import { formatDateTime } from '@/utils/format'
 import type { RedeemCode, RedeemCodeType, Group, GroupPlatform, SubscriptionType } from '@/types'
+import {
+  formatAdminRedeemValue,
+  redeemTypeNeedsGroup,
+  redeemTypeUsesTokenValue,
+  redeemTypeUsesValidityDays
+} from './redeem-utils'
 import type { Column } from '@/components/common/types'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
@@ -434,12 +431,25 @@ interface GroupOption {
 const showGenerateDialog = ref(false)
 const showResultDialog = ref(false)
 const generatedCodes = ref<RedeemCode[]>([])
-const subscriptionGroups = ref<Group[]>([])
+const availableGroups = ref<Group[]>([])
 
 // 订阅类型分组选项
 const subscriptionGroupOptions = computed(() => {
-  return subscriptionGroups.value
-    .filter((g) => g.subscription_type === 'subscription')
+  return availableGroups.value
+    .filter((g) => g.subscription_type === 'subscription' && g.status === 'active')
+    .map((g) => ({
+      value: g.id,
+      label: g.name,
+      description: g.description,
+      platform: g.platform,
+      subscriptionType: g.subscription_type,
+      rate: g.rate_multiplier
+    }))
+})
+
+const tokenGroupOptions = computed(() => {
+  return availableGroups.value
+    .filter((g) => g.platform === 'openai' && g.status === 'active')
     .map((g) => ({
       value: g.id,
       label: g.name,
@@ -513,6 +523,7 @@ const typeOptions = computed(() => [
   { value: 'balance', label: t('admin.redeem.balance') },
   { value: 'concurrency', label: t('admin.redeem.concurrency') },
   { value: 'subscription', label: t('admin.redeem.subscription') },
+  { value: 'token', label: t('admin.redeem.token') },
   { value: 'invitation', label: t('admin.redeem.invitation') }
 ])
 
@@ -521,6 +532,7 @@ const filterTypeOptions = computed(() => [
   { value: 'balance', label: t('admin.redeem.balance') },
   { value: 'concurrency', label: t('admin.redeem.concurrency') },
   { value: 'subscription', label: t('admin.redeem.subscription') },
+  { value: 'token', label: t('admin.redeem.token') },
   { value: 'invitation', label: t('admin.redeem.invitation') }
 ])
 
@@ -565,6 +577,36 @@ const generateForm = reactive({
   validity_days: 30
 })
 
+const currentGroupOptions = computed(() =>
+  redeemTypeUsesTokenValue(generateForm.type)
+    ? tokenGroupOptions.value
+    : subscriptionGroupOptions.value
+)
+
+const groupLabel = computed(() =>
+  redeemTypeUsesTokenValue(generateForm.type)
+    ? t('admin.redeem.selectTokenGroup')
+    : t('admin.redeem.selectGroup')
+)
+
+const groupPlaceholder = computed(() =>
+  redeemTypeUsesTokenValue(generateForm.type)
+    ? t('admin.redeem.selectTokenGroupPlaceholder')
+    : t('admin.redeem.selectGroupPlaceholder')
+)
+
+const valueLabel = computed(() => {
+  if (redeemTypeUsesTokenValue(generateForm.type)) {
+    return t('admin.redeem.tokenAmount')
+  }
+  return generateForm.type === 'balance'
+    ? t('admin.redeem.amount')
+    : t('admin.redeem.columns.value')
+})
+
+const valueStep = computed(() => (generateForm.type === 'balance' ? '0.01' : '1'))
+const valueMin = computed(() => (generateForm.type === 'balance' ? '0.01' : '1'))
+
 // 监听类型变化，邀请码类型时自动设置 value 为 0
 watch(
   () => generateForm.type,
@@ -573,6 +615,9 @@ watch(
       generateForm.value = 0
     } else if (generateForm.value === 0) {
       generateForm.value = 10
+    }
+    if (!redeemTypeNeedsGroup(newType)) {
+      generateForm.group_id = null
     }
   }
 )
@@ -653,9 +698,17 @@ const handleSort = (key: string, order: 'asc' | 'desc') => {
 }
 
 const handleGenerateCodes = async () => {
-  // 订阅类型必须选择分组
-  if (generateForm.type === 'subscription' && !generateForm.group_id) {
-    appStore.showError(t('admin.redeem.groupRequired'))
+  if (redeemTypeNeedsGroup(generateForm.type) && !generateForm.group_id) {
+    appStore.showError(
+      redeemTypeUsesTokenValue(generateForm.type)
+        ? t('admin.redeem.tokenGroupRequired')
+        : t('admin.redeem.groupRequired')
+    )
+    return
+  }
+
+  if (redeemTypeUsesTokenValue(generateForm.type) && generateForm.value <= 0) {
+    appStore.showError(t('admin.redeem.tokenAmountRequired'))
     return
   }
 
@@ -665,8 +718,8 @@ const handleGenerateCodes = async () => {
       generateForm.count,
       generateForm.type,
       generateForm.value,
-      generateForm.type === 'subscription' ? generateForm.group_id : undefined,
-      generateForm.type === 'subscription' ? generateForm.validity_days : undefined
+      redeemTypeNeedsGroup(generateForm.type) ? generateForm.group_id : undefined,
+      redeemTypeUsesValidityDays(generateForm.type) ? generateForm.validity_days : undefined
     )
     showGenerateDialog.value = false
     generatedCodes.value = result
@@ -760,11 +813,25 @@ const confirmDeleteUnused = async () => {
 const loadSubscriptionGroups = async () => {
   try {
     const groups = await adminAPI.groups.getAll()
-    subscriptionGroups.value = groups
+    availableGroups.value = groups
   } catch (error) {
     console.error('Error loading subscription groups:', error)
   }
 }
+
+const renderRedeemValue = (row: RedeemCode) =>
+  formatAdminRedeemValue(
+    {
+      type: row.type,
+      value: row.value,
+      validity_days: row.validity_days
+    },
+    {
+      daysLabel: t('admin.redeem.days'),
+      tokenSuffix: t('admin.redeem.tokenUnit'),
+      currencySymbol: '$'
+    }
+  )
 
 onMounted(() => {
   loadCodes()

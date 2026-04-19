@@ -12,19 +12,19 @@ pub struct DashboardViewModel {
 impl DashboardViewModel {
     pub fn empty() -> Self {
         Self {
-            balance_text: "余额：--".to_string(),
-            usage_text: "今日用量：--".to_string(),
+            balance_text: "--".to_string(),
+            usage_text: "--".to_string(),
             recharge_notice: "计费中心已支持余额、套餐、订单与兑换记录的统一查看。".to_string(),
         }
     }
 
-    pub fn from_user_and_billing(user: &UserProfile, summary: Option<&BillingSummary>) -> Self {
+    pub fn from_user_and_billing(_user: &UserProfile, summary: Option<&BillingSummary>) -> Self {
         let balance_text = summary
-            .map(|item| format!("剩余 Token：{}", format_token_count(item.remaining_tokens)))
-            .unwrap_or_else(|| "剩余 Token：--".to_string());
+            .map(|item| format_token_count(item.remaining_tokens))
+            .unwrap_or_else(|| "--".to_string());
         let usage_text = summary
-            .map(|item| format!("累计消费：{}", format_token_count(item.consumed_tokens)))
-            .unwrap_or_else(|| format!("并发额度：{} 路", user.concurrency));
+            .map(|item| format_token_count(item.consumed_tokens))
+            .unwrap_or_else(|| "--".to_string());
         Self {
             balance_text,
             usage_text,
@@ -64,9 +64,17 @@ mod tests {
         };
         let vm = DashboardViewModel::from_user_and_billing(&user, Some(&summary));
 
-        assert_eq!(vm.balance_text, "剩余 Token：1亿 Token");
-        assert_eq!(vm.usage_text, "累计消费：2000万 Token");
+        assert_eq!(vm.balance_text, "1亿 Token");
+        assert_eq!(vm.usage_text, "2000万 Token");
         assert!(vm.recharge_notice.contains("Token CDK"));
         assert!(!vm.recharge_notice.contains("API Key"));
+    }
+
+    #[test]
+    fn dashboard_view_model_empty_state_keeps_value_slots_compact() {
+        let vm = DashboardViewModel::empty();
+
+        assert_eq!(vm.balance_text, "--");
+        assert_eq!(vm.usage_text, "--");
     }
 }

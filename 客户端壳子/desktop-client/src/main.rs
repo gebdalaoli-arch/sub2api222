@@ -405,7 +405,6 @@ fn start_platform_launch(
     let Some(app) = app_handle.upgrade() else {
         return;
     };
-    let selected_group_index = app.get_launch_selected_group_index() as usize;
     app.set_launch_status_text(SharedString::from("正在创建平台代理会话..."));
 
     let ui_handle = app_handle.clone();
@@ -413,17 +412,17 @@ fn start_platform_launch(
         let Some(session) = auth_session.lock().ok().and_then(|state| state.clone()) else {
             let _ = ui_handle.upgrade_in_event_loop(move |app| {
                 app.set_launch_status_text(SharedString::from(
-                    "请先登录并加载可用分组，再启动平台代理模式。",
+                    "请先登录并加载桌面客户端专用分组，再启动平台代理模式。",
                 ))
             });
             return;
         };
 
         let groups = platform_launch_groups(&current_groups_snapshot(&available_groups));
-        let Some(group) = groups.get(selected_group_index).cloned() else {
+        let Some(group) = groups.first().cloned() else {
             let _ = ui_handle.upgrade_in_event_loop(move |app| {
                 app.set_launch_status_text(SharedString::from(
-                    "当前没有可用于 Codex 的 OpenAI 分组，请先检查套餐或切换分组。",
+                    "当前没有可用于桌面客户端的 OpenAI 分组，请先检查服务端分组配置。",
                 ))
             });
             return;
@@ -2729,13 +2728,13 @@ fn apply_logged_out_state(app: &AppWindow) {
     app.set_current_section(0);
     app.set_brand_status_copy(SharedString::from("你的电子牛马已就位。"));
     app.set_dashboard_user_label(SharedString::from("当前账号：未登录"));
-    app.set_dashboard_balance_text(SharedString::from("剩余 Token：--"));
-    app.set_dashboard_usage_text(SharedString::from("累计消费：--"));
+    app.set_dashboard_balance_text(SharedString::from("--"));
+    app.set_dashboard_usage_text(SharedString::from("--"));
     app.set_dashboard_account_status_text(SharedString::from("账户状态：待登录"));
     app.set_dashboard_notice_text(SharedString::from(
         "登录后可直接查看余额、套餐、订单与兑换记录，并在需要时切换到官方模式。",
     ));
-    app.set_launch_group_options(single_option_model("登录后加载可用分组"));
+    app.set_launch_group_options(single_option_model("登录后加载桌面客户端专用分组"));
     app.set_launch_selected_group_index(0);
     apply_billing_state(app, &BillingViewModel::empty());
     apply_checkout_state(app, None);
@@ -2775,9 +2774,9 @@ fn apply_authenticated_state(
     )));
     app.set_dashboard_notice_text(SharedString::from(match group_count {
         Some(count) => format!(
-            "已登录，可用分组 {count} 个。平台模式将基于分组、订阅和桌面会话创建独立受管启动环境。"
+            "已登录，当前服务端已为桌面客户端准备 {count} 个可用分组；客户端会固定使用首个桌面专用分组启动。"
         ),
-        None => "已登录，但暂未拉到可用分组列表；可稍后重试或继续使用官方模式。".to_string(),
+        None => "已登录，但暂未拉到桌面客户端分组；可稍后重试或继续使用官方模式。".to_string(),
     }));
     app.set_auth_status_text(SharedString::from("登录成功，可继续进入启动中心。"));
 }
@@ -2998,7 +2997,7 @@ fn open_update_download_url(url: &str) -> anyhow::Result<()> {
 fn apply_available_groups_state(app: &AppWindow, groups: &[GroupSummary]) {
     let launchable_groups = platform_launch_groups(groups);
     if launchable_groups.is_empty() {
-        app.set_launch_group_options(single_option_model("当前没有可用于 Codex 的 OpenAI 分组"));
+        app.set_launch_group_options(single_option_model("当前没有可用于桌面客户端的 OpenAI 分组"));
         app.set_launch_selected_group_index(0);
         return;
     }

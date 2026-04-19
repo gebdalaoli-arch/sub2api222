@@ -27,8 +27,8 @@ export component AppWindow inherits Window {
     in-out property <string> auth-status-text: "请先登录以启用平台模式与账户同步。";
     in-out property <string> reset-status-text: "可先发送重置邮件，再填写邮件中的重置码。";
     in-out property <string> dashboard-user-label: "当前账号：未登录";
-    in-out property <string> dashboard-balance-text: "余额：--";
-    in-out property <string> dashboard-usage-text: "并发额度：--";
+    in-out property <string> dashboard-balance-text: "--";
+    in-out property <string> dashboard-usage-text: "--";
     in-out property <string> dashboard-account-status-text: "账户状态：待登录";
     in-out property <string> dashboard-notice-text: "计费中心已支持余额、套餐、订单与兑换记录的统一查看。";
     in-out property <bool> remember-password: true;
@@ -68,7 +68,7 @@ export component AppWindow inherits Window {
     in-out property <int> usage-selected-view-mode-index: 0;
     in-out property <string> usage-status-text: "登录后可查看消费明细。";
     in-out property <int> current-section: 0;
-    in-out property <[string]> launch-group-options: ["登录后加载可用分组"];
+    in-out property <[string]> launch-group-options: ["登录后加载桌面客户端专用分组"];
     in-out property <int> launch-selected-group-index: 0;
     in-out property <bool> launch-cli-mode: false;
     in-out property <bool> update-dialog-visible: false;

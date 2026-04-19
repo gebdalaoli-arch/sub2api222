@@ -116,13 +116,15 @@ mod tests {
         assert!(launch.contains("启动方式"));
         assert!(launch.contains("桌面版"));
         assert!(launch.contains("CLI"));
-        assert!(launch.contains("启动分组"));
+        assert!(launch.contains("客户端专用分组"));
+        assert!(launch.contains("桌面客户端当前固定走服务端唯一分组"));
         assert!(help_detail.contains("高级设置"));
         assert!(help_detail.contains("官方模式"));
         assert!(!launch.contains("平台代理模式"));
         assert!(!launch.contains("Environment Status"));
         assert!(!launch.contains("INTERFACE MODE"));
         assert!(!launch.contains("READY"));
+        assert!(!launch.contains("ComboBox"));
     }
 
     #[test]

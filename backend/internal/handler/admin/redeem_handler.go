@@ -294,7 +294,9 @@ func (h *RedeemHandler) GetStats(c *gin.Context) {
 		"by_type": gin.H{
 			"balance":     0,
 			"concurrency": 0,
-			"trial":       0,
+			"subscription": 0,
+			"invitation":   0,
+			"token":        0,
 		},
 	})
 }

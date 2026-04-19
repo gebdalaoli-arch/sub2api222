@@ -58,7 +58,7 @@ export async function getById(id: number): Promise<RedeemCode> {
  * @param count - Number of codes to generate
  * @param type - Type of redeem code
  * @param value - Value of the code
- * @param groupId - Group ID (required for subscription type)
+ * @param groupId - Group ID (required for subscription/token type)
  * @param validityDays - Validity days (for subscription type)
  * @returns Array of generated redeem codes
  */
@@ -75,9 +75,12 @@ export async function generate(
     value
   }
 
-  // 订阅类型专用字段
-  if (type === 'subscription') {
+  // 分组绑定类型专用字段
+  if (type === 'subscription' || type === 'token') {
     payload.group_id = groupId
+  }
+
+  if (type === 'subscription') {
     if (validityDays && validityDays > 0) {
       payload.validity_days = validityDays
     }

@@ -119,17 +119,21 @@ export component OverviewScreen inherits Rectangle {
 
         Text {
             x: 24px; y: 90px;
+            width: parent.width - 48px;
             text: root.balance-text;
             color: #2c3437;
-            font-size: 32px;
+            font-size: 28px;
             font-weight: 800;
+            wrap: word-wrap;
         }
 
         Text {
             x: 24px; y: 136px;
+            width: parent.width - 48px;
             text: root.usage-text;
             color: #596064;
             font-size: 12px;
+            wrap: word-wrap;
         }
 
         // Action buttons

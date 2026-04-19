@@ -1,4 +1,4 @@
-import { Button, ComboBox } from "std-widgets.slint";
+import { Button } from "std-widgets.slint";
 
 export component LaunchPanel inherits Rectangle {
     in property <bool> desktop-available: false;
@@ -106,21 +106,40 @@ export component LaunchPanel inherits Rectangle {
         }
     }
 
-    // ─── 启动分组 ───
+    // ─── 客户端专用分组 ───
     Text {
         x: 40px; y: 208px;
-        text: "启动分组";
+        text: "客户端专用分组";
         color: #596064;
         font-size: 11px;
         font-weight: 600;
     }
 
-    ComboBox {
+    Rectangle {
         x: 40px; y: 232px;
         width: parent.width - 80px;
-        height: 48px;
-        model: root.group-options;
-        current-index <=> root.selected-group-index;
+        height: 72px;
+        background: #f7f9fb;
+        border-radius: 12px;
+
+        Text {
+            x: 16px; y: 14px;
+            width: parent.width - 32px;
+            text: root.group-options.length > 0 ? root.group-options[0] : "登录后加载桌面客户端专用分组";
+            color: #2c3437;
+            font-size: 16px;
+            font-weight: 700;
+            wrap: word-wrap;
+        }
+
+        Text {
+            x: 16px; y: 42px;
+            width: parent.width - 32px;
+            text: "桌面客户端当前固定走服务端唯一分组，无需手动选择。";
+            color: #596064;
+            font-size: 11px;
+            wrap: word-wrap;
+        }
     }
 
     // ─── Primary Action Button ───
