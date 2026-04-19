@@ -21,6 +21,11 @@ $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 $cargoConfigDir = Join-Path $repoRoot ".cargo"
 $cargoConfigPath = Join-Path $cargoConfigDir "config.toml"
 $installerPath = Join-Path $outputDir "Sub2API-Desktop-Setup-$appVersion.exe"
+$licenseCandidates = @(
+    (Join-Path $repoRoot "LICENSE"),
+    (Join-Path (Split-Path $repoRoot -Parent) "LICENSE")
+)
+$licenseFile = $licenseCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 
 function Normalize-ApiBaseUrl([string]$InputUrl) {
     $trimmed = ""
@@ -42,6 +47,10 @@ if (-not (Test-Path $iscc)) {
     throw "未找到 Inno Setup 编译器：$iscc"
 }
 
+if (-not $licenseFile) {
+    throw "未找到 LICENSE 文件。已检查路径：$($licenseCandidates -join ', ')"
+}
+
 if ([string]::IsNullOrWhiteSpace($ApiBaseUrl)) {
     throw "打包安装包时必须显式传入 -ApiBaseUrl，例如：powershell -NoProfile -ExecutionPolicy Bypass -File .\\build-desktop-installer.ps1 -ApiBaseUrl `"https://your-sub2api.example.com`""
 }
@@ -60,10 +69,15 @@ Write-Host "==> 构建 release 二进制"
 $normalizedApiBaseUrl = Normalize-ApiBaseUrl $ApiBaseUrl
 $env:SUB2API_DESKTOP_API_BASE_URL = $normalizedApiBaseUrl
 Write-Host "==> 使用 API 基地址: $normalizedApiBaseUrl"
+Push-Location $repoRoot
 try {
-    & cargo build --release --manifest-path desktop-client/Cargo.toml
+    & cargo build --release --manifest-path $cargoToml
+    if ($LASTEXITCODE -ne 0) {
+        throw "cargo build 失败，退出码：$LASTEXITCODE"
+    }
 }
 finally {
+    Pop-Location
     if (Test-Path $cargoConfigPath) {
         Remove-Item $cargoConfigPath -Force
     }
@@ -79,7 +93,11 @@ Write-Host "==> 生成 Inno Setup 安装包"
     "/DMySourceExe=$releaseExe" `
     "/DMyOutputDir=$outputDir" `
     "/DMyRepoRoot=$repoRoot" `
+    "/DMyLicenseFile=$licenseFile" `
     $issPath
+if ($LASTEXITCODE -ne 0) {
+    throw "Inno Setup 编译失败，退出码：$LASTEXITCODE"
+}
 
 if (-not (Test-Path $installerPath)) {
     throw "未生成安装包：$installerPath"

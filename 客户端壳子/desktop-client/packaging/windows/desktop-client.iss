@@ -18,6 +18,10 @@
   #error "MyRepoRoot is required"
 #endif
 
+#ifndef MyLicenseFile
+  #define MyLicenseFile "{#MyRepoRoot}\LICENSE"
+#endif
+
 [Setup]
 AppId={{8C8F44A6-247B-4947-A43C-8D577D6D9D0E}
 AppName={#MyAppName}
@@ -37,7 +41,7 @@ SolidCompression=yes
 WizardStyle=modern
 ChangesAssociations=no
 DisableProgramGroupPage=yes
-LicenseFile={#MyRepoRoot}\LICENSE
+LicenseFile={#MyLicenseFile}
 SetupIconFile={#MyRepoRoot}\desktop-client\assets\app.ico
 OutputDir={#MyOutputDir}
 OutputBaseFilename=Sub2API-Desktop-Setup-{#MyAppVersion}
@@ -47,7 +51,7 @@ Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: 
 
 [Files]
 Source: "{#MySourceExe}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#MyRepoRoot}\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#MyLicenseFile}"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
