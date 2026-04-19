@@ -7,8 +7,8 @@ pub enum LoginSubmission {
     TwoFactor(Login2FARequest),
 }
 
-pub fn should_restore_session(prefs: &AuthPreferences, has_refresh_token: bool) -> bool {
-    prefs.sanitized().auto_login && has_refresh_token
+pub fn should_restore_session(prefs: &AuthPreferences, has_saved_auth_secret: bool) -> bool {
+    prefs.sanitized().auto_login && has_saved_auth_secret
 }
 
 pub fn build_login_submission(
@@ -80,6 +80,13 @@ mod tests {
             auto_login: false,
         };
         assert!(!super::should_restore_session(&prefs, true));
+        assert!(super::should_restore_session(
+            &AuthPreferences {
+                remember_password: true,
+                auto_login: true,
+            },
+            true
+        ));
         assert!(super::should_restore_session(
             &AuthPreferences {
                 remember_password: true,

@@ -15,7 +15,7 @@ impl UsageDetailViewModel {
             summary_title: "最近 0 条消费明细".to_string(),
             total_requests_text: "0".to_string(),
             total_tokens_text: "0".to_string(),
-            total_actual_cost_text: "$0.000000".to_string(),
+            total_actual_cost_text: "¥0.000000".to_string(),
             lines: vec!["登录后可查看模型、Token、时间与费用明细。".to_string()],
         }
     }
@@ -41,7 +41,7 @@ impl UsageDetailViewModel {
             summary_title: format!("最近 {} 条消费明细", page.items.len()),
             total_requests_text: page.items.len().to_string(),
             total_tokens_text: total_tokens.to_string(),
-            total_actual_cost_text: format!("${total_actual_cost:.6}"),
+            total_actual_cost_text: format!("¥{total_actual_cost:.6}"),
             lines,
         }
     }
@@ -63,7 +63,7 @@ fn format_usage_line(log: &UsageLog) -> String {
         .as_deref()
         .unwrap_or("/v1/unknown");
     format!(
-        "{} · {}\n{} · {} · 输入 {} · 输出 {} · 缓存 {} / {} · ${:.6}",
+        "{} · {}\n{} · {} · 输入 {} · 输出 {} · 缓存 {} / {} · ¥{:.6}",
         log.model,
         time,
         api_key_name,
@@ -136,12 +136,12 @@ mod tests {
         assert_eq!(vm.summary_title, "最近 1 条消费明细");
         assert_eq!(vm.total_requests_text, "1");
         assert_eq!(vm.total_tokens_text, "609");
-        assert_eq!(vm.total_actual_cost_text, "$0.004500");
+        assert_eq!(vm.total_actual_cost_text, "¥0.004500");
         assert!(vm.lines[0].contains("gpt-5.4"));
         assert!(vm.lines[0].contains("2025-01-02 15:04:05"));
         assert!(vm.lines[0].contains("输入 123"));
         assert!(vm.lines[0].contains("输出 456"));
-        assert!(vm.lines[0].contains("$0.004500"));
+        assert!(vm.lines[0].contains("¥0.004500"));
     }
 
     #[test]
@@ -151,7 +151,7 @@ mod tests {
         assert_eq!(vm.summary_title, "最近 0 条消费明细");
         assert_eq!(vm.total_requests_text, "0");
         assert_eq!(vm.total_tokens_text, "0");
-        assert_eq!(vm.total_actual_cost_text, "$0.000000");
+        assert_eq!(vm.total_actual_cost_text, "¥0.000000");
         assert_eq!(vm.lines, vec!["登录后可查看模型、Token、时间与费用明细。".to_string()]);
     }
 }

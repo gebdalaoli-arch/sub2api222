@@ -1,5 +1,6 @@
 use crate::api::{
     account::UserProfile,
+    groups::GroupSummary,
     payment::PaymentOrder,
     redeem::RedeemHistoryItem,
     subscriptions::{SubscriptionSummary, SubscriptionSummaryItem},
@@ -38,12 +39,22 @@ impl BillingViewModel {
         summary: Option<&SubscriptionSummary>,
         orders: &[PaymentOrder],
         history: &[RedeemHistoryItem],
+        openai_group: Option<&GroupSummary>,
     ) -> Self {
         let mut model = Self::empty();
 
         if let Some(user) = user {
-            model.balance_headline = format!("¥{:.2}", user.balance);
-            model.usage_caption = format!("账户状态：{} · 并发额度 {} 路", user.status, user.concurrency);
+            if let Some(group) = openai_group {
+                model.balance_headline = format_token_equivalent(user.balance, group.rate_multiplier);
+                model.usage_caption = format!(
+                    "按 OpenAI 分组“{}”倍率 ×{:.2} 折算 · 账户状态：{} · 并发额度 {} 路",
+                    group.name, group.rate_multiplier, user.status, user.concurrency
+                );
+            } else {
+                model.balance_headline = format_currency_yuan(user.balance);
+                model.usage_caption =
+                    format!("账户状态：{} · 并发额度 {} 路", user.status, user.concurrency);
+            }
         }
 
         if let Some(summary) = summary {
@@ -53,8 +64,9 @@ impl BillingViewModel {
                 .map(|item| item.group_name.clone())
                 .unwrap_or_else(|| "按量钱包".to_string());
             model.subscription_summary_text = format!(
-                "活跃订阅 {} 个，累计标准计费 ${:.2}",
-                summary.active_count, summary.total_used_usd
+                "活跃订阅 {} 个，累计标准计费 {}",
+                summary.active_count,
+                format_currency_yuan(summary.total_used_usd)
             );
             model.subscription_lines = if summary.subscriptions.is_empty() {
                 vec!["当前没有活跃订阅。".to_string()]
@@ -113,25 +125,25 @@ fn subscription_summary_line(item: &SubscriptionSummaryItem) -> String {
 fn subscription_detail_line(item: &SubscriptionSummaryItem) -> String {
     match item.expires_at.as_deref() {
         Some(expires_at) => format!(
-            "{} · 日 ${:.2}/${:.2} · 周 ${:.2}/${:.2} · 月 ${:.2}/${:.2} · 到期 {}",
+            "{} · 日 {}/{} · 周 {}/{} · 月 {}/{} · 到期 {}",
             item.group_name,
-            item.daily_used_usd,
-            item.daily_limit_usd,
-            item.weekly_used_usd,
-            item.weekly_limit_usd,
-            item.monthly_used_usd,
-            item.monthly_limit_usd,
+            format_currency_yuan(item.daily_used_usd),
+            format_currency_yuan(item.daily_limit_usd),
+            format_currency_yuan(item.weekly_used_usd),
+            format_currency_yuan(item.weekly_limit_usd),
+            format_currency_yuan(item.monthly_used_usd),
+            format_currency_yuan(item.monthly_limit_usd),
             expires_at
         ),
         None => format!(
-            "{} · 日 ${:.2}/${:.2} · 周 ${:.2}/${:.2} · 月 ${:.2}/${:.2}",
+            "{} · 日 {}/{} · 周 {}/{} · 月 {}/{}",
             item.group_name,
-            item.daily_used_usd,
-            item.daily_limit_usd,
-            item.weekly_used_usd,
-            item.weekly_limit_usd,
-            item.monthly_used_usd,
-            item.monthly_limit_usd,
+            format_currency_yuan(item.daily_used_usd),
+            format_currency_yuan(item.daily_limit_usd),
+            format_currency_yuan(item.weekly_used_usd),
+            format_currency_yuan(item.weekly_limit_usd),
+            format_currency_yuan(item.monthly_used_usd),
+            format_currency_yuan(item.monthly_limit_usd),
         ),
     }
 }
@@ -167,11 +179,50 @@ fn history_detail_line(item: &RedeemHistoryItem) -> String {
     )
 }
 
+fn format_currency_yuan(value: f64) -> String {
+    format!("¥{value:.2}")
+}
+
+fn format_token_equivalent(balance: f64, rate_multiplier: f64) -> String {
+    let effective_rate = if rate_multiplier > 0.0 { rate_multiplier } else { 1.0 };
+    let token_total = (balance / effective_rate) * 1_000_000.0;
+    let (value, unit) = if token_total >= 1_000_000_000_000.0 {
+        (token_total / 1_000_000_000_000.0, "万亿")
+    } else if token_total >= 10_000_000_000.0 {
+        (token_total / 10_000_000_000.0, "百亿")
+    } else if token_total >= 100_000_000.0 {
+        (token_total / 100_000_000.0, "亿")
+    } else if token_total >= 1_000_000.0 {
+        (token_total / 1_000_000.0, "百万")
+    } else if token_total >= 10_000.0 {
+        (token_total / 10_000.0, "万")
+    } else {
+        (token_total, "个")
+    };
+    let formatted = if unit == "个" {
+        format!("{:.0}", value)
+    } else {
+        trim_trailing_zeros(format!("{:.2}", value))
+    };
+    format!("{formatted}{unit} Token")
+}
+
+fn trim_trailing_zeros(mut value: String) -> String {
+    while value.contains('.') && value.ends_with('0') {
+        value.pop();
+    }
+    if value.ends_with('.') {
+        value.pop();
+    }
+    value
+}
+
 #[cfg(test)]
 mod tests {
     use super::BillingViewModel;
     use crate::api::{
         account::UserProfile,
+        groups::{GroupPlatform, GroupSummary, SubscriptionType},
         payment::PaymentOrder,
         redeem::RedeemHistoryItem,
         subscriptions::{SubscriptionSummary, SubscriptionSummaryItem},
@@ -245,15 +296,39 @@ mod tests {
             plan_id: None,
             provider_instance_id: None,
         }];
+        let group = GroupSummary {
+            id: 9,
+            name: "OpenAI Pro".to_string(),
+            description: None,
+            platform: GroupPlatform::OpenAI,
+            rate_multiplier: 1.5,
+            is_exclusive: false,
+            status: "active".to_string(),
+            subscription_type: SubscriptionType::Subscription,
+            daily_limit_usd: Some(10.0),
+            weekly_limit_usd: Some(30.0),
+            monthly_limit_usd: Some(100.0),
+            image_price_1k: None,
+            image_price_2k: None,
+            image_price_4k: None,
+            claude_code_only: false,
+            fallback_group_id: None,
+            fallback_group_id_on_invalid_request: None,
+            require_oauth_only: false,
+            require_privacy_set: false,
+            created_at: "2025-01-02T15:04:05Z".to_string(),
+            updated_at: "2025-01-02T15:04:05Z".to_string(),
+        };
 
-        let vm = BillingViewModel::from_account_state(Some(&user), Some(&summary), &orders, &history);
+        let vm =
+            BillingViewModel::from_account_state(Some(&user), Some(&summary), &orders, &history, Some(&group));
 
         assert_eq!(vm.plan_title, "OpenAI Pro");
-        assert_eq!(vm.balance_headline, "¥188.00");
-        assert!(vm.usage_caption.contains("并发额度 6 路"));
+        assert_eq!(vm.balance_headline, "1.25亿 Token");
+        assert!(vm.usage_caption.contains("OpenAI 分组“OpenAI Pro”倍率 ×1.50"));
         assert!(vm.subscription_summary_text.contains("活跃订阅 1 个"));
-        assert!(vm.subscription_detail_lines[0].contains("日 $2.00/$10.00"));
-        assert!(vm.subscription_detail_lines[0].contains("周 $4.00/$30.00"));
+        assert!(vm.subscription_detail_lines[0].contains("日 ¥2.00/¥10.00"));
+        assert!(vm.subscription_detail_lines[0].contains("周 ¥4.00/¥30.00"));
         assert!(vm.order_lines[0].contains("ORD-1"));
         assert!(vm.order_detail_lines[0].contains("balance"));
         assert!(vm.redeem_history_lines[0].contains("CDK-123"));
@@ -262,7 +337,7 @@ mod tests {
 
     #[test]
     fn billing_view_model_uses_safe_defaults_without_data() {
-        let vm = BillingViewModel::from_account_state(None, None, &[], &[]);
+        let vm = BillingViewModel::from_account_state(None, None, &[], &[], None);
 
         assert_eq!(vm.plan_title, "暂未开通订阅");
         assert_eq!(vm.balance_headline, "¥--");

@@ -66,6 +66,8 @@ mod tests {
         let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
         let overview =
             std::fs::read_to_string(manifest_dir.join("ui/screens/overview.slint")).unwrap();
+        let billing_detail =
+            std::fs::read_to_string(manifest_dir.join("ui/screens/billing_detail.slint")).unwrap();
         let help_detail =
             std::fs::read_to_string(manifest_dir.join("ui/screens/help_detail.slint")).unwrap();
         let usage_detail =
@@ -77,6 +79,12 @@ mod tests {
         assert!(overview.contains("启动 Codex"));
         assert!(overview.contains("计费中心"));
         assert!(overview.contains("系统公告与日志"));
+        assert!(billing_detail.contains("兑换 CDK"));
+        assert!(billing_detail.contains("暂未开放"));
+        assert!(billing_detail.contains("余额充值"));
+        assert!(billing_detail.contains("套餐购买"));
+        assert!(billing_detail.contains("订阅明细"));
+        assert!(billing_detail.contains("订单明细"));
         assert!(help_detail.contains("设置与帮助"));
         assert!(help_detail.contains("安全边界"));
         assert!(help_detail.contains("检查更新"));

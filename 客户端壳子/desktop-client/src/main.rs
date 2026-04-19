@@ -124,7 +124,7 @@ fn main() -> anyhow::Result<()> {
 
     apply_launch_state(&app, &targets.borrow());
     apply_logged_out_state(&app);
-    preload_local_state(&app, &app_state);
+    preload_local_state(&app, &app_state, &token_store);
     let _ = cleanup_runtime_roots_older_than(
         &app_state.root().join("runtime"),
         Duration::from_secs(60 * 60 * 12),
@@ -212,7 +212,11 @@ fn main() -> anyhow::Result<()> {
     }
 }
 
-fn preload_local_state(app: &AppWindow, app_state: &AppStateStore) {
+fn preload_local_state(
+    app: &AppWindow,
+    app_state: &AppStateStore,
+    token_store: &SystemCredentialStore,
+) {
     if let Ok(Some(email)) = app_state.load_last_email() {
         app.set_email(SharedString::from(email));
     }
@@ -223,6 +227,11 @@ fn preload_local_state(app: &AppWindow, app_state: &AppStateStore) {
         .unwrap_or_default();
     app.set_remember_password(prefs.remember_password);
     app.set_auto_login(prefs.auto_login);
+    if prefs.remember_password {
+        if let Ok(Some(password)) = token_store.load_password() {
+            app.set_password(SharedString::from(password));
+        }
+    }
 }
 
 fn wire_launch_callbacks(app: &AppWindow, targets: Rc<RefCell<Vec<InstalledTarget>>>) {
@@ -602,11 +611,17 @@ fn wire_auth_callbacks(
                         &pending_payment,
                         &usage_page,
                         email,
+                        Some(password.clone()),
                         auth,
                     );
                     let groups_snapshot = current_groups_snapshot(&available_groups);
-                    let billing_vm =
-                        current_billing_vm(&auth_session, &subscription_summary, &recent_orders, &redeem_history);
+                    let billing_vm = current_billing_vm(
+                        &auth_session,
+                        &available_groups,
+                        &subscription_summary,
+                        &recent_orders,
+                        &redeem_history,
+                    );
                     let checkout_snapshot = current_checkout_snapshot(&checkout_info);
                     let usage_vm = current_usage_vm(&usage_page);
                     let group_count = Some(groups_snapshot.len());
@@ -700,7 +715,7 @@ fn wire_auth_callbacks(
         let usage_page = Arc::clone(&register_usage_page);
         thread::spawn(move || {
             let client = ApiClient::new(config.api_base_url.clone());
-            let request = RegisterRequest::new(email.trim(), password)
+            let request = RegisterRequest::new(email.trim(), password.clone())
                 .with_verify_code(verification_code.trim());
             match register_blocking(&client, &request) {
                 Ok(auth) => {
@@ -719,11 +734,17 @@ fn wire_auth_callbacks(
                         &pending_payment,
                         &usage_page,
                         email,
+                        Some(password.clone()),
                         auth,
                     );
                     let groups_snapshot = current_groups_snapshot(&available_groups);
-                    let billing_vm =
-                        current_billing_vm(&auth_session, &subscription_summary, &recent_orders, &redeem_history);
+                    let billing_vm = current_billing_vm(
+                        &auth_session,
+                        &available_groups,
+                        &subscription_summary,
+                        &recent_orders,
+                        &redeem_history,
+                    );
                     let checkout_snapshot = current_checkout_snapshot(&checkout_info);
                     let usage_vm = current_usage_vm(&usage_page);
                     let group_count = Some(groups_snapshot.len());
@@ -1406,11 +1427,19 @@ fn restore_saved_session(
         .ok()
         .flatten()
         .unwrap_or_default();
-    match token_store.load_refresh_token() {
-        Ok(Some(refresh_token)) => {
-            if !should_restore_session(&auth_preferences, true) {
-                return;
-            }
+    let saved_refresh_token = token_store.load_refresh_token().ok().flatten();
+    let saved_password = token_store.load_password().ok().flatten();
+    let saved_email = app_state.load_last_email().ok().flatten();
+
+    if !should_restore_session(
+        &auth_preferences,
+        saved_refresh_token.is_some() || saved_password.is_some(),
+    ) {
+        return;
+    }
+
+    match saved_refresh_token {
+        Some(refresh_token) => {
             app.set_auth_status_text(SharedString::from("正在恢复上次登录状态..."));
             thread::spawn(move || {
                 let client = ApiClient::new(config.api_base_url.clone());
@@ -1464,12 +1493,81 @@ fn restore_saved_session(
                             }
                             Err(error) => {
                                 let _ = token_store.clear_refresh_token();
-                                let _ = app_handle.upgrade_in_event_loop(move |app| {
-                                    apply_logged_out_state(&app);
-                                    app.set_auth_status_text(SharedString::from(format!(
-                                        "恢复登录失败：{error}，请重新登录。"
-                                    )));
-                                });
+                                if let (Some(email), Some(password)) =
+                                    (saved_email.clone(), saved_password.clone())
+                                {
+                                    let login_client = ApiClient::new(config.api_base_url.clone());
+                                    match login_blocking(
+                                        &login_client,
+                                        &sub2api_desktop::api::auth::LoginRequest::new(
+                                            email.as_str(),
+                                            password.as_str(),
+                                        ),
+                                    ) {
+                                        Ok(LoginResponse::Authenticated(auth)) => {
+                                            handle_auth_success(
+                                                &config,
+                                                &app_state,
+                                                &token_store,
+                                                &auth_preferences,
+                                                &auth_session,
+                                                &pending_totp_token,
+                                                &available_groups,
+                                                &subscription_summary,
+                                                &redeem_history,
+                                                &recent_orders,
+                                                &checkout_info,
+                                                &pending_payment,
+                                                &usage_page,
+                                                email,
+                                                Some(password),
+                                                auth,
+                                            );
+                                            let groups_snapshot = current_groups_snapshot(&available_groups);
+                                            let billing_vm = current_billing_vm(
+                                                &auth_session,
+                                                &available_groups,
+                                                &subscription_summary,
+                                                &recent_orders,
+                                                &redeem_history,
+                                            );
+                                            let checkout_snapshot = current_checkout_snapshot(&checkout_info);
+                                            let usage_vm = current_usage_vm(&usage_page);
+                                            let group_count = Some(groups_snapshot.len());
+                                            let _ = app_handle.upgrade_in_event_loop(move |app| {
+                                                if let Some(session) = auth_session
+                                                    .lock()
+                                                    .ok()
+                                                    .and_then(|state| state.clone())
+                                                {
+                                                    apply_authenticated_state(&app, &session, group_count);
+                                                    apply_available_groups_state(&app, &groups_snapshot);
+                                                    apply_billing_state(&app, &billing_vm);
+                                                    apply_checkout_state(&app, checkout_snapshot.as_ref());
+                                                    apply_usage_state(&app, &usage_vm);
+                                                    app.set_auth_status_text(SharedString::from(
+                                                        "已用保存的账号密码恢复登录状态。",
+                                                    ));
+                                                }
+                                            });
+                                        }
+                                        Ok(LoginResponse::TotpRequired { .. }) | Err(_) => {
+                                            let _ = app_handle.upgrade_in_event_loop(move |app| {
+                                                apply_logged_out_state(&app);
+                                                app.set_auth_status_text(SharedString::from(format!(
+                                                    "恢复登录失败：{error}，请重新登录。"
+                                                )));
+                                            });
+                                        }
+                                    }
+                                } else {
+                                    let _ = app_handle.upgrade_in_event_loop(move |app| {
+                                        apply_logged_out_state(&app);
+                                        app.set_auth_status_text(SharedString::from(format!(
+                                            "恢复登录失败：{error}，请重新登录。"
+                                        )));
+                                    });
+                                }
                             }
                         }
                     }
@@ -1485,7 +1583,79 @@ fn restore_saved_session(
                 }
             });
         }
-        Ok(None) | Err(_) => {}
+        None => {
+            if let (Some(email), Some(password)) = (saved_email, saved_password) {
+                app.set_auth_status_text(SharedString::from("正在使用保存的账号密码恢复登录状态..."));
+                thread::spawn(move || {
+                    let client = ApiClient::new(config.api_base_url.clone());
+                    match login_blocking(
+                        &client,
+                        &sub2api_desktop::api::auth::LoginRequest::new(
+                            email.as_str(),
+                            password.as_str(),
+                        ),
+                    ) {
+                        Ok(LoginResponse::Authenticated(auth)) => {
+                            handle_auth_success(
+                                &config,
+                                &app_state,
+                                &token_store,
+                                &auth_preferences,
+                                &auth_session,
+                                &pending_totp_token,
+                                &available_groups,
+                                &subscription_summary,
+                                &redeem_history,
+                                &recent_orders,
+                                &checkout_info,
+                                &pending_payment,
+                                &usage_page,
+                                email,
+                                Some(password),
+                                auth,
+                            );
+                            let groups_snapshot = current_groups_snapshot(&available_groups);
+                            let billing_vm = current_billing_vm(
+                                &auth_session,
+                                &available_groups,
+                                &subscription_summary,
+                                &recent_orders,
+                                &redeem_history,
+                            );
+                            let checkout_snapshot = current_checkout_snapshot(&checkout_info);
+                            let usage_vm = current_usage_vm(&usage_page);
+                            let group_count = Some(groups_snapshot.len());
+                            let _ = app_handle.upgrade_in_event_loop(move |app| {
+                                if let Some(session) =
+                                    auth_session.lock().ok().and_then(|state| state.clone())
+                                {
+                                    apply_authenticated_state(&app, &session, group_count);
+                                    apply_available_groups_state(&app, &groups_snapshot);
+                                    apply_billing_state(&app, &billing_vm);
+                                    apply_checkout_state(&app, checkout_snapshot.as_ref());
+                                    apply_usage_state(&app, &usage_vm);
+                                    app.set_auth_status_text(SharedString::from(
+                                        "已自动登录当前账户。",
+                                    ));
+                                    app.set_session_active(true);
+                                    app.set_auth_subview(0);
+                                    app.set_show_login_totp(false);
+                                    app.set_current_section(0);
+                                }
+                            });
+                        }
+                        _ => {
+                            let _ = app_handle.upgrade_in_event_loop(move |app| {
+                                apply_logged_out_state(&app);
+                                app.set_auth_status_text(SharedString::from(
+                                    "自动登录失败，请手动重新登录。",
+                                ));
+                            });
+                        }
+                    }
+                });
+            }
+        }
     }
 }
 
@@ -1504,16 +1674,21 @@ fn handle_auth_success(
     pending_payment: &SharedPendingPayment,
     usage_page: &SharedUsagePage,
     email: String,
+    remembered_password: Option<String>,
     auth: AuthResponse,
 ) {
     let _ = app_state.save_last_email(&email);
     let _ = app_state.save_auth_preferences(auth_preferences);
     if auth_preferences.remember_password {
+        if let Some(password) = remembered_password.as_deref() {
+            let _ = token_store.save_password(password);
+        }
         if let Some(refresh_token) = auth.refresh_token.as_deref() {
             let _ = token_store.save_refresh_token(refresh_token);
         }
     } else {
         let _ = token_store.clear_refresh_token();
+        let _ = token_store.clear_password();
     }
     if let Ok(mut pending) = pending_totp_token.lock() {
         *pending = None;
@@ -1736,7 +1911,13 @@ fn sync_user_side_state(
     refresh_checkout_info_state(client, checkout_info);
     refresh_usage_page_state(client, usage_page);
     let groups_snapshot = current_groups_snapshot(available_groups);
-    let billing_vm = current_billing_vm(auth_session, subscription_summary, recent_orders, redeem_history);
+    let billing_vm = current_billing_vm(
+        auth_session,
+        available_groups,
+        subscription_summary,
+        recent_orders,
+        redeem_history,
+    );
     (group_count, groups_snapshot, billing_vm)
 }
 
@@ -1832,6 +2013,7 @@ fn current_usage_vm(usage_page: &SharedUsagePage) -> UsageDetailViewModel {
 
 fn current_billing_vm(
     auth_session: &SharedAuthSession,
+    available_groups: &SharedGroups,
     subscription_summary: &SharedSubscriptionSummary,
     recent_orders: &SharedOrders,
     redeem_history: &SharedRedeemHistory,
@@ -1854,7 +2036,48 @@ fn current_billing_vm(
         .ok()
         .map(|state| state.clone())
         .unwrap_or_default();
-    BillingViewModel::from_account_state(user.as_ref(), summary.as_ref(), &orders, &history)
+    let groups = available_groups
+        .lock()
+        .ok()
+        .map(|state| state.clone())
+        .unwrap_or_default();
+    let openai_groups = groups
+        .iter()
+        .filter(|group| group.platform == GroupPlatform::OpenAI)
+        .cloned()
+        .collect::<Vec<_>>();
+    let openai_group_ids = openai_groups.iter().map(|group| group.id).collect::<Vec<_>>();
+    let filtered_summary = summary.map(|current| SubscriptionSummary {
+        active_count: current
+            .subscriptions
+            .iter()
+            .filter(|item| openai_group_ids.contains(&item.group_id))
+            .count() as i32,
+        total_used_usd: current
+            .subscriptions
+            .iter()
+            .filter(|item| openai_group_ids.contains(&item.group_id))
+            .map(|item| item.monthly_used_usd)
+            .sum(),
+        subscriptions: current
+            .subscriptions
+            .iter()
+            .filter(|item| openai_group_ids.contains(&item.group_id))
+            .cloned()
+            .collect(),
+    });
+    let active_openai_group = filtered_summary
+        .as_ref()
+        .and_then(|current| current.subscriptions.first())
+        .and_then(|subscription| openai_groups.iter().find(|group| group.id == subscription.group_id))
+        .or_else(|| openai_groups.first());
+    BillingViewModel::from_account_state(
+        user.as_ref(),
+        filtered_summary.as_ref(),
+        &orders,
+        &history,
+        active_openai_group,
+    )
 }
 
 fn apply_launch_state(app: &AppWindow, targets: &[InstalledTarget]) {
@@ -2233,7 +2456,7 @@ fn apply_checkout_state(app: &AppWindow, checkout: Option<&CheckoutInfo>) {
     let subscription_plans = checkout
         .map(ordered_subscription_plan_labels)
         .filter(|items| !items.is_empty())
-        .unwrap_or_else(|| vec!["暂无可用套餐".to_string()]);
+        .unwrap_or_else(|| vec!["暂无可用 OpenAI 套餐".to_string()]);
     app.set_billing_subscription_plan_options(string_model(
         subscription_plans
             .into_iter()
@@ -2296,6 +2519,12 @@ fn ordered_subscription_plans(checkout: &CheckoutInfo) -> Vec<SubscriptionPlan> 
         .plans
         .iter()
         .filter(|plan| plan.for_sale)
+        .filter(|plan| {
+            plan.group_platform
+                .as_deref()
+                .map(|platform| platform.eq_ignore_ascii_case("openai"))
+                .unwrap_or(false)
+        })
         .cloned()
         .collect::<Vec<_>>();
     plans.sort_by(|left, right| {

@@ -21,7 +21,7 @@ impl DashboardViewModel {
             balance_text: format!("余额：¥{:.2}", user.balance),
             usage_text: format!("并发额度：{} 路", user.concurrency),
             recharge_notice:
-                "可在计费中心创建充值/订阅订单，查看套餐明细、历史订单与兑换记录。"
+                "可在计费中心兑换 CDK，并在需要时查看消费明细、套餐与订单状态。"
                     .to_string(),
         }
     }
@@ -50,7 +50,7 @@ mod tests {
 
         assert_eq!(vm.balance_text, "余额：¥20.00");
         assert_eq!(vm.usage_text, "并发额度：3 路");
-        assert!(vm.recharge_notice.contains("充值/订阅订单"));
+        assert!(vm.recharge_notice.contains("兑换 CDK"));
         assert!(!vm.recharge_notice.contains("API Key"));
     }
 }
