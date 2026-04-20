@@ -102,3 +102,49 @@ func TestBillingCacheServiceEnqueueAfterStopReturnsFalse(t *testing.T) {
 	})
 	require.False(t, enqueued)
 }
+
+func TestBillingCacheServiceCheckBillingEligibilityUsesTokenWalletBeforeMoneyBalance(t *testing.T) {
+	tokenRepo := &stubClientTokenWalletRepo{balanceMilli: 1000}
+	tokenResolver := &stubClientTokenChannelResolver{
+		channel: &Channel{
+			ID:             9,
+			Status:         StatusActive,
+			SettlementUnit: SettlementUnitToken,
+		},
+	}
+	tokenSvc := NewClientTokenBillingService(tokenRepo, tokenResolver)
+	svc := NewBillingCacheService(nil, nil, nil, nil, &config.Config{}, tokenSvc)
+
+	err := svc.CheckBillingEligibility(
+		context.Background(),
+		&User{ID: 7, Balance: 0},
+		&APIKey{},
+		&Group{ID: 15, Status: StatusActive},
+		nil,
+	)
+
+	require.NoError(t, err)
+}
+
+func TestBillingCacheServiceCheckBillingEligibilityRejectsInsufficientTokenWallet(t *testing.T) {
+	tokenRepo := &stubClientTokenWalletRepo{balanceMilli: 0}
+	tokenResolver := &stubClientTokenChannelResolver{
+		channel: &Channel{
+			ID:             9,
+			Status:         StatusActive,
+			SettlementUnit: SettlementUnitToken,
+		},
+	}
+	tokenSvc := NewClientTokenBillingService(tokenRepo, tokenResolver)
+	svc := NewBillingCacheService(nil, nil, nil, nil, &config.Config{}, tokenSvc)
+
+	err := svc.CheckBillingEligibility(
+		context.Background(),
+		&User{ID: 7, Balance: 999},
+		&APIKey{},
+		&Group{ID: 15, Status: StatusActive},
+		nil,
+	)
+
+	require.ErrorIs(t, err, ErrInsufficientTokenBalance)
+}

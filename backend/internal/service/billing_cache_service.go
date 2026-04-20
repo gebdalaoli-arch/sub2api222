@@ -87,6 +87,7 @@ type BillingCacheService struct {
 	userRepo              UserRepository
 	subRepo               UserSubscriptionRepository
 	apiKeyRateLimitLoader apiKeyRateLimitLoader
+	tokenBillingService   *ClientTokenBillingService
 	cfg                   *config.Config
 	circuitBreaker        *billingCircuitBreaker
 
@@ -104,12 +105,17 @@ type BillingCacheService struct {
 }
 
 // NewBillingCacheService 创建计费缓存服务
-func NewBillingCacheService(cache BillingCache, userRepo UserRepository, subRepo UserSubscriptionRepository, apiKeyRepo APIKeyRepository, cfg *config.Config) *BillingCacheService {
+func NewBillingCacheService(cache BillingCache, userRepo UserRepository, subRepo UserSubscriptionRepository, apiKeyRepo APIKeyRepository, cfg *config.Config, tokenBillingService ...*ClientTokenBillingService) *BillingCacheService {
+	var tokenService *ClientTokenBillingService
+	if len(tokenBillingService) > 0 {
+		tokenService = tokenBillingService[0]
+	}
 	svc := &BillingCacheService{
 		cache:                 cache,
 		userRepo:              userRepo,
 		subRepo:               subRepo,
 		apiKeyRateLimitLoader: apiKeyRepo,
+		tokenBillingService:   tokenService,
 		cfg:                   cfg,
 	}
 	svc.circuitBreaker = newBillingCircuitBreaker(cfg.Billing.CircuitBreaker)
@@ -652,7 +658,23 @@ func (s *BillingCacheService) CheckBillingEligibility(ctx context.Context, user 
 			return err
 		}
 	} else {
-		if err := s.checkBalanceEligibility(ctx, user.ID); err != nil {
+		if user != nil && group != nil && s.tokenBillingService != nil {
+			usesTokenSettlement, allowed, err := s.tokenBillingService.CheckAccess(ctx, user.ID, group.ID)
+			if err != nil {
+				if s.circuitBreaker != nil {
+					s.circuitBreaker.OnFailure(err)
+				}
+				logger.LegacyPrintf("service.billing_cache", "ALERT: token billing check failed for user %d group %d: %v", user.ID, group.ID, err)
+				return ErrBillingServiceUnavailable.WithCause(err)
+			}
+			if usesTokenSettlement {
+				if !allowed {
+					return ErrInsufficientTokenBalance
+				}
+			} else if err := s.checkBalanceEligibility(ctx, user.ID); err != nil {
+				return err
+			}
+		} else if err := s.checkBalanceEligibility(ctx, user.ID); err != nil {
 			return err
 		}
 	}
