@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::{
     ffi::OsString,
     path::{Path, PathBuf},
-    process::{Child, Command, Stdio},
+    process::{Child, Command, Output, Stdio},
 };
 
 use super::install_detection::InstalledTarget;
@@ -162,38 +162,12 @@ pub fn windows_store_desktop_is_running_for_launch() -> bool {
 }
 
 fn spawn_command(spec: LaunchCommandSpec) -> Result<Option<Child>> {
-    let mut command = Command::new(&spec.program);
-    command.args(&spec.args);
-    for (key, value) in spec.envs {
-        command.env(key, value);
-    }
-    if let Some(current_dir) = spec.current_dir {
-        command.current_dir(current_dir);
-    }
+    let mut command = build_command(&spec);
     if spec.null_stdio {
         command
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null());
-    }
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-
-        const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
-        const DETACHED_PROCESS: u32 = 0x0000_0008;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-
-        let mut creation_flags = 0;
-        if spec.windows_create_no_window {
-            creation_flags |= CREATE_NO_WINDOW;
-        }
-        if spec.windows_detach_process {
-            creation_flags |= CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS;
-        }
-        if creation_flags != 0 {
-            command.creation_flags(creation_flags);
-        }
     }
     let child = command.spawn()?;
     if spec.tracks_child_lifecycle {
@@ -201,6 +175,26 @@ fn spawn_command(spec: LaunchCommandSpec) -> Result<Option<Child>> {
     } else {
         Ok(None)
     }
+}
+
+fn build_command(spec: &LaunchCommandSpec) -> Command {
+    let mut command = Command::new(&spec.program);
+    command.args(&spec.args);
+    for (key, value) in &spec.envs {
+        command.env(key, value);
+    }
+    if let Some(current_dir) = spec.current_dir.as_ref() {
+        command.current_dir(current_dir);
+    }
+    #[cfg(windows)]
+    {
+        apply_windows_creation_flags(&mut command, spec);
+    }
+    command
+}
+
+fn capture_command_output(spec: &LaunchCommandSpec) -> std::io::Result<Output> {
+    build_command(spec).output()
 }
 
 fn windows_store_app_id(target: &InstalledTarget) -> Option<String> {
@@ -244,10 +238,8 @@ fn is_windows_store_desktop_target(target: &InstalledTarget) -> bool {
 
 #[cfg(windows)]
 fn windows_store_desktop_is_running() -> bool {
-    let Ok(output) = Command::new("tasklist")
-        .args(["/FI", "IMAGENAME eq Codex.exe", "/FO", "CSV", "/NH"])
-        .output()
-    else {
+    let spec = windows_store_running_query_command();
+    let Ok(output) = capture_command_output(&spec) else {
         return false;
     };
 
@@ -271,11 +263,50 @@ fn windows_tasklist_reports_codex_running(tasklist_stdout: &str) -> bool {
     })
 }
 
+fn windows_store_running_query_command() -> LaunchCommandSpec {
+    LaunchCommandSpec {
+        program: OsString::from("tasklist"),
+        args: vec![
+            OsString::from("/FI"),
+            OsString::from("IMAGENAME eq Codex.exe"),
+            OsString::from("/FO"),
+            OsString::from("CSV"),
+            OsString::from("/NH"),
+        ],
+        envs: Vec::new(),
+        current_dir: None,
+        tracks_child_lifecycle: false,
+        windows_create_no_window: true,
+        windows_detach_process: false,
+        null_stdio: false,
+    }
+}
+
+#[cfg(windows)]
+fn apply_windows_creation_flags(command: &mut Command, spec: &LaunchCommandSpec) {
+    use std::os::windows::process::CommandExt;
+
+    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+    const DETACHED_PROCESS: u32 = 0x0000_0008;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+    let mut creation_flags = 0;
+    if spec.windows_create_no_window {
+        creation_flags |= CREATE_NO_WINDOW;
+    }
+    if spec.windows_detach_process {
+        creation_flags |= CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS;
+    }
+    if creation_flags != 0 {
+        command.creation_flags(creation_flags);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         official_launch_command, platform_launch_command, requires_user_home_injection,
-        validate_platform_launch_target,
+        validate_platform_launch_target, windows_store_running_query_command,
         windows_tasklist_reports_codex_running,
     };
     use crate::platform::install_detection::{InstalledTarget, LaunchTarget};
@@ -463,5 +494,20 @@ mod tests {
         let output = "INFO: No tasks are running which match the specified criteria.";
 
         assert!(!windows_tasklist_reports_codex_running(output));
+    }
+
+    #[test]
+    fn windows_store_running_query_hides_console_window() {
+        let spec = windows_store_running_query_command();
+        let args: Vec<String> = spec
+            .args
+            .iter()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect();
+
+        assert_eq!(spec.program.to_string_lossy(), "tasklist");
+        assert_eq!(args, vec!["/FI", "IMAGENAME eq Codex.exe", "/FO", "CSV", "/NH"]);
+        assert!(spec.windows_create_no_window);
+        assert!(!spec.null_stdio);
     }
 }
