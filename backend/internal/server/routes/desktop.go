@@ -41,6 +41,7 @@ func RegisterDesktopRoutes(
 		desktopGateway.Use(gin.HandlerFunc(desktopAuth))
 		{
 			desktopGateway.POST("/responses", h.OpenAIGateway.Responses)
+			desktopGateway.POST("/responses/*subpath", h.OpenAIGateway.Responses)
 			desktopGateway.POST("/chat/completions", h.OpenAIGateway.ChatCompletions)
 			desktopGateway.GET("/responses", h.OpenAIGateway.ResponsesWebSocket)
 		}

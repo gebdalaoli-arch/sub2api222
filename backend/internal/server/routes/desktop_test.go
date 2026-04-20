@@ -173,6 +173,44 @@ func TestDesktopRoutesRuntimeResponsesRouteDoesNotFailWithMissingAPIKeyContext(t
 	require.NotContains(t, resp.Body.String(), "Invalid API key")
 }
 
+func TestDesktopRoutesRuntimeResponsesCompactRouteDoesNotFailWithMissingAPIKeyContext(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	router := gin.New()
+	v1 := router.Group("/api/v1")
+
+	RegisterDesktopRoutes(
+		router,
+		v1,
+		&handler.Handlers{
+			Desktop:       &handler.DesktopHandler{},
+			OpenAIGateway: &handler.OpenAIGatewayHandler{},
+		},
+		servermiddleware.JWTAuthMiddleware(func(c *gin.Context) { c.Next() }),
+		servermiddleware.NewDesktopRuntimeAuthMiddleware(&desktopRoutesRuntimeAuthStub{
+			session: &service.DesktopSession{
+				SessionID: "sess-route-1",
+				UserID:    7,
+				GroupID:   9,
+				Target:    string(service.DesktopSessionTargetDesktop),
+				Status:    service.StatusActive,
+			},
+			user: &service.User{ID: 7, Role: service.RoleUser, Status: service.StatusActive, Concurrency: 4},
+		}),
+		nil,
+	)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/desktop/v1/responses/compact", strings.NewReader(`{"model":"gpt-5"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer runtime-route-token")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	require.Equal(t, http.StatusServiceUnavailable, resp.Code)
+	require.NotContains(t, resp.Body.String(), "Invalid API key")
+}
+
 func TestDesktopRoutesCreateSessionRejectsMissingGroupID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
