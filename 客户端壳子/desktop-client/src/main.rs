@@ -51,7 +51,7 @@ use sub2api_desktop::{
         auth_flow::{build_login_submission, should_restore_session, LoginSubmission},
         launch_errors::describe_platform_launch_error,
         view_models::{
-            billing_vm::BillingViewModel,
+            billing_vm::{format_token_count, BillingViewModel},
             dashboard_vm::DashboardViewModel,
             launch_vm::LaunchViewModel,
             update_vm::{UpdateDialogState, UpdateViewModel},
@@ -1123,8 +1123,7 @@ fn wire_billing_callbacks(
                         }
                     }
 
-                    let status_message =
-                        format!("兑换成功：{}（{}）", result.message, result.r#type);
+                    let status_message = format_redeem_success_message(&result);
                     let _ = ui_handle.upgrade_in_event_loop(move |app| {
                         if let Some(session) =
                             auth_session.lock().ok().and_then(|state| state.clone())
@@ -3220,6 +3219,23 @@ fn ordered_subscription_plan_labels(checkout: &CheckoutInfo) -> Vec<String> {
         .collect()
 }
 
+fn format_redeem_success_message(result: &sub2api_desktop::api::redeem::RedeemResult) -> String {
+    match result.r#type.as_str() {
+        "token" => format!(
+            "兑换成功：已入账 {}",
+            format_token_count(result.token_amount.unwrap_or(result.value))
+        ),
+        "balance" => format!("兑换成功：已入账 ¥{:.2}", result.value),
+        "concurrency" => format!("兑换成功：已增加 {:.0} 路并发", result.value),
+        "subscription" => match result.validity_days {
+            Some(days) if days > 0 => format!("兑换成功：订阅已延长 {days} 天"),
+            Some(days) if days < 0 => format!("兑换成功：订阅已调整 {} 天", days.abs()),
+            _ => "兑换成功：订阅已更新".to_string(),
+        },
+        other => format!("兑换成功：{other} 类型 CDK 已处理"),
+    }
+}
+
 fn create_payment_open_target(
     result: &sub2api_desktop::api::payment::CreateOrderResult,
     request: &CreateOrderRequest,
@@ -3508,8 +3524,11 @@ fn local_device_id(target_kind: LaunchTarget) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::platform_launch_groups;
-    use sub2api_desktop::api::groups::{GroupPlatform, GroupSummary, SubscriptionType};
+    use super::{format_redeem_success_message, platform_launch_groups};
+    use sub2api_desktop::api::{
+        groups::{GroupPlatform, GroupSummary, SubscriptionType},
+        redeem::{RedeemHistoryGroup, RedeemResult},
+    };
 
     fn test_group(id: i64, name: &str, platform: GroupPlatform) -> GroupSummary {
         GroupSummary {
@@ -3563,5 +3582,27 @@ mod tests {
         let launchable = platform_launch_groups(&[inactive, claude_only]);
 
         assert!(launchable.is_empty());
+    }
+
+    #[test]
+    fn redeem_success_message_prefers_token_amount_for_token_codes() {
+        let result = RedeemResult {
+            id: 1,
+            code: "CDK-123".to_string(),
+            r#type: "token".to_string(),
+            value: 100_000_000.0,
+            token_amount: Some(100_000_000.0),
+            status: "used".to_string(),
+            used_at: Some("2025-01-02T15:04:05Z".to_string()),
+            created_at: "2025-01-01T15:04:05Z".to_string(),
+            group_id: Some(9),
+            validity_days: Some(0),
+            group: Some(RedeemHistoryGroup {
+                id: 9,
+                name: "desktop-openai".to_string(),
+            }),
+        };
+
+        assert_eq!(format_redeem_success_message(&result), "兑换成功：已入账 1亿 Token");
     }
 }
