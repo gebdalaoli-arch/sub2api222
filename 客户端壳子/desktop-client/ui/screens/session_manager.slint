@@ -1,0 +1,241 @@
+import { Button } from "std-widgets.slint";
+
+export component SessionManagerScreen inherits Rectangle {
+    in property <string> home-count-text: "0";
+    in property <string> session-count-text: "0";
+    in property <string> trash-count-text: "0";
+    in property <string> status-text: "本地会话会显示在这里。";
+    in property <[string]> group-lines: ["暂无工作区"];
+    in-out property <int> selected-group-index: 0;
+    in property <[string]> session-lines: ["暂无会话"];
+    in-out property <int> selected-session-index: 0;
+    in property <[string]> trash-lines: ["废纸篓为空"];
+    in-out property <int> selected-trash-index: 0;
+
+    callback refresh-requested();
+    callback sync-requested();
+    callback repair-requested();
+    callback group-selected(int);
+    callback session-selected(int);
+    callback trash-selected(int);
+    callback move-selected-requested();
+    callback restore-selected-requested();
+
+    background: #ffffff;
+    border-radius: 12px;
+    border-color: #d7e4f0;
+    border-width: 0px;
+
+    Text {
+        x: 24px;
+        y: 20px;
+        text: "会话管理";
+        color: #2c3437;
+        font-size: 28px;
+        font-weight: 800;
+    }
+
+    Text {
+        x: 24px;
+        y: 58px;
+        width: parent.width - 48px;
+        text: "按工作区分组查看 Codex 会话，并支持同步、可见性修复、移到废纸篓与恢复。";
+        color: #596064;
+        font-size: 13px;
+        wrap: word-wrap;
+    }
+
+    Button {
+        x: parent.width - 360px;
+        y: 22px;
+        width: 84px;
+        height: 34px;
+        text: "同步会话";
+        clicked => { root.sync-requested(); }
+    }
+
+    Button {
+        x: parent.width - 264px;
+        y: 22px;
+        width: 96px;
+        height: 34px;
+        text: "修复可见性";
+        clicked => { root.repair-requested(); }
+    }
+
+    Button {
+        x: parent.width - 156px;
+        y: 22px;
+        width: 120px;
+        height: 34px;
+        text: "刷新本地会话";
+        clicked => { root.refresh-requested(); }
+    }
+
+    Rectangle {
+        x: 24px;
+        y: 104px;
+        width: (parent.width - 64px) / 3;
+        height: 84px;
+        background: #f7f9fb;
+        border-radius: 12px;
+        Text { x: 16px; y: 16px; text: "目录数"; color: #596064; font-size: 12px; font-weight: 700; }
+        Text { x: 16px; y: 42px; text: root.home-count-text; color: #2c3437; font-size: 24px; font-weight: 800; }
+    }
+
+    Rectangle {
+        x: 32px + (parent.width - 64px) / 3;
+        y: 104px;
+        width: (parent.width - 64px) / 3;
+        height: 84px;
+        background: #f7f9fb;
+        border-radius: 12px;
+        Text { x: 16px; y: 16px; text: "会话数"; color: #596064; font-size: 12px; font-weight: 700; }
+        Text { x: 16px; y: 42px; text: root.session-count-text; color: #2c3437; font-size: 24px; font-weight: 800; }
+    }
+
+    Rectangle {
+        x: 40px + ((parent.width - 64px) / 3) * 2;
+        y: 104px;
+        width: (parent.width - 64px) / 3;
+        height: 84px;
+        background: #f7f9fb;
+        border-radius: 12px;
+        Text { x: 16px; y: 16px; text: "废纸篓"; color: #596064; font-size: 12px; font-weight: 700; }
+        Text { x: 16px; y: 42px; text: root.trash-count-text; color: #2c3437; font-size: 24px; font-weight: 800; }
+    }
+
+    Rectangle {
+        x: 24px;
+        y: 204px;
+        width: parent.width - 48px;
+        height: 44px;
+        background: #eef8ff;
+        border-radius: 12px;
+        Text {
+            x: 16px;
+            y: 12px;
+            width: parent.width - 32px;
+            text: root.status-text;
+            color: #596064;
+            font-size: 12px;
+            wrap: word-wrap;
+        }
+    }
+
+    property <length> panel-y: 268px;
+    property <length> panel-h: self.height - root.panel-y - 24px;
+    property <length> panel-gap: 20px;
+    property <length> available-w: self.width - 48px - root.panel-gap * 2;
+    property <length> left-w: root.available-w * 28 / 100;
+    property <length> mid-w: root.available-w * 42 / 100;
+    property <length> right-w: root.available-w - root.left-w - root.mid-w;
+
+    Rectangle {
+        x: 24px;
+        y: root.panel-y;
+        width: root.left-w;
+        height: root.panel-h;
+        background: #f7f9fb;
+        border-radius: 16px;
+
+        Text { x: 16px; y: 16px; text: "工作区"; color: #2c3437; font-size: 18px; font-weight: 800; }
+
+        for line[index] in root.group-lines : Rectangle {
+            x: 12px;
+            y: 52px + index * 68px;
+            width: parent.width - 24px;
+            height: 56px;
+            group-touch := TouchArea { clicked => { root.group-selected(index); } }
+            background: root.selected-group-index == index ? #ffffff : (group-touch.pressed ? #eef3f7 : transparent);
+            border-radius: 12px;
+            Text {
+                x: 12px;
+                y: 10px;
+                width: parent.width - 24px;
+                text: line;
+                color: root.selected-group-index == index ? #2c3437 : #596064;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
+        }
+    }
+
+    Rectangle {
+        x: 24px + root.left-w + root.panel-gap;
+        y: root.panel-y;
+        width: root.mid-w;
+        height: root.panel-h;
+        background: #f7f9fb;
+        border-radius: 16px;
+
+        Text { x: 16px; y: 16px; text: "会话详情"; color: #2c3437; font-size: 18px; font-weight: 800; }
+
+        Button {
+            x: parent.width - 124px;
+            y: 12px;
+            width: 108px;
+            height: 34px;
+            text: "移到废纸篓";
+            clicked => { root.move-selected-requested(); }
+        }
+
+        for line[index] in root.session-lines : Rectangle {
+            x: 12px;
+            y: 56px + index * 92px;
+            width: parent.width - 24px;
+            height: 80px;
+            session-touch := TouchArea { clicked => { root.session-selected(index); } }
+            background: root.selected-session-index == index ? #ffffff : (session-touch.pressed ? #eef3f7 : transparent);
+            border-radius: 14px;
+            Text {
+                x: 14px;
+                y: 12px;
+                width: parent.width - 28px;
+                text: line;
+                color: root.selected-session-index == index ? #2c3437 : #596064;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
+        }
+    }
+
+    Rectangle {
+        x: 24px + root.left-w + root.panel-gap + root.mid-w + root.panel-gap;
+        y: root.panel-y;
+        width: root.right-w;
+        height: root.panel-h;
+        background: #f7f9fb;
+        border-radius: 16px;
+
+        Text { x: 16px; y: 16px; text: "废纸篓"; color: #2c3437; font-size: 18px; font-weight: 800; }
+
+        Button {
+            x: parent.width - 108px;
+            y: 12px;
+            width: 92px;
+            height: 34px;
+            text: "恢复";
+            clicked => { root.restore-selected-requested(); }
+        }
+
+        for line[index] in root.trash-lines : Rectangle {
+            x: 12px;
+            y: 56px + index * 92px;
+            width: parent.width - 24px;
+            height: 80px;
+            trash-touch := TouchArea { clicked => { root.trash-selected(index); } }
+            background: root.selected-trash-index == index ? #ffffff : (trash-touch.pressed ? #eef3f7 : transparent);
+            border-radius: 14px;
+            Text {
+                x: 14px;
+                y: 12px;
+                width: parent.width - 28px;
+                text: line;
+                color: root.selected-trash-index == index ? #2c3437 : #596064;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
+        }
+    }
+}

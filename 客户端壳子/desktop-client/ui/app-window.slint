@@ -5,6 +5,7 @@ import { HelpDetailScreen } from "screens/help_detail.slint";
 import { LaunchPanel } from "screens/launch_panel.slint";
 import { LoginScene } from "screens/login_scene.slint";
 import { OverviewScreen } from "screens/overview.slint";
+import { SessionManagerScreen } from "screens/session_manager.slint";
 import { UpdateDialog } from "screens/update_dialog.slint";
 import { UsageDetailScreen } from "screens/usage_detail.slint";
 
@@ -84,6 +85,16 @@ export component AppWindow inherits Window {
     in-out property <[string]> announcement-feed-lines: ["暂无系统公告"];
     in-out property <string> view-key-password: "";
     in-out property <string> view-key-status-text: "输入账户密码后，可生成一个 7 天有效的使用密钥并打开说明页。";
+    in-out property <string> session-home-count-text: "0";
+    in-out property <string> session-count-text: "0";
+    in-out property <string> session-trash-count-text: "0";
+    in-out property <string> session-status-text: "本地会话会显示在这里。";
+    in-out property <[string]> session-group-lines: ["暂无工作区"];
+    in-out property <int> session-selected-group-index: 0;
+    in-out property <[string]> session-entry-lines: ["暂无会话"];
+    in-out property <int> session-selected-entry-index: 0;
+    in-out property <[string]> session-trash-lines: ["废纸篓为空"];
+    in-out property <int> session-selected-trash-index: 0;
 
     callback refresh-installations-requested();
     callback launch-desktop-requested();
@@ -105,6 +116,14 @@ export component AppWindow inherits Window {
     callback usage-next-page-requested();
     callback usage-view-mode-changed(int);
     callback usage-export-excel-requested();
+    callback session-refresh-requested();
+    callback session-sync-requested();
+    callback session-repair-requested();
+    callback session-group-selected(int);
+    callback session-entry-selected(int);
+    callback session-trash-selected(int);
+    callback session-move-selected-requested();
+    callback session-restore-selected-requested();
     callback manual-update-check-requested();
     callback view-usage-key-requested();
     callback update-primary-requested();
@@ -233,6 +252,21 @@ export component AppWindow inherits Window {
                     color: root.current-section == 4 ? #006499 : #51616b;
                     font-size: 14px;
                     font-weight: root.current-section == 4 ? 700 : 400;
+                }
+            }
+
+            Rectangle {
+                x: 24px; y: 336px;
+                width: 208px; height: 44px;
+                nav-touch-5 := TouchArea { clicked => { root.current-section = 6; } }
+                background: nav-touch-5.pressed ? #eaeff2 : (root.current-section == 6 ? #ffffff : transparent);
+                border-radius: 8px;
+                Text {
+                    x: 44px; y: 12px;
+                    text: "会话管理";
+                    color: root.current-section == 6 ? #006499 : #51616b;
+                    font-size: 14px;
+                    font-weight: root.current-section == 6 ? 700 : 400;
                 }
             }
         }
@@ -427,8 +461,40 @@ export component AppWindow inherits Window {
             }
         }
 
+        if root.current-section == 6: Rectangle {
+            x: 256px + 48px;
+            y: 64px + 48px;
+            width: parent.width - 256px - 96px;
+            height: parent.height - 64px - 96px;
+            background: transparent;
+
+            SessionManagerScreen {
+                x: 0px; y: 0px;
+                width: parent.width;
+                height: parent.height;
+                home-count-text: root.session-home-count-text;
+                session-count-text: root.session-count-text;
+                trash-count-text: root.session-trash-count-text;
+                status-text: root.session-status-text;
+                group-lines: root.session-group-lines;
+                selected-group-index <=> root.session-selected-group-index;
+                session-lines: root.session-entry-lines;
+                selected-session-index <=> root.session-selected-entry-index;
+                trash-lines: root.session-trash-lines;
+                selected-trash-index <=> root.session-selected-trash-index;
+                refresh-requested => { root.session-refresh-requested(); }
+                sync-requested => { root.session-sync-requested(); }
+                repair-requested => { root.session-repair-requested(); }
+                group-selected(index) => { root.session-group-selected(index); }
+                session-selected(index) => { root.session-entry-selected(index); }
+                trash-selected(index) => { root.session-trash-selected(index); }
+                move-selected-requested => { root.session-move-selected-requested(); }
+                restore-selected-requested => { root.session-restore-selected-requested(); }
+            }
+        }
+
         // ═══ Login Scene overlay (when !session-active, covers everything) ═══
-        if !root.session-active: LoginScene {
+        if !root.session-active && root.current-section != 6: LoginScene {
             x: 0px; y: 0px;
             width: parent.width;
             height: parent.height;

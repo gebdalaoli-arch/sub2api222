@@ -8,6 +8,7 @@ slint::include_modules!();
 use slint::{ModelRc, SharedString, VecModel};
 use std::{
     cell::RefCell,
+    collections::HashMap,
     path::PathBuf,
     rc::Rc,
     sync::{Arc, Mutex},
@@ -68,10 +69,15 @@ use sub2api_desktop::{
         managed_home::{
             backup_user_codex_config, cleanup_runtime_roots_older_than,
             inject_platform_config_into_user_home, resolve_user_codex_home,
-            restore_user_codex_config, write_platform_home, write_runtime_metadata,
-            ManagedHomePaths,
+            restore_user_codex_config, write_platform_home, write_runtime_metadata, ManagedHomePaths,
         },
         runtime_bootstrap::StartupDiagnostics,
+        session_manager::{
+            get_session_token_stats, list_session_groups, list_session_homes, list_trashed_sessions,
+            move_sessions_to_trash, repair_session_visibility, restore_sessions_from_trash,
+            sync_sessions_across_homes, SessionGroup, SessionHome, SessionTokenStats,
+            TrashedSessionRecord,
+        },
     },
     storage::{
         app_state::{AppStateStore, AuthPreferences},
@@ -95,6 +101,7 @@ type SharedCheckoutInfo = Arc<Mutex<Option<CheckoutInfo>>>;
 type SharedPendingPayment = Arc<Mutex<Option<PendingPaymentState>>>;
 type SharedUsagePage = Arc<Mutex<Option<PaginatedUsageLogs>>>;
 type SharedUsageQuery = Arc<Mutex<UsageQueryState>>;
+type SharedSessionManager = Arc<Mutex<SessionManagerState>>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct PendingPaymentState {
@@ -107,6 +114,18 @@ struct UsageQueryState {
     page: i32,
     page_size: i32,
     view_mode: UsageViewMode,
+}
+
+#[derive(Debug, Clone, Default)]
+struct SessionManagerState {
+    homes: Vec<SessionHome>,
+    groups: Vec<SessionGroup>,
+    token_stats: HashMap<String, SessionTokenStats>,
+    trash: Vec<TrashedSessionRecord>,
+    selected_group_index: i32,
+    selected_session_id: Option<String>,
+    selected_trash_id: Option<String>,
+    status_text: String,
 }
 
 impl Default for UsageQueryState {
@@ -189,10 +208,16 @@ fn main() -> anyhow::Result<()> {
     let pending_payment: SharedPendingPayment = Arc::new(Mutex::new(None));
     let usage_page: SharedUsagePage = Arc::new(Mutex::new(None));
     let usage_query: SharedUsageQuery = Arc::new(Mutex::new(UsageQueryState::default()));
+    let session_manager: SharedSessionManager = Arc::new(Mutex::new(SessionManagerState {
+        status_text: "本地会话会显示在这里。".to_string(),
+        ..SessionManagerState::default()
+    }));
 
     apply_launch_state(&app, &targets.borrow());
     apply_logged_out_state(&app);
     preload_local_state(&app, &app_state, &token_store);
+    refresh_session_manager_state(&app_state, &session_manager);
+    apply_session_manager_state(&app, &current_session_manager_vm(&session_manager));
     let _ = cleanup_runtime_roots_older_than(
         &app_state.root().join("runtime"),
         Duration::from_secs(60 * 60 * 12),
@@ -257,6 +282,7 @@ fn main() -> anyhow::Result<()> {
         Arc::clone(&auth_session),
         Arc::clone(&available_groups),
     );
+    wire_session_manager_callbacks(&app, app_state.clone(), Arc::clone(&session_manager));
     wire_update_callbacks(&app, Arc::clone(&config));
     restore_saved_session(
         &app,
@@ -1827,6 +1853,183 @@ fn wire_use_key_callbacks(
     });
 }
 
+fn wire_session_manager_callbacks(
+    app: &AppWindow,
+    app_state: AppStateStore,
+    session_manager: SharedSessionManager,
+) {
+    let refresh_app = app.as_weak();
+    let refresh_state = app_state.clone();
+    let refresh_manager = Arc::clone(&session_manager);
+    app.on_session_refresh_requested(move || {
+        let ui_handle = refresh_app.clone();
+        let app_state = refresh_state.clone();
+        let session_manager = Arc::clone(&refresh_manager);
+        thread::spawn(move || {
+            refresh_session_manager_state(&app_state, &session_manager);
+            if let Ok(mut state) = session_manager.lock() {
+                state.status_text = "已刷新本地会话列表。".to_string();
+            }
+            let vm = current_session_manager_vm(&session_manager);
+            let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                apply_session_manager_state(&app, &vm);
+            });
+        });
+    });
+
+    let sync_app = app.as_weak();
+    let sync_state = app_state.clone();
+    let sync_manager = Arc::clone(&session_manager);
+    app.on_session_sync_requested(move || {
+        let ui_handle = sync_app.clone();
+        let app_state = sync_state.clone();
+        let session_manager = Arc::clone(&sync_manager);
+        thread::spawn(move || {
+            let message = match sync_sessions_across_homes(app_state.root()) {
+                Ok(summary) => summary.message,
+                Err(error) => format!("同步会话失败：{error}"),
+            };
+            refresh_session_manager_state(&app_state, &session_manager);
+            if let Ok(mut state) = session_manager.lock() {
+                state.status_text = message;
+            }
+            let vm = current_session_manager_vm(&session_manager);
+            let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                apply_session_manager_state(&app, &vm);
+            });
+        });
+    });
+
+    let repair_app = app.as_weak();
+    let repair_state = app_state.clone();
+    let repair_manager = Arc::clone(&session_manager);
+    app.on_session_repair_requested(move || {
+        let ui_handle = repair_app.clone();
+        let app_state = repair_state.clone();
+        let session_manager = Arc::clone(&repair_manager);
+        thread::spawn(move || {
+            let message = match repair_session_visibility(app_state.root()) {
+                Ok(summary) => summary.message,
+                Err(error) => format!("修复可见性失败：{error}"),
+            };
+            refresh_session_manager_state(&app_state, &session_manager);
+            if let Ok(mut state) = session_manager.lock() {
+                state.status_text = message;
+            }
+            let vm = current_session_manager_vm(&session_manager);
+            let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                apply_session_manager_state(&app, &vm);
+            });
+        });
+    });
+
+    let group_app = app.as_weak();
+    let group_manager = Arc::clone(&session_manager);
+    app.on_session_group_selected(move |index| {
+        if let Ok(mut state) = group_manager.lock() {
+            state.selected_group_index = index;
+            state.selected_session_id = state
+                .groups
+                .get(index.max(0) as usize)
+                .and_then(|group| group.sessions.first().map(|session| session.session_id.clone()));
+        }
+        if let Some(app) = group_app.upgrade() {
+            apply_session_manager_state(&app, &current_session_manager_vm(&group_manager));
+        }
+    });
+
+    let entry_app = app.as_weak();
+    let entry_manager = Arc::clone(&session_manager);
+    app.on_session_entry_selected(move |index| {
+        if let Ok(mut state) = entry_manager.lock() {
+            state.selected_session_id = state
+                .groups
+                .get(state.selected_group_index.max(0) as usize)
+                .and_then(|group| group.sessions.get(index.max(0) as usize))
+                .map(|session| session.session_id.clone());
+        }
+        if let Some(app) = entry_app.upgrade() {
+            apply_session_manager_state(&app, &current_session_manager_vm(&entry_manager));
+        }
+    });
+
+    let trash_app = app.as_weak();
+    let trash_manager = Arc::clone(&session_manager);
+    app.on_session_trash_selected(move |index| {
+        if let Ok(mut state) = trash_manager.lock() {
+            state.selected_trash_id = state
+                .trash
+                .get(index.max(0) as usize)
+                .map(|item| item.session_id.clone());
+        }
+        if let Some(app) = trash_app.upgrade() {
+            apply_session_manager_state(&app, &current_session_manager_vm(&trash_manager));
+        }
+    });
+
+    let move_app = app.as_weak();
+    let move_state = app_state.clone();
+    let move_manager = Arc::clone(&session_manager);
+    app.on_session_move_selected_requested(move || {
+        let ui_handle = move_app.clone();
+        let app_state = move_state.clone();
+        let session_manager = Arc::clone(&move_manager);
+        thread::spawn(move || {
+            let selected_id = session_manager
+                .lock()
+                .ok()
+                .and_then(|state| state.selected_session_id.clone());
+            let message = if let Some(session_id) = selected_id {
+                match move_sessions_to_trash(app_state.root(), &[session_id]) {
+                    Ok(summary) => summary.message,
+                    Err(error) => format!("移到废纸篓失败：{error}"),
+                }
+            } else {
+                "请先选择一条会话。".to_string()
+            };
+            refresh_session_manager_state(&app_state, &session_manager);
+            if let Ok(mut state) = session_manager.lock() {
+                state.status_text = message;
+            }
+            let vm = current_session_manager_vm(&session_manager);
+            let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                apply_session_manager_state(&app, &vm);
+            });
+        });
+    });
+
+    let restore_app = app.as_weak();
+    let restore_state = app_state.clone();
+    let restore_manager = Arc::clone(&session_manager);
+    app.on_session_restore_selected_requested(move || {
+        let ui_handle = restore_app.clone();
+        let app_state = restore_state.clone();
+        let session_manager = Arc::clone(&restore_manager);
+        thread::spawn(move || {
+            let selected_id = session_manager
+                .lock()
+                .ok()
+                .and_then(|state| state.selected_trash_id.clone());
+            let message = if let Some(session_id) = selected_id {
+                match restore_sessions_from_trash(app_state.root(), &[session_id]) {
+                    Ok(summary) => summary.message,
+                    Err(error) => format!("恢复会话失败：{error}"),
+                }
+            } else {
+                "请先选择一条待恢复会话。".to_string()
+            };
+            refresh_session_manager_state(&app_state, &session_manager);
+            if let Ok(mut state) = session_manager.lock() {
+                state.status_text = message;
+            }
+            let vm = current_session_manager_vm(&session_manager);
+            let _ = ui_handle.upgrade_in_event_loop(move |app| {
+                apply_session_manager_state(&app, &vm);
+            });
+        });
+    });
+}
+
 fn restore_saved_session(
     app: &AppWindow,
     config: Arc<AppConfig>,
@@ -2710,6 +2913,290 @@ fn current_billing_vm(
         &history,
         active_openai_group,
     )
+}
+
+#[derive(Debug, Clone)]
+struct SessionManagerViewModel {
+    home_count_text: String,
+    session_count_text: String,
+    trash_count_text: String,
+    status_text: String,
+    group_lines: Vec<String>,
+    selected_group_index: i32,
+    session_lines: Vec<String>,
+    selected_session_index: i32,
+    trash_lines: Vec<String>,
+    selected_trash_index: i32,
+}
+
+fn refresh_session_manager_state(app_state: &AppStateStore, session_manager: &SharedSessionManager) {
+    let homes = list_session_homes(app_state.root()).unwrap_or_default();
+    let groups = list_session_groups(app_state.root()).unwrap_or_default();
+    let session_ids = groups
+        .iter()
+        .flat_map(|group| group.sessions.iter().map(|session| session.session_id.clone()))
+        .collect::<Vec<_>>();
+    let token_stats = get_session_token_stats(app_state.root(), &session_ids)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|item| (item.session_id.clone(), item))
+        .collect::<HashMap<_, _>>();
+    let trash = list_trashed_sessions(app_state.root()).unwrap_or_default();
+
+    if let Ok(mut state) = session_manager.lock() {
+        let previous_group_cwd = state
+            .groups
+            .get(state.selected_group_index.max(0) as usize)
+            .map(|group| group.cwd.clone());
+        let previous_session_id = state.selected_session_id.clone();
+        let previous_trash_id = state.selected_trash_id.clone();
+
+        state.homes = homes;
+        state.groups = groups;
+        state.token_stats = token_stats;
+        state.trash = trash;
+
+        state.selected_group_index = previous_group_cwd
+            .and_then(|cwd| {
+                state
+                    .groups
+                    .iter()
+                    .position(|group| group.cwd == cwd)
+                    .map(|index| index as i32)
+            })
+            .unwrap_or_else(|| if state.groups.is_empty() { -1 } else { 0 });
+
+        state.selected_session_id = if let Some(session_id) = previous_session_id {
+            if state
+                .groups
+                .iter()
+                .flat_map(|group| group.sessions.iter())
+                .any(|session| session.session_id == session_id)
+            {
+                Some(session_id)
+            } else {
+                state
+                    .groups
+                    .get(state.selected_group_index.max(0) as usize)
+                    .and_then(|group| group.sessions.first().map(|session| session.session_id.clone()))
+            }
+        } else {
+            state
+                .groups
+                .get(state.selected_group_index.max(0) as usize)
+                .and_then(|group| group.sessions.first().map(|session| session.session_id.clone()))
+        };
+
+        state.selected_trash_id = if let Some(trash_id) = previous_trash_id {
+            if state.trash.iter().any(|item| item.session_id == trash_id) {
+                Some(trash_id)
+            } else {
+                state.trash.first().map(|item| item.session_id.clone())
+            }
+        } else {
+            state.trash.first().map(|item| item.session_id.clone())
+        };
+    }
+}
+
+fn current_session_manager_vm(session_manager: &SharedSessionManager) -> SessionManagerViewModel {
+    let state = session_manager.lock().ok().map(|item| item.clone()).unwrap_or_default();
+    let selected_group = state
+        .groups
+        .get(state.selected_group_index.max(0) as usize)
+        .cloned();
+    let selected_session_index = selected_group
+        .as_ref()
+        .and_then(|group| {
+            state
+                .selected_session_id
+                .as_ref()
+                .and_then(|selected| {
+                    group
+                        .sessions
+                        .iter()
+                        .position(|session| session.session_id == *selected)
+                })
+        })
+        .map(|index| index as i32)
+        .unwrap_or_else(|| if selected_group.as_ref().is_some_and(|group| !group.sessions.is_empty()) { 0 } else { -1 });
+    let selected_trash_index = state
+        .selected_trash_id
+        .as_ref()
+        .and_then(|selected| state.trash.iter().position(|item| item.session_id == *selected))
+        .map(|index| index as i32)
+        .unwrap_or_else(|| if state.trash.is_empty() { -1 } else { 0 });
+
+    SessionManagerViewModel {
+        home_count_text: state.homes.len().to_string(),
+        session_count_text: state
+            .groups
+            .iter()
+            .map(|group| group.sessions.len())
+            .sum::<usize>()
+            .to_string(),
+        trash_count_text: state.trash.len().to_string(),
+        status_text: if state.status_text.trim().is_empty() {
+            "本地会话会显示在这里。".to_string()
+        } else {
+            state.status_text.clone()
+        },
+        group_lines: if state.groups.is_empty() {
+            vec!["暂无工作区".to_string()]
+        } else {
+            state.groups.iter().map(format_session_group_line).collect()
+        },
+        selected_group_index: if state.groups.is_empty() {
+            0
+        } else {
+            state.selected_group_index.max(0)
+        },
+        session_lines: selected_group
+            .map(|group| {
+                if group.sessions.is_empty() {
+                    vec!["暂无会话".to_string()]
+                } else {
+                    group
+                        .sessions
+                        .iter()
+                        .map(|session| format_session_entry_line(session, state.token_stats.get(&session.session_id)))
+                        .collect()
+                }
+            })
+            .unwrap_or_else(|| vec!["暂无会话".to_string()]),
+        selected_session_index: selected_session_index.max(0),
+        trash_lines: if state.trash.is_empty() {
+            vec!["废纸篓为空".to_string()]
+        } else {
+            state.trash.iter().map(format_trashed_session_line).collect()
+        },
+        selected_trash_index: selected_trash_index.max(0),
+    }
+}
+
+fn apply_session_manager_state(app: &AppWindow, vm: &SessionManagerViewModel) {
+    app.set_session_home_count_text(SharedString::from(vm.home_count_text.clone()));
+    app.set_session_count_text(SharedString::from(vm.session_count_text.clone()));
+    app.set_session_trash_count_text(SharedString::from(vm.trash_count_text.clone()));
+    app.set_session_status_text(SharedString::from(vm.status_text.clone()));
+    app.set_session_group_lines(string_model(
+        vm.group_lines.iter().cloned().map(SharedString::from).collect(),
+    ));
+    app.set_session_selected_group_index(vm.selected_group_index);
+    app.set_session_entry_lines(string_model(
+        vm.session_lines.iter().cloned().map(SharedString::from).collect(),
+    ));
+    app.set_session_selected_entry_index(vm.selected_session_index);
+    app.set_session_trash_lines(string_model(
+        vm.trash_lines.iter().cloned().map(SharedString::from).collect(),
+    ));
+    app.set_session_selected_trash_index(vm.selected_trash_index);
+}
+
+fn format_session_group_line(group: &SessionGroup) -> String {
+    format!(
+        "{}\n{} 条会话 · 最近 {}",
+        resolve_session_group_label(&group.cwd),
+        group.sessions.len(),
+        format_session_timestamp(group.latest_updated_at)
+    )
+}
+
+fn format_session_entry_line(
+    session: &sub2api_desktop::platform::session_manager::SessionRecord,
+    stats: Option<&SessionTokenStats>,
+) -> String {
+    let locations = session
+        .locations
+        .iter()
+        .map(|location| location.home_label.clone())
+        .collect::<Vec<_>>()
+        .join(" / ");
+    let token_text = stats
+        .map(|item| {
+            format!(
+                "输入 {} / 输出 {} / 总计 {}",
+                format_large_count(item.input_tokens),
+                format_large_count(item.output_tokens),
+                format_large_count(item.total_tokens)
+            )
+        })
+        .unwrap_or_else(|| "Token 暂无统计".to_string());
+    format!(
+        "{}\n{} · {}\n{}",
+        session.title,
+        format_session_id_short(&session.session_id),
+        format_session_timestamp(session.updated_at),
+        if locations.is_empty() {
+            token_text
+        } else {
+            format!("{token_text}\n{locations}")
+        }
+    )
+}
+
+fn format_trashed_session_line(session: &TrashedSessionRecord) -> String {
+    let locations = session
+        .locations
+        .iter()
+        .map(|location| location.home_label.clone())
+        .collect::<Vec<_>>()
+        .join(" / ");
+    format!(
+        "{}\n{} · 删除于 {}\n{}",
+        session.title,
+        format_session_id_short(&session.session_id),
+        format_session_timestamp(session.deleted_at),
+        if locations.is_empty() { session.cwd.clone() } else { locations }
+    )
+}
+
+fn resolve_session_group_label(cwd: &str) -> String {
+    cwd.replace('\\', "/")
+        .trim_end_matches('/')
+        .rsplit('/')
+        .next()
+        .filter(|value| !value.is_empty())
+        .unwrap_or(cwd)
+        .to_string()
+}
+
+fn format_session_id_short(session_id: &str) -> String {
+    if session_id.len() <= 18 {
+        session_id.to_string()
+    } else {
+        format!("{}...{}", &session_id[..8], &session_id[session_id.len() - 6..])
+    }
+}
+
+fn format_large_count(value: u64) -> String {
+    if value >= 1_000_000 {
+        format!("{:.1}M", value as f64 / 1_000_000.0)
+    } else if value >= 1_000 {
+        format!("{:.1}K", value as f64 / 1_000.0)
+    } else {
+        value.to_string()
+    }
+}
+
+fn format_session_timestamp(value: Option<i64>) -> String {
+    let Some(value) = value else {
+        return "时间未知".to_string();
+    };
+    let seconds = if value > 1_000_000_000_000 { value / 1000 } else { value };
+    let now = chrono::Utc::now().timestamp();
+    let diff = (now - seconds).max(0);
+    if diff < 3600 {
+        format!("{} 分钟前", (diff / 60).max(1))
+    } else if diff < 86_400 {
+        format!("{} 小时前", diff / 3600)
+    } else if diff < 604_800 {
+        format!("{} 天前", diff / 86_400)
+    } else {
+        chrono::DateTime::<chrono::Utc>::from_timestamp(seconds, 0)
+            .map(|value| value.format("%m-%d %H:%M").to_string())
+            .unwrap_or_else(|| seconds.to_string())
+    }
 }
 
 fn apply_launch_state(app: &AppWindow, targets: &[InstalledTarget]) {
