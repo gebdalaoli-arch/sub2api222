@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
@@ -11,11 +12,14 @@ import (
 const (
 	TokenLedgerSourceRedeemCode = "redeem_code"
 	TokenLedgerSourceUsage      = "usage"
+	TokenLedgerSourceAdminAdjust = "admin_adjust"
 )
 
 var (
 	ErrTokenSettlementChannelNotFound = infraerrors.BadRequest("TOKEN_SETTLEMENT_CHANNEL_NOT_FOUND", "token settlement channel not found for group")
 	ErrInvalidTokenAmount             = infraerrors.BadRequest("INVALID_TOKEN_AMOUNT", "token amount must be greater than 0")
+	ErrInvalidTokenOperation          = infraerrors.BadRequest("INVALID_TOKEN_OPERATION", "token operation must be add or subtract")
+	ErrInsufficientTokenBalance       = infraerrors.BadRequest("INSUFFICIENT_TOKEN_BALANCE", "insufficient token balance")
 )
 
 type ClientTokenWalletBalance struct {
@@ -125,6 +129,54 @@ func (s *ClientTokenBillingService) CreditRedeemCode(ctx context.Context, userID
 		return nil, fmt.Errorf("credit token wallet: %w", err)
 	}
 	return balance, nil
+}
+
+func (s *ClientTokenBillingService) UpdateAdminTokenBalance(ctx context.Context, userID, groupID int64, tokenAmount float64, operation, notes string) (*ClientBillingSummary, error) {
+	if s == nil || s.walletRepo == nil || s.channelResolver == nil {
+		return nil, ErrTokenSettlementChannelNotFound
+	}
+	amountMilli := milliTokensFromTokens(tokenAmount)
+	if amountMilli <= 0 {
+		return nil, ErrInvalidTokenAmount
+	}
+	channel, err := s.channelResolver.GetChannelForGroup(ctx, groupID)
+	if err != nil {
+		return nil, fmt.Errorf("resolve token settlement channel: %w", err)
+	}
+	if channel == nil || !channel.UsesTokenSettlement() {
+		return nil, ErrTokenSettlementChannelNotFound
+	}
+
+	sourceID := buildAdminAdjustSourceID(operation, notes)
+	switch operation {
+	case "add":
+		if _, err := s.walletRepo.Credit(ctx, userID, channel.ID, amountMilli, TokenLedgerSourceAdminAdjust, sourceID); err != nil {
+			return nil, fmt.Errorf("credit token wallet: %w", err)
+		}
+	case "subtract":
+		balanceMilli, err := s.walletRepo.GetBalance(ctx, userID, channel.ID)
+		if err != nil {
+			return nil, fmt.Errorf("get token wallet balance: %w", err)
+		}
+		if balanceMilli < amountMilli {
+			return nil, ErrInsufficientTokenBalance
+		}
+		if _, err := s.walletRepo.Debit(ctx, userID, channel.ID, amountMilli, TokenLedgerSourceAdminAdjust, sourceID); err != nil {
+			return nil, fmt.Errorf("debit token wallet: %w", err)
+		}
+	default:
+		return nil, ErrInvalidTokenOperation
+	}
+
+	return s.GetBillingSummary(ctx, userID)
+}
+
+func buildAdminAdjustSourceID(operation, notes string) string {
+	trimmed := strings.TrimSpace(notes)
+	if trimmed != "" {
+		return fmt.Sprintf("%s:%s", operation, trimmed)
+	}
+	return operation
 }
 
 func ResolveUsageTokenDebit(ctx context.Context, resolver ClientTokenChannelResolver, groupID *int64, inputTokens, outputTokens, cacheCreateTokens, cacheReadTokens int) (int64, int64, bool, error) {

@@ -22,13 +22,19 @@ type UserWithConcurrency struct {
 type UserHandler struct {
 	adminService       service.AdminService
 	concurrencyService *service.ConcurrencyService
+	tokenBillingService *service.ClientTokenBillingService
 }
 
 // NewUserHandler creates a new admin user handler
-func NewUserHandler(adminService service.AdminService, concurrencyService *service.ConcurrencyService) *UserHandler {
+func NewUserHandler(adminService service.AdminService, concurrencyService *service.ConcurrencyService, tokenBillingService ...*service.ClientTokenBillingService) *UserHandler {
+	var tokenService *service.ClientTokenBillingService
+	if len(tokenBillingService) > 0 {
+		tokenService = tokenBillingService[0]
+	}
 	return &UserHandler{
 		adminService:       adminService,
 		concurrencyService: concurrencyService,
+		tokenBillingService: tokenService,
 	}
 }
 
@@ -63,6 +69,13 @@ type UpdateUserRequest struct {
 type UpdateBalanceRequest struct {
 	Balance   float64 `json:"balance" binding:"required,gt=0"`
 	Operation string  `json:"operation" binding:"required,oneof=set add subtract"`
+	Notes     string  `json:"notes"`
+}
+
+type UpdateTokenBalanceRequest struct {
+	Tokens    float64 `json:"tokens" binding:"required,gt=0"`
+	Operation string  `json:"operation" binding:"required,oneof=add subtract"`
+	GroupID   int64   `json:"group_id" binding:"required,gt=0"`
 	Notes     string  `json:"notes"`
 }
 
@@ -279,6 +292,65 @@ func (h *UserHandler) UpdateBalance(c *gin.Context) {
 			return nil, execErr
 		}
 		return dto.UserFromServiceAdmin(user), nil
+	})
+}
+
+// GetTokenBalance handles getting user's token wallet summary
+// GET /api/v1/admin/users/:id/token-balance
+func (h *UserHandler) GetTokenBalance(c *gin.Context) {
+	if h.tokenBillingService == nil {
+		response.InternalError(c, "token billing service not configured")
+		return
+	}
+
+	userID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid user ID")
+		return
+	}
+
+	summary, err := h.tokenBillingService.GetBillingSummary(c.Request.Context(), userID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, summary)
+}
+
+// UpdateTokenBalance handles updating user token wallet balance
+// POST /api/v1/admin/users/:id/token-balance
+func (h *UserHandler) UpdateTokenBalance(c *gin.Context) {
+	if h.tokenBillingService == nil {
+		response.InternalError(c, "token billing service not configured")
+		return
+	}
+
+	userID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid user ID")
+		return
+	}
+
+	var req UpdateTokenBalanceRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	idempotencyPayload := struct {
+		UserID int64                    `json:"user_id"`
+		Body   UpdateTokenBalanceRequest `json:"body"`
+	}{
+		UserID: userID,
+		Body:   req,
+	}
+	executeAdminIdempotentJSON(c, "admin.users.token_balance.update", idempotencyPayload, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
+		summary, execErr := h.tokenBillingService.UpdateAdminTokenBalance(ctx, userID, req.GroupID, req.Tokens, req.Operation, req.Notes)
+		if execErr != nil {
+			return nil, execErr
+		}
+		return summary, nil
 	})
 }
 

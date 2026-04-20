@@ -15,6 +15,15 @@ type stubClientTokenWalletRepo struct {
 	creditUserID      int64
 	creditChannelID   int64
 	creditAmountMilli int64
+	creditSourceType  string
+	creditSourceID    string
+	debitResult       *ClientTokenWalletBalance
+	debitCalls        int
+	debitUserID       int64
+	debitChannelID    int64
+	debitAmountMilli  int64
+	debitSourceType   string
+	debitSourceID     string
 }
 
 func (s *stubClientTokenWalletRepo) Credit(ctx context.Context, userID, channelID int64, amountMilli int64, sourceType, sourceID string) (*ClientTokenWalletBalance, error) {
@@ -22,6 +31,8 @@ func (s *stubClientTokenWalletRepo) Credit(ctx context.Context, userID, channelI
 	s.creditUserID = userID
 	s.creditChannelID = channelID
 	s.creditAmountMilli = amountMilli
+	s.creditSourceType = sourceType
+	s.creditSourceID = sourceID
 	if s.creditResult != nil {
 		return s.creditResult, nil
 	}
@@ -34,6 +45,15 @@ func (s *stubClientTokenWalletRepo) Credit(ctx context.Context, userID, channelI
 }
 
 func (s *stubClientTokenWalletRepo) Debit(ctx context.Context, userID, channelID int64, amountMilli int64, sourceType, sourceID string) (*ClientTokenWalletBalance, error) {
+	s.debitCalls++
+	s.debitUserID = userID
+	s.debitChannelID = channelID
+	s.debitAmountMilli = amountMilli
+	s.debitSourceType = sourceType
+	s.debitSourceID = sourceID
+	if s.debitResult != nil {
+		return s.debitResult, nil
+	}
 	return &ClientTokenWalletBalance{
 		UserID:             userID,
 		ChannelID:          channelID,
@@ -152,5 +172,59 @@ func TestClientTokenBillingServiceCreditRedeemCode(t *testing.T) {
 	require.Equal(t, int64(8), repo.creditUserID)
 	require.Equal(t, int64(11), repo.creditChannelID)
 	require.Equal(t, int64(100000000000), repo.creditAmountMilli)
+	require.Equal(t, TokenLedgerSourceRedeemCode, repo.creditSourceType)
 	require.Equal(t, int64(100000000000), result.BalanceMilliTokens)
+}
+
+func TestClientTokenBillingServiceUpdateAdminTokenBalanceCreditsWallet(t *testing.T) {
+	repo := &stubClientTokenWalletRepo{
+		creditResult: &ClientTokenWalletBalance{
+			UserID:                    8,
+			ChannelID:                 11,
+			BalanceMilliTokens:        150000000000,
+			TotalRechargedMilliTokens: 150000000000,
+		},
+		summary: &ClientBillingSummary{
+			RemainingMilliTokens: 150000000000,
+			RechargedMilliTokens: 150000000000,
+			ConsumedMilliTokens:  0,
+		},
+	}
+	resolver := &stubClientTokenChannelResolver{
+		channel: &Channel{
+			ID:             11,
+			Status:         StatusActive,
+			SettlementUnit: SettlementUnitToken,
+		},
+	}
+
+	svc := NewClientTokenBillingService(repo, resolver)
+	summary, err := svc.UpdateAdminTokenBalance(context.Background(), 8, 21, 150000000, "add", "manual-topup")
+
+	require.NoError(t, err)
+	require.NotNil(t, summary)
+	require.Equal(t, 1, repo.creditCalls)
+	require.Equal(t, TokenLedgerSourceAdminAdjust, repo.creditSourceType)
+	require.Equal(t, "add:manual-topup", repo.creditSourceID)
+	require.Equal(t, 150000000.0, summary.RemainingTokens)
+}
+
+func TestClientTokenBillingServiceUpdateAdminTokenBalanceRejectsOverdraft(t *testing.T) {
+	repo := &stubClientTokenWalletRepo{
+		balanceMilli: 5000,
+	}
+	resolver := &stubClientTokenChannelResolver{
+		channel: &Channel{
+			ID:             11,
+			Status:         StatusActive,
+			SettlementUnit: SettlementUnitToken,
+		},
+	}
+
+	svc := NewClientTokenBillingService(repo, resolver)
+	summary, err := svc.UpdateAdminTokenBalance(context.Background(), 8, 21, 10, "subtract", "")
+
+	require.Nil(t, summary)
+	require.ErrorIs(t, err, ErrInsufficientTokenBalance)
+	require.Equal(t, 0, repo.debitCalls)
 }

@@ -6,6 +6,16 @@
 import { apiClient } from '../client'
 import type { AdminUser, UpdateUserRequest, PaginatedResponse, ApiKey } from '@/types'
 
+export interface AdminUserTokenBalanceSummary {
+  remaining_milli_tokens: number
+  recharged_milli_tokens: number
+  consumed_milli_tokens: number
+  remaining_tokens: number
+  recharged_tokens: number
+  consumed_tokens: number
+  token_unit: string
+}
+
 /**
  * List all users with pagination
  * @param page - Page number (default: 1)
@@ -123,6 +133,27 @@ export async function updateBalance(
   const { data } = await apiClient.post<AdminUser>(`/admin/users/${id}/balance`, {
     balance,
     operation,
+    notes: notes || ''
+  })
+  return data
+}
+
+export async function getTokenBalance(id: number): Promise<AdminUserTokenBalanceSummary> {
+  const { data } = await apiClient.get<AdminUserTokenBalanceSummary>(`/admin/users/${id}/token-balance`)
+  return data
+}
+
+export async function updateTokenBalance(
+  id: number,
+  tokens: number,
+  operation: 'add' | 'subtract',
+  group_id: number,
+  notes?: string
+): Promise<AdminUserTokenBalanceSummary> {
+  const { data } = await apiClient.post<AdminUserTokenBalanceSummary>(`/admin/users/${id}/token-balance`, {
+    tokens,
+    operation,
+    group_id,
     notes: notes || ''
   })
   return data
@@ -255,6 +286,8 @@ export const usersAPI = {
   update,
   delete: deleteUser,
   updateBalance,
+  getTokenBalance,
+  updateTokenBalance,
   updateConcurrency,
   toggleStatus,
   getUserApiKeys,

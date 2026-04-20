@@ -568,6 +568,24 @@
                 {{ t('admin.users.withdraw') }}
               </button>
 
+              <button
+                @click="handleDepositToken(user); closeActionMenu()"
+                class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700"
+              >
+                <Icon name="plus" size="sm" class="text-sky-500" :stroke-width="2" />
+                {{ t('admin.users.depositToken') }}
+              </button>
+
+              <button
+                @click="handleWithdrawToken(user); closeActionMenu()"
+                class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700"
+              >
+                <svg class="h-4 w-4 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
+                </svg>
+                {{ t('admin.users.withdrawToken') }}
+              </button>
+
               <!-- Balance History -->
               <button
                 @click="handleBalanceHistory(user); closeActionMenu()"
@@ -600,6 +618,7 @@
     <UserApiKeysModal :show="showApiKeysModal" :user="viewingUser" @close="closeApiKeysModal" />
     <UserAllowedGroupsModal :show="showAllowedGroupsModal" :user="allowedGroupsUser" @close="closeAllowedGroupsModal" @success="loadUsers" />
     <UserBalanceModal :show="showBalanceModal" :user="balanceUser" :operation="balanceOperation" @close="closeBalanceModal" @success="loadUsers" />
+    <UserTokenBalanceModal :show="showTokenBalanceModal" :user="tokenBalanceUser" :operation="tokenBalanceOperation" @close="closeTokenBalanceModal" @success="loadUsers" />
     <UserBalanceHistoryModal :show="showBalanceHistoryModal" :user="balanceHistoryUser" @close="closeBalanceHistoryModal" @deposit="handleDepositFromHistory" @withdraw="handleWithdrawFromHistory" />
     <GroupReplaceModal :show="showGroupReplaceModal" :user="groupReplaceUser" :old-group="groupReplaceOldGroup" :all-groups="allGroups" @close="closeGroupReplaceModal" @success="loadUsers" />
     <UserAttributesConfigModal :show="showAttributesModal" @close="handleAttributesModalClose" />
@@ -634,6 +653,7 @@ import UserEditModal from '@/components/admin/user/UserEditModal.vue'
 import UserApiKeysModal from '@/components/admin/user/UserApiKeysModal.vue'
 import UserAllowedGroupsModal from '@/components/admin/user/UserAllowedGroupsModal.vue'
 import UserBalanceModal from '@/components/admin/user/UserBalanceModal.vue'
+import UserTokenBalanceModal from '@/components/admin/user/UserTokenBalanceModal.vue'
 import UserBalanceHistoryModal from '@/components/admin/user/UserBalanceHistoryModal.vue'
 import GroupReplaceModal from '@/components/admin/user/GroupReplaceModal.vue'
 
@@ -1102,6 +1122,9 @@ const groupReplaceOldGroup = ref<{ id: number; name: string } | null>(null)
 const showBalanceModal = ref(false)
 const balanceUser = ref<AdminUser | null>(null)
 const balanceOperation = ref<'add' | 'subtract'>('add')
+const showTokenBalanceModal = ref(false)
+const tokenBalanceUser = ref<AdminUser | null>(null)
+const tokenBalanceOperation = ref<'add' | 'subtract'>('add')
 
 // Balance History modal state
 const showBalanceHistoryModal = ref(false)
@@ -1360,6 +1383,23 @@ const handleWithdraw = (user: AdminUser) => {
 const closeBalanceModal = () => {
   showBalanceModal.value = false
   balanceUser.value = null
+}
+
+const handleDepositToken = (user: AdminUser) => {
+  tokenBalanceUser.value = user
+  tokenBalanceOperation.value = 'add'
+  showTokenBalanceModal.value = true
+}
+
+const handleWithdrawToken = (user: AdminUser) => {
+  tokenBalanceUser.value = user
+  tokenBalanceOperation.value = 'subtract'
+  showTokenBalanceModal.value = true
+}
+
+const closeTokenBalanceModal = () => {
+  showTokenBalanceModal.value = false
+  tokenBalanceUser.value = null
 }
 
 const handleBalanceHistory = (user: AdminUser) => {
