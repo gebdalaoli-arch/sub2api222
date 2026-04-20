@@ -132,13 +132,23 @@ fn classify_codex_path(path: &Path) -> Option<LaunchTarget> {
     if text.starts_with(r"shell:appsfolder\openai.codex_") {
         return Some(LaunchTarget::Desktop);
     }
+    if text.contains(r"windowsapps\openai.codex")
+        && text.contains(r"\app\resources\")
+        && matches!(file_name.as_str(), "codex.exe" | "codex")
+    {
+        return None;
+    }
     if matches!(file_name.as_str(), "codex.cmd" | "codex.ps1" | "codex") {
         if text.contains("windowsapps") && text.contains("openai.codex") {
             return None;
         }
         return Some(LaunchTarget::Cli);
     }
-    if file_name == "codex.exe" && text.contains("windowsapps") && text.contains("openai.codex") {
+    if file_name == "codex.exe"
+        && text.contains("windowsapps")
+        && text.contains("openai.codex")
+        && text.contains(r"\app\codex.exe")
+    {
         return Some(LaunchTarget::Desktop);
     }
     if file_name == "codex.exe" {
@@ -169,7 +179,7 @@ mod tests {
     fn detects_cli_and_desktop_from_known_windows_paths() {
         let targets = detect_targets_from_paths(&[
             r"C:\Users\tester\AppData\Roaming\npm\codex.cmd".into(),
-            r"C:\Program Files\WindowsApps\OpenAI.Codex_26.409.7971.0_x64__2p2nqsd0c76g0\app\resources\codex.exe".into(),
+            r"C:\Program Files\WindowsApps\OpenAI.Codex_26.409.7971.0_x64__2p2nqsd0c76g0\app\Codex.exe".into(),
         ]);
 
         assert!(targets
@@ -199,6 +209,15 @@ mod tests {
         ));
 
         assert_eq!(kind, Some(LaunchTarget::Desktop));
+    }
+
+    #[test]
+    fn ignores_windowsapps_resources_codex_exe_as_desktop() {
+        let kind = classify_codex_path(Path::new(
+            r"C:\Program Files\WindowsApps\OpenAI.Codex_26.415.1938.0_x64__2p2nqsd0c76g0\app\resources\codex.exe",
+        ));
+
+        assert_eq!(kind, None);
     }
 
     #[test]

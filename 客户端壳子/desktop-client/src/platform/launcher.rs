@@ -50,6 +50,29 @@ impl LaunchCommandSpec {
             null_stdio: true,
         }
     }
+
+    pub fn windows_store_entry(app_id: String) -> Self {
+        let script = format!(
+            "$target='shell:AppsFolder\\{app_id}'; Start-Process -FilePath $target -ErrorAction Stop | Out-Null"
+        );
+        Self {
+            program: OsString::from("powershell"),
+            args: vec![
+                OsString::from("-WindowStyle"),
+                OsString::from("Hidden"),
+                OsString::from("-NonInteractive"),
+                OsString::from("-NoProfile"),
+                OsString::from("-Command"),
+                OsString::from(script),
+            ],
+            envs: Vec::new(),
+            current_dir: None,
+            tracks_child_lifecycle: false,
+            windows_create_no_window: true,
+            windows_detach_process: false,
+            null_stdio: true,
+        }
+    }
 }
 
 pub fn validate_platform_launch_target(target: &InstalledTarget) -> Result<()> {
@@ -61,22 +84,8 @@ pub fn validate_platform_launch_target(target: &InstalledTarget) -> Result<()> {
 }
 
 pub fn official_launch_command(target: &InstalledTarget) -> LaunchCommandSpec {
-    if is_shell_appsfolder_target(target) {
-        let app_id = windows_store_app_id(target).expect("shell target must resolve app id");
-        return LaunchCommandSpec {
-            program: OsString::from("explorer.exe"),
-            args: vec![OsString::from(format!(r"shell:AppsFolder\{app_id}"))],
-            envs: Vec::new(),
-            current_dir: None,
-            tracks_child_lifecycle: false,
-            windows_create_no_window: false,
-            windows_detach_process: false,
-            null_stdio: true,
-        };
-    }
-
-    if is_windows_store_desktop_target(target) {
-        return LaunchCommandSpec::detached_gui(target.executable.clone());
+    if let Some(app_id) = windows_store_app_id(target) {
+        return LaunchCommandSpec::windows_store_entry(app_id);
     }
 
     let executable = target.executable.clone();
@@ -128,26 +137,7 @@ pub fn launch_official(target: &InstalledTarget) -> Result<()> {
 }
 
 pub fn platform_launch_command(target: &InstalledTarget, codex_home: &Path) -> LaunchCommandSpec {
-    let mut spec = if is_shell_appsfolder_target(target) {
-        let app_id = windows_store_app_id(target).expect("shell target must resolve app id");
-        LaunchCommandSpec {
-            program: OsString::from("cmd"),
-            args: vec![
-                OsString::from("/C"),
-                OsString::from("start"),
-                OsString::from(""),
-                OsString::from(format!(r"shell:AppsFolder\{app_id}")),
-            ],
-            envs: Vec::new(),
-            current_dir: None,
-            tracks_child_lifecycle: false,
-            windows_create_no_window: true,
-            windows_detach_process: false,
-            null_stdio: true,
-        }
-    } else {
-        official_launch_command(target)
-    };
+    let mut spec = official_launch_command(target);
     if !requires_user_home_injection(target) {
         spec.envs.push((
             OsString::from("CODEX_HOME"),
@@ -252,14 +242,6 @@ fn is_windows_store_desktop_target(target: &InstalledTarget) -> bool {
     windows_store_app_id(target).is_some()
 }
 
-fn is_shell_appsfolder_target(target: &InstalledTarget) -> bool {
-    target
-        .executable
-        .to_string_lossy()
-        .to_ascii_lowercase()
-        .starts_with(r"shell:appsfolder\")
-}
-
 #[cfg(windows)]
 fn windows_store_desktop_is_running() -> bool {
     let Ok(output) = Command::new("tasklist")
@@ -331,12 +313,28 @@ mod tests {
 
         let spec = official_launch_command(&target);
 
-        assert_eq!(
-            spec.program.to_string_lossy(),
-            r"C:\Program Files\WindowsApps\OpenAI.Codex_1.0.0.0_x64__2p2nqsd0c76g0\app\Codex.exe"
-        );
-        assert!(spec.tracks_child_lifecycle);
-        assert!(spec.windows_detach_process);
+        assert_eq!(spec.program.to_string_lossy(), "powershell");
+        assert!(!spec.tracks_child_lifecycle);
+        assert!(spec.windows_create_no_window);
+        assert!(spec.null_stdio);
+        assert!(spec.args.iter().any(|arg| {
+            arg.to_string_lossy()
+                .contains(r"shell:AppsFolder\OpenAI.Codex_2p2nqsd0c76g0!App")
+        }));
+    }
+
+    #[test]
+    fn official_launch_for_shell_appsfolder_target_uses_hidden_powershell() {
+        let target = InstalledTarget {
+            kind: LaunchTarget::Desktop,
+            executable: PathBuf::from(r"shell:AppsFolder\OpenAI.Codex_2p2nqsd0c76g0!App"),
+            display_name: "Codex Desktop".to_string(),
+        };
+
+        let spec = official_launch_command(&target);
+
+        assert_eq!(spec.program.to_string_lossy(), "powershell");
+        assert!(spec.windows_create_no_window);
         assert!(spec.null_stdio);
     }
 
@@ -351,16 +349,14 @@ mod tests {
         let runtime_home = PathBuf::from(r"D:\TokenClient\runtime\platform-desktop");
         let spec = platform_launch_command(&target, runtime_home.as_path());
 
-        assert_eq!(spec.program.to_string_lossy(), "cmd");
-        assert_eq!(spec.args[0].to_string_lossy(), "/C");
-        assert_eq!(spec.args[1].to_string_lossy(), "start");
-        assert_eq!(
-            spec.args[3].to_string_lossy(),
-            r"shell:AppsFolder\OpenAI.Codex_2p2nqsd0c76g0!App"
-        );
+        assert_eq!(spec.program.to_string_lossy(), "powershell");
         assert!(!spec.tracks_child_lifecycle);
         assert_eq!(spec.current_dir, None);
         assert!(spec.envs.is_empty());
+        assert!(spec.args.iter().any(|arg| {
+            arg.to_string_lossy()
+                .contains(r"shell:AppsFolder\OpenAI.Codex_2p2nqsd0c76g0!App")
+        }));
     }
 
     #[test]
@@ -376,12 +372,9 @@ mod tests {
         let runtime_home = PathBuf::from(r"D:\TokenClient\runtime\platform-desktop");
         let spec = platform_launch_command(&target, runtime_home.as_path());
 
-        assert_eq!(
-            spec.program.to_string_lossy(),
-            r"C:\Program Files\WindowsApps\OpenAI.Codex_26.415.4716.0_x64__2p2nqsd0c76g0\app\Codex.exe"
-        );
-        assert!(spec.tracks_child_lifecycle);
-        assert!(spec.windows_detach_process);
+        assert_eq!(spec.program.to_string_lossy(), "powershell");
+        assert!(!spec.tracks_child_lifecycle);
+        assert!(spec.windows_create_no_window);
         assert!(spec.null_stdio);
     }
 
