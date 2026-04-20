@@ -93,8 +93,12 @@ export component AppWindow inherits Window {
     in-out property <int> session-selected-group-index: 0;
     in-out property <[string]> session-entry-lines: ["暂无会话"];
     in-out property <int> session-selected-entry-index: 0;
+    in-out property <string> session-detail-title: "未选择会话";
+    in-out property <[string]> session-detail-lines: ["选择左侧会话后，可查看更详细的信息。"];
     in-out property <[string]> session-trash-lines: ["废纸篓为空"];
     in-out property <int> session-selected-trash-index: 0;
+    in-out property <string> session-trash-detail-title: "废纸篓摘要";
+    in-out property <[string]> session-trash-detail-lines: ["选择废纸篓会话后，可查看恢复前信息。"];
 
     callback refresh-installations-requested();
     callback launch-desktop-requested();
@@ -480,8 +484,12 @@ export component AppWindow inherits Window {
                 selected-group-index <=> root.session-selected-group-index;
                 session-lines: root.session-entry-lines;
                 selected-session-index <=> root.session-selected-entry-index;
+                session-detail-title: root.session-detail-title;
+                session-detail-lines: root.session-detail-lines;
                 trash-lines: root.session-trash-lines;
                 selected-trash-index <=> root.session-selected-trash-index;
+                trash-detail-title: root.session-trash-detail-title;
+                trash-detail-lines: root.session-trash-detail-lines;
                 refresh-requested => { root.session-refresh-requested(); }
                 sync-requested => { root.session-sync-requested(); }
                 repair-requested => { root.session-repair-requested(); }

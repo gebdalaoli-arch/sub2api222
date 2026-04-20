@@ -9,8 +9,12 @@ export component SessionManagerScreen inherits Rectangle {
     in-out property <int> selected-group-index: 0;
     in property <[string]> session-lines: ["暂无会话"];
     in-out property <int> selected-session-index: 0;
+    in property <string> session-detail-title: "未选择会话";
+    in property <[string]> session-detail-lines: ["选择左侧会话后，可查看更详细的信息。"];
     in property <[string]> trash-lines: ["废纸篓为空"];
     in-out property <int> selected-trash-index: 0;
+    in property <string> trash-detail-title: "废纸篓摘要";
+    in property <[string]> trash-detail-lines: ["选择废纸篓会话后，可查看恢复前信息。"];
 
     callback refresh-requested();
     callback sync-requested();
@@ -208,7 +212,7 @@ export component SessionManagerScreen inherits Rectangle {
         background: #f7f9fb;
         border-radius: 16px;
 
-        Text { x: 16px; y: 16px; text: "废纸篓"; color: #2c3437; font-size: 18px; font-weight: 800; }
+        Text { x: 16px; y: 16px; text: "详情与废纸篓"; color: #2c3437; font-size: 18px; font-weight: 800; }
 
         Button {
             x: parent.width - 108px;
@@ -219,9 +223,63 @@ export component SessionManagerScreen inherits Rectangle {
             clicked => { root.restore-selected-requested(); }
         }
 
+        Text {
+            x: 16px;
+            y: 58px;
+            text: root.session-detail-title;
+            color: #2c3437;
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        for line[index] in root.session-detail-lines : Rectangle {
+            x: 12px;
+            y: 86px + index * 52px;
+            width: parent.width - 24px;
+            height: 44px;
+            background: #ffffff;
+            border-radius: 12px;
+            Text {
+                x: 12px;
+                y: 10px;
+                width: parent.width - 24px;
+                text: line;
+                color: #596064;
+                font-size: 11px;
+                wrap: word-wrap;
+            }
+        }
+
+        Text {
+            x: 16px;
+            y: 302px;
+            text: root.trash-detail-title;
+            color: #2c3437;
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        for line[index] in root.trash-detail-lines : Rectangle {
+            x: 12px;
+            y: 330px + index * 52px;
+            width: parent.width - 24px;
+            height: 44px;
+            background: #ffffff;
+            border-radius: 12px;
+            Text {
+                x: 12px;
+                y: 10px;
+                width: parent.width - 24px;
+                text: line;
+                color: #596064;
+                font-size: 11px;
+                wrap: word-wrap;
+            }
+        }
+
         for line[index] in root.trash-lines : Rectangle {
             x: 12px;
-            y: 56px + index * 92px;
+            y: 502px + index * 92px;
             width: parent.width - 24px;
             height: 80px;
             trash-touch := TouchArea { clicked => { root.trash-selected(index); } }

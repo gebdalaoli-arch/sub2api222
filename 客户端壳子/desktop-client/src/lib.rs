@@ -137,9 +137,13 @@ mod tests {
             std::fs::read_to_string(manifest_dir.join("ui/screens/billing_detail.slint")).unwrap();
         let usage_detail =
             std::fs::read_to_string(manifest_dir.join("ui/screens/usage_detail.slint")).unwrap();
+        let session_manager =
+            std::fs::read_to_string(manifest_dir.join("ui/screens/session_manager.slint")).unwrap();
 
         assert!(app_window.contains("open-help-requested => { root.current-section = 4; }"));
         assert!(app_window.contains("announcement-touch"));
+        assert!(app_window.contains("SessionManagerScreen"));
+        assert!(app_window.contains("text: \"会话管理\""));
         assert!(login_scene.contains("announcement-touch"));
         assert!(!login_scene.contains("// Window: minimize"));
         assert!(!login_scene.contains("// Window: close"));
@@ -150,6 +154,10 @@ mod tests {
         assert!(billing_detail.contains("future-touch"));
         assert!(usage_detail.contains("property <length> list-height"));
         assert!(!usage_detail.contains("height: parent.height - 384px"));
+        assert!(session_manager.contains("同步会话"));
+        assert!(session_manager.contains("修复可见性"));
+        assert!(session_manager.contains("移到废纸篓"));
+        assert!(session_manager.contains("恢复"));
     }
 
     #[test]

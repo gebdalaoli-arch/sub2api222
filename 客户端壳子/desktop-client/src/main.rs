@@ -2925,8 +2925,12 @@ struct SessionManagerViewModel {
     selected_group_index: i32,
     session_lines: Vec<String>,
     selected_session_index: i32,
+    session_detail_title: String,
+    session_detail_lines: Vec<String>,
     trash_lines: Vec<String>,
     selected_trash_index: i32,
+    trash_detail_title: String,
+    trash_detail_lines: Vec<String>,
 }
 
 fn refresh_session_manager_state(app_state: &AppStateStore, session_manager: &SharedSessionManager) {
@@ -3003,10 +3007,8 @@ fn current_session_manager_vm(session_manager: &SharedSessionManager) -> Session
     let state = session_manager.lock().ok().map(|item| item.clone()).unwrap_or_default();
     let selected_group = state
         .groups
-        .get(state.selected_group_index.max(0) as usize)
-        .cloned();
+        .get(state.selected_group_index.max(0) as usize);
     let selected_session_index = selected_group
-        .as_ref()
         .and_then(|group| {
             state
                 .selected_session_id
@@ -3019,13 +3021,23 @@ fn current_session_manager_vm(session_manager: &SharedSessionManager) -> Session
                 })
         })
         .map(|index| index as i32)
-        .unwrap_or_else(|| if selected_group.as_ref().is_some_and(|group| !group.sessions.is_empty()) { 0 } else { -1 });
+        .unwrap_or_else(|| if selected_group.is_some_and(|group| !group.sessions.is_empty()) { 0 } else { -1 });
     let selected_trash_index = state
         .selected_trash_id
         .as_ref()
         .and_then(|selected| state.trash.iter().position(|item| item.session_id == *selected))
         .map(|index| index as i32)
         .unwrap_or_else(|| if state.trash.is_empty() { -1 } else { 0 });
+    let selected_session = selected_group.and_then(|group| {
+        group
+            .sessions
+            .get(selected_session_index.max(0) as usize)
+            .or_else(|| group.sessions.first())
+    });
+    let selected_trash = state
+        .trash
+        .get(selected_trash_index.max(0) as usize)
+        .or_else(|| state.trash.first());
 
     SessionManagerViewModel {
         home_count_text: state.homes.len().to_string(),
@@ -3065,12 +3077,24 @@ fn current_session_manager_vm(session_manager: &SharedSessionManager) -> Session
             })
             .unwrap_or_else(|| vec!["暂无会话".to_string()]),
         selected_session_index: selected_session_index.max(0),
+        session_detail_title: selected_session
+            .map(|session| session.title.clone())
+            .unwrap_or_else(|| "未选择会话".to_string()),
+        session_detail_lines: selected_session
+            .map(|session| build_session_detail_lines(session, state.token_stats.get(&session.session_id)))
+            .unwrap_or_else(|| vec!["选择左侧会话后，可查看更详细的信息。".to_string()]),
         trash_lines: if state.trash.is_empty() {
             vec!["废纸篓为空".to_string()]
         } else {
             state.trash.iter().map(format_trashed_session_line).collect()
         },
         selected_trash_index: selected_trash_index.max(0),
+        trash_detail_title: selected_trash
+            .map(|session| session.title.clone())
+            .unwrap_or_else(|| "废纸篓摘要".to_string()),
+        trash_detail_lines: selected_trash
+            .map(build_trash_detail_lines)
+            .unwrap_or_else(|| vec!["选择废纸篓会话后，可查看恢复前信息。".to_string()]),
     }
 }
 
@@ -3087,10 +3111,26 @@ fn apply_session_manager_state(app: &AppWindow, vm: &SessionManagerViewModel) {
         vm.session_lines.iter().cloned().map(SharedString::from).collect(),
     ));
     app.set_session_selected_entry_index(vm.selected_session_index);
+    app.set_session_detail_title(SharedString::from(vm.session_detail_title.clone()));
+    app.set_session_detail_lines(string_model(
+        vm.session_detail_lines
+            .iter()
+            .cloned()
+            .map(SharedString::from)
+            .collect(),
+    ));
     app.set_session_trash_lines(string_model(
         vm.trash_lines.iter().cloned().map(SharedString::from).collect(),
     ));
     app.set_session_selected_trash_index(vm.selected_trash_index);
+    app.set_session_trash_detail_title(SharedString::from(vm.trash_detail_title.clone()));
+    app.set_session_trash_detail_lines(string_model(
+        vm.trash_detail_lines
+            .iter()
+            .cloned()
+            .map(SharedString::from)
+            .collect(),
+    ));
 }
 
 fn format_session_group_line(group: &SessionGroup) -> String {
@@ -3149,6 +3189,50 @@ fn format_trashed_session_line(session: &TrashedSessionRecord) -> String {
         format_session_timestamp(session.deleted_at),
         if locations.is_empty() { session.cwd.clone() } else { locations }
     )
+}
+
+fn build_session_detail_lines(
+    session: &sub2api_desktop::platform::session_manager::SessionRecord,
+    stats: Option<&SessionTokenStats>,
+) -> Vec<String> {
+    let locations = session
+        .locations
+        .iter()
+        .map(|location| location.home_label.clone())
+        .collect::<Vec<_>>()
+        .join(" / ");
+    let token_line = stats
+        .map(|item| {
+            format!(
+                "Token：输入 {} · 输出 {} · 总计 {}",
+                format_large_count(item.input_tokens),
+                format_large_count(item.output_tokens),
+                format_large_count(item.total_tokens)
+            )
+        })
+        .unwrap_or_else(|| "Token：暂无统计".to_string());
+    vec![
+        format!("工作区：{}", session.cwd),
+        format!("会话 ID：{}", session.session_id),
+        format!("最近更新时间：{}", format_session_timestamp(session.updated_at)),
+        format!("分布位置：{}", if locations.is_empty() { "未知".to_string() } else { locations }),
+        token_line,
+    ]
+}
+
+fn build_trash_detail_lines(session: &TrashedSessionRecord) -> Vec<String> {
+    let locations = session
+        .locations
+        .iter()
+        .map(|location| location.home_label.clone())
+        .collect::<Vec<_>>()
+        .join(" / ");
+    vec![
+        format!("工作区：{}", session.cwd),
+        format!("会话 ID：{}", session.session_id),
+        format!("删除时间：{}", format_session_timestamp(session.deleted_at)),
+        format!("原始位置：{}", if locations.is_empty() { "未知".to_string() } else { locations }),
+    ]
 }
 
 fn resolve_session_group_label(cwd: &str) -> String {
