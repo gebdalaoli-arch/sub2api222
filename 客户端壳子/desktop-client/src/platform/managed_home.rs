@@ -43,6 +43,19 @@ fn user_auth_path(home_dir: &Path) -> PathBuf {
     home_dir.join("auth.json")
 }
 
+fn build_managed_auth_json(runtime_token: &str) -> JsonValue {
+    let mut auth = Map::new();
+    auth.insert(
+        "auth_mode".to_string(),
+        JsonValue::String("apikey".to_string()),
+    );
+    auth.insert(
+        "OPENAI_API_KEY".to_string(),
+        JsonValue::String(runtime_token.to_string()),
+    );
+    JsonValue::Object(auth)
+}
+
 fn backup_path(path: &Path) -> PathBuf {
     PathBuf::from(format!("{}.platform-backup", path.to_string_lossy()))
 }
@@ -178,21 +191,7 @@ pub fn inject_platform_config_into_user_home(
     fs::write(&config_path, toml::to_string_pretty(&config)?)?;
 
     let auth_path = user_auth_path(home_dir);
-    let mut auth = if auth_path.exists() {
-        serde_json::from_slice::<JsonValue>(&std::fs::read(&auth_path)?)
-            .unwrap_or_else(|_| JsonValue::Object(Map::new()))
-    } else {
-        JsonValue::Object(Map::new())
-    };
-
-    let auth_map = auth
-        .as_object_mut()
-        .ok_or_else(|| anyhow!("auth.json 不是有效的 object"))?;
-    auth_map.insert(
-        "OPENAI_API_KEY".to_string(),
-        JsonValue::String(runtime_token.to_string()),
-    );
-
+    let auth = build_managed_auth_json(runtime_token);
     fs::write(&auth_path, serde_json::to_vec_pretty(&auth)?)?;
     Ok(())
 }
@@ -230,10 +229,8 @@ pub fn write_platform_home(
         paths.codex_home.join("config.toml"),
         toml::to_string_pretty(&config)?,
     )?;
-    fs::write(
-        paths.codex_home.join("auth.json"),
-        format!("{{\"OPENAI_API_KEY\":\"{}\"}}\n", runtime_token),
-    )?;
+    let auth = build_managed_auth_json(runtime_token);
+    fs::write(paths.codex_home.join("auth.json"), serde_json::to_vec_pretty(&auth)?)?;
     Ok(())
 }
 
@@ -338,6 +335,7 @@ mod tests {
         assert!(config.contains("model_auto_compact_token_limit = 900000"));
         assert!(config.contains("base_url = \"http://127.0.0.1:8080/api/desktop/v1\""));
         assert!(auth.contains("runtime-token-abc"));
+        assert!(auth.contains("\"auth_mode\": \"apikey\""));
         assert!(!temp.path().join(".codex").exists());
     }
 
@@ -460,7 +458,9 @@ base_url = "https://old.example.com"
         assert!(injected_config.contains("enabled = true"));
         assert!(injected_config.contains("base_url = \"http://127.0.0.1:8080/api/desktop/v1\""));
         assert!(injected_auth.contains("runtime-token-abc"));
-        assert!(injected_auth.contains("\"other\": \"keep-me\""));
+        assert!(injected_auth.contains("\"auth_mode\": \"apikey\""));
+        assert!(!injected_auth.contains("old-token"));
+        assert!(!injected_auth.contains("\"other\": \"keep-me\""));
 
         restore_user_codex_config(&user_home).unwrap();
 

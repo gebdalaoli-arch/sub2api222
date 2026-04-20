@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::{
     ffi::OsString,
     path::{Path, PathBuf},
-    process::{Child, Command},
+    process::{Child, Command, Stdio},
 };
 
 use super::install_detection::InstalledTarget;
@@ -14,6 +14,9 @@ pub struct LaunchCommandSpec {
     pub envs: Vec<(OsString, OsString)>,
     pub current_dir: Option<PathBuf>,
     pub tracks_child_lifecycle: bool,
+    pub windows_create_no_window: bool,
+    pub windows_detach_process: bool,
+    pub null_stdio: bool,
 }
 
 pub const WINDOWS_STORE_DESKTOP_PLATFORM_UNSUPPORTED: &str =
@@ -28,6 +31,23 @@ impl LaunchCommandSpec {
             envs: Vec::new(),
             current_dir: None,
             tracks_child_lifecycle: true,
+            windows_create_no_window: false,
+            windows_detach_process: false,
+            null_stdio: false,
+        }
+    }
+
+    pub fn detached_gui(executable: PathBuf) -> Self {
+        let current_dir = executable.parent().map(PathBuf::from);
+        Self {
+            program: executable.into_os_string(),
+            args: Vec::new(),
+            envs: Vec::new(),
+            current_dir,
+            tracks_child_lifecycle: true,
+            windows_create_no_window: false,
+            windows_detach_process: true,
+            null_stdio: true,
         }
     }
 }
@@ -41,14 +61,22 @@ pub fn validate_platform_launch_target(target: &InstalledTarget) -> Result<()> {
 }
 
 pub fn official_launch_command(target: &InstalledTarget) -> LaunchCommandSpec {
-    if let Some(app_id) = windows_store_app_id(target) {
+    if is_shell_appsfolder_target(target) {
+        let app_id = windows_store_app_id(target).expect("shell target must resolve app id");
         return LaunchCommandSpec {
             program: OsString::from("explorer.exe"),
             args: vec![OsString::from(format!(r"shell:AppsFolder\{app_id}"))],
             envs: Vec::new(),
             current_dir: None,
             tracks_child_lifecycle: false,
+            windows_create_no_window: false,
+            windows_detach_process: false,
+            null_stdio: true,
         };
+    }
+
+    if is_windows_store_desktop_target(target) {
+        return LaunchCommandSpec::detached_gui(target.executable.clone());
     }
 
     let executable = target.executable.clone();
@@ -69,6 +97,9 @@ pub fn official_launch_command(target: &InstalledTarget) -> LaunchCommandSpec {
             envs: Vec::new(),
             current_dir: None,
             tracks_child_lifecycle: false,
+            windows_create_no_window: true,
+            windows_detach_process: false,
+            null_stdio: true,
         },
         Some("ps1") => LaunchCommandSpec {
             program: OsString::from("powershell"),
@@ -82,6 +113,9 @@ pub fn official_launch_command(target: &InstalledTarget) -> LaunchCommandSpec {
             envs: Vec::new(),
             current_dir: None,
             tracks_child_lifecycle: false,
+            windows_create_no_window: true,
+            windows_detach_process: false,
+            null_stdio: true,
         },
         _ => LaunchCommandSpec::direct(executable),
     }
@@ -94,7 +128,8 @@ pub fn launch_official(target: &InstalledTarget) -> Result<()> {
 }
 
 pub fn platform_launch_command(target: &InstalledTarget, codex_home: &Path) -> LaunchCommandSpec {
-    let mut spec = if let Some(app_id) = windows_store_app_id(target) {
+    let mut spec = if is_shell_appsfolder_target(target) {
+        let app_id = windows_store_app_id(target).expect("shell target must resolve app id");
         LaunchCommandSpec {
             program: OsString::from("cmd"),
             args: vec![
@@ -106,6 +141,9 @@ pub fn platform_launch_command(target: &InstalledTarget, codex_home: &Path) -> L
             envs: Vec::new(),
             current_dir: None,
             tracks_child_lifecycle: false,
+            windows_create_no_window: true,
+            windows_detach_process: false,
+            null_stdio: true,
         }
     } else {
         official_launch_command(target)
@@ -141,6 +179,31 @@ fn spawn_command(spec: LaunchCommandSpec) -> Result<Option<Child>> {
     }
     if let Some(current_dir) = spec.current_dir {
         command.current_dir(current_dir);
+    }
+    if spec.null_stdio {
+        command
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+
+        const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+        const DETACHED_PROCESS: u32 = 0x0000_0008;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+        let mut creation_flags = 0;
+        if spec.windows_create_no_window {
+            creation_flags |= CREATE_NO_WINDOW;
+        }
+        if spec.windows_detach_process {
+            creation_flags |= CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS;
+        }
+        if creation_flags != 0 {
+            command.creation_flags(creation_flags);
+        }
     }
     let child = command.spawn()?;
     if spec.tracks_child_lifecycle {
@@ -187,6 +250,14 @@ fn windows_store_app_id(target: &InstalledTarget) -> Option<String> {
 
 fn is_windows_store_desktop_target(target: &InstalledTarget) -> bool {
     windows_store_app_id(target).is_some()
+}
+
+fn is_shell_appsfolder_target(target: &InstalledTarget) -> bool {
+    target
+        .executable
+        .to_string_lossy()
+        .to_ascii_lowercase()
+        .starts_with(r"shell:appsfolder\")
 }
 
 #[cfg(windows)]
@@ -260,12 +331,13 @@ mod tests {
 
         let spec = official_launch_command(&target);
 
-        assert_eq!(spec.program.to_string_lossy(), "explorer.exe");
         assert_eq!(
-            spec.args[0].to_string_lossy(),
-            r"shell:AppsFolder\OpenAI.Codex_2p2nqsd0c76g0!App"
+            spec.program.to_string_lossy(),
+            r"C:\Program Files\WindowsApps\OpenAI.Codex_1.0.0.0_x64__2p2nqsd0c76g0\app\Codex.exe"
         );
-        assert!(!spec.tracks_child_lifecycle);
+        assert!(spec.tracks_child_lifecycle);
+        assert!(spec.windows_detach_process);
+        assert!(spec.null_stdio);
     }
 
     #[test]
@@ -289,6 +361,28 @@ mod tests {
         assert!(!spec.tracks_child_lifecycle);
         assert_eq!(spec.current_dir, None);
         assert!(spec.envs.is_empty());
+    }
+
+    #[test]
+    fn platform_launch_for_windows_store_desktop_bundle_prefers_gui_executable() {
+        let target = InstalledTarget {
+            kind: LaunchTarget::Desktop,
+            executable: PathBuf::from(
+                r"C:\Program Files\WindowsApps\OpenAI.Codex_26.415.4716.0_x64__2p2nqsd0c76g0\app\Codex.exe",
+            ),
+            display_name: "Codex Desktop".to_string(),
+        };
+
+        let runtime_home = PathBuf::from(r"D:\TokenClient\runtime\platform-desktop");
+        let spec = platform_launch_command(&target, runtime_home.as_path());
+
+        assert_eq!(
+            spec.program.to_string_lossy(),
+            r"C:\Program Files\WindowsApps\OpenAI.Codex_26.415.4716.0_x64__2p2nqsd0c76g0\app\Codex.exe"
+        );
+        assert!(spec.tracks_child_lifecycle);
+        assert!(spec.windows_detach_process);
+        assert!(spec.null_stdio);
     }
 
     #[test]
