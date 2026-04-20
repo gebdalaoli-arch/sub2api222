@@ -93,6 +93,14 @@ func ProvideAdminDesktopUpdateHandler(svc *service.DesktopUpdateService) *admin.
 	return admin.NewDesktopUpdateHandler(svc)
 }
 
+func ProvideAdminUserHandler(
+	adminService service.AdminService,
+	concurrencyService *service.ConcurrencyService,
+	tokenBillingService *service.ClientTokenBillingService,
+) *admin.UserHandler {
+	return admin.NewUserHandler(adminService, concurrencyService, tokenBillingService)
+}
+
 // ProvideHandlers creates the Handlers struct
 func ProvideHandlers(
 	authHandler *AuthHandler,
@@ -158,7 +166,7 @@ var ProviderSet = wire.NewSet(
 
 	// Admin handlers
 	admin.NewDashboardHandler,
-	admin.NewUserHandler,
+	ProvideAdminUserHandler,
 	admin.NewGroupHandler,
 	admin.NewAccountHandler,
 	admin.NewAnnouncementHandler,

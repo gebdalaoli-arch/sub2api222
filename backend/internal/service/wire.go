@@ -407,6 +407,17 @@ func ProvideClientTokenChannelResolver(channelService *ChannelService) ClientTok
 	return channelService
 }
 
+func ProvideBillingCacheService(
+	cache BillingCache,
+	userRepo UserRepository,
+	subRepo UserSubscriptionRepository,
+	apiKeyRepo APIKeyRepository,
+	cfg *config.Config,
+	tokenBillingService *ClientTokenBillingService,
+) *BillingCacheService {
+	return NewBillingCacheService(cache, userRepo, subRepo, apiKeyRepo, cfg, tokenBillingService)
+}
+
 // ProviderSet is the Wire provider set for all services
 var ProviderSet = wire.NewSet(
 	// Core services
@@ -425,7 +436,7 @@ var ProviderSet = wire.NewSet(
 	NewBillingService,
 	ProvideClientTokenChannelResolver,
 	NewClientTokenBillingService,
-	NewBillingCacheService,
+	ProvideBillingCacheService,
 	NewAnnouncementService,
 	NewAdminService,
 	NewGatewayService,

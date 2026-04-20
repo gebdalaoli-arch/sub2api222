@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/stretchr/testify/require"
 	"github.com/zeromicro/go-zero/core/collection"
 )
 
@@ -34,4 +36,13 @@ func TestProvideTimingWheelService_Success(t *testing.T) {
 		t.Fatalf("期望 svc 非空，但得到 nil")
 	}
 	svc.Stop()
+}
+
+func TestProvideBillingCacheServicePassesTokenBillingService(t *testing.T) {
+	tokenSvc := &ClientTokenBillingService{}
+
+	svc := ProvideBillingCacheService(nil, nil, nil, nil, &config.Config{}, tokenSvc)
+
+	require.NotNil(t, svc)
+	require.Same(t, tokenSvc, svc.tokenBillingService)
 }
