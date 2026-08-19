@@ -421,7 +421,11 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			if c != nil && c.Request != nil {
 				clientHeaders = c.Request.Header
 			}
-			fpIDs := resolveCodexFingerprintIDsFromRequest(account, clientHeaders)
+			scope := ""
+			if c != nil && c.Request != nil {
+				scope = HTTPUpstreamIsolationScopeFromContext(c.Request.Context())
+			}
+			fpIDs := resolveCodexFingerprintIDsFromRequestWithScope(account, clientHeaders, scope)
 			if fpIDs != nil {
 				if applyCodexFingerprintClientMetadata(decoded, fpIDs) {
 					markDecodedModified()

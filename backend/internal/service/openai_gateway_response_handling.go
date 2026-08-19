@@ -1136,7 +1136,7 @@ func (s *OpenAIGatewayService) bindHTTPResponseAccount(ctx context.Context, c *g
 	}
 	groupID := getOpenAIGroupIDFromContext(c)
 	ttl := s.openAIWSResponseStickyTTL()
-	logOpenAIWSBindResponseAccountWarn(groupID, account.ID, responseID, store.BindResponseAccount(ctx, groupID, responseID, account.ID, ttl))
+	logOpenAIWSBindResponseAccountWarn(groupID, account.ID, responseID, store.BindResponseAccount(ctx, groupID, scopedOpenAIWSStateKey(ctx, responseID), account.ID, ttl))
 }
 
 func openAIUsageFromGJSON(value gjson.Result) (OpenAIUsage, bool) {

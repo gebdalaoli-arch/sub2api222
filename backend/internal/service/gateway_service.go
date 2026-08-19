@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 	"unsafe"
@@ -282,11 +283,35 @@ func redactAuthHeaderValue(v string) string {
 func safeHeaderValueForLog(key string, v string) string {
 	key = strings.ToLower(strings.TrimSpace(key))
 	switch key {
-	case "authorization", "x-api-key":
+	case "authorization",
+		"x-api-key",
+		"api-key",
+		"x-goog-api-key",
+		"x-access-token",
+		"x-auth-token",
+		"proxy-authorization",
+		"cookie",
+		"set-cookie":
 		return redactAuthHeaderValue(v)
-	default:
-		return strings.TrimSpace(v)
+	case "baggage",
+		"session_id",
+		"tracestate",
+		"traceparent",
+		"x-request-id",
+		"conversation_id",
+		"x-correlation-id",
+		"x-codex-window-id",
+		"x-codex-turn-state",
+		"x-client-request-id",
+		"x-codex-turn-metadata",
+		"x-codex-installation-id",
+		"x-claude-code-session-id":
+		return "[redacted]"
 	}
+	if strings.Contains(key, "secret") || strings.Contains(key, "token") || strings.HasSuffix(key, "-key") {
+		return "[redacted]"
+	}
+	return strings.TrimSpace(v)
 }
 
 func extractSystemPreviewFromBody(body []byte) string {
@@ -760,6 +785,7 @@ type GatewayService struct {
 	resolver              *ModelPricingResolver
 	compositeResolver     *CompositeRouteResolver
 	debugGatewayBodyFile  atomic.Pointer[os.File] // non-nil when SUB2API_DEBUG_GATEWAY_BODY is set
+	debugGatewayBodyMu    sync.Mutex
 	tlsFPProfileService   *TLSFingerprintProfileService
 	balanceNotifyService  *BalanceNotifyService
 	userPlatformQuotaRepo UserPlatformQuotaRepository
@@ -1496,10 +1522,13 @@ func (s *GatewayService) initDebugGatewayBodyFile(path string) {
 		}
 	}
 
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 	if err != nil {
 		slog.Error("failed to open gateway debug log file", "path", path, "error", err)
 		return
+	}
+	if err := f.Chmod(0600); err != nil {
+		slog.Warn("failed to restrict gateway debug log permissions", "path", path, "error", err)
 	}
 	s.debugGatewayBodyFile.Store(f)
 	slog.Info("gateway debug logging enabled", "path", path)
@@ -1559,6 +1588,8 @@ func (s *GatewayService) debugLogGatewaySnapshot(tag string, headers http.Header
 		}
 	}
 
-	// 写入文件（调试用，并发写入可能交错但不影响可读性）
+	// 写入文件
+	s.debugGatewayBodyMu.Lock()
+	defer s.debugGatewayBodyMu.Unlock()
 	_, _ = f.WriteString(buf.String())
 }

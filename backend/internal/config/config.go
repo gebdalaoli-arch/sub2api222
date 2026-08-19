@@ -904,6 +904,8 @@ type GatewayConfig struct {
 	GeminiDebugResponseHeaders bool `mapstructure:"gemini_debug_response_headers"`
 	// ConnectionPoolIsolation: 上游连接池隔离策略（proxy/account/account_proxy）
 	ConnectionPoolIsolation string `mapstructure:"connection_pool_isolation"`
+	// OutboundPrivacy: 上游请求隐私保护配置。
+	OutboundPrivacy GatewayOutboundPrivacyConfig `mapstructure:"outbound_privacy"`
 	// ForceCodexCLI: 强制将 OpenAI `/v1/responses` 请求按 Codex CLI 处理。
 	// 用于网关未透传/改写 User-Agent 时的兼容兜底（默认关闭，避免影响其他客户端）。
 	ForceCodexCLI bool `mapstructure:"force_codex_cli"`
@@ -1025,6 +1027,12 @@ type GatewayConfig struct {
 
 	// Grok: Grok/xAI gateway scheduling and free-tier soft-gate settings.
 	Grok GatewayGrokConfig `mapstructure:"grok"`
+}
+
+type GatewayOutboundPrivacyConfig struct {
+	Enabled                bool     `mapstructure:"enabled"`
+	StrictAccountIsolation bool     `mapstructure:"strict_account_isolation"`
+	PreserveHeaders        []string `mapstructure:"preserve_headers"`
 }
 
 // GatewayGrokConfig holds Grok-specific gateway scheduling knobs.
@@ -2368,6 +2376,9 @@ func setDefaults() {
 	viper.SetDefault("gateway.proxy_probe_response_read_max_bytes", int64(1024*1024))
 	viper.SetDefault("gateway.gemini_debug_response_headers", false)
 	viper.SetDefault("gateway.connection_pool_isolation", ConnectionPoolIsolationAccountProxy)
+	viper.SetDefault("gateway.outbound_privacy.enabled", true)
+	viper.SetDefault("gateway.outbound_privacy.strict_account_isolation", true)
+	viper.SetDefault("gateway.outbound_privacy.preserve_headers", []string{})
 	// HTTP 上游连接池配置（针对 5000+ 并发用户优化）
 	viper.SetDefault("gateway.max_idle_conns", 2560)          // 最大空闲连接总数（高并发场景可调大）
 	viper.SetDefault("gateway.max_idle_conns_per_host", 120)  // 每主机最大空闲连接（HTTP/2 场景默认）
