@@ -53,7 +53,7 @@ func applyStagedCodexFingerprintHeaders(c *gin.Context, account *Account, h http
 	applyCodexFingerprintHeaders(h, stagedCodexFingerprintIDs(c, account))
 }
 
-func applyStagedCodexFingerprintClientMetadata(c *gin.Context, account *Account, reqBody map[string]any) bool {
+func applyStagedCodexFingerprintClientMetadata(c *gin.Context, account *Account, reqBody map[string]any) bool { //nolint:unused
 	return applyCodexFingerprintClientMetadata(reqBody, stagedCodexFingerprintIDs(c, account))
 }
 
@@ -97,11 +97,11 @@ func canonicalCodexFingerprintSeed(value any) (string, bool) {
 	return trimmed, true
 }
 
-func newCodexFingerprintSeed() string {
+func newCodexFingerprintSeed() string { //nolint:unused
 	return uuid.NewString()
 }
 
-func stripCodexFingerprintSeed(extra map[string]any) map[string]any {
+func stripCodexFingerprintSeed(extra map[string]any) map[string]any { //nolint:unused
 	if extra == nil {
 		return nil
 	}
@@ -139,7 +139,7 @@ func codexFingerprintSeed(extra map[string]any) (string, bool) {
 	return canonicalCodexFingerprintSeed(extra[codexFingerprintSeedExtraKey])
 }
 
-func prepareCodexFingerprintExtraForCreate(platform, accountType string, extra map[string]any) map[string]any {
+func prepareCodexFingerprintExtraForCreate(platform, accountType string, extra map[string]any) map[string]any { //nolint:unused
 	prepared := stripCodexFingerprintSeed(extra)
 	if platform != PlatformOpenAI || accountType != AccountTypeOAuth || !codexFingerprintModeRequiresSeed(codexFingerprintModeFromExtra(prepared)) {
 		return prepared
@@ -151,7 +151,7 @@ func prepareCodexFingerprintExtraForCreate(platform, accountType string, extra m
 	return prepared
 }
 
-func prepareCodexFingerprintExtraForUpdate(account *Account, extra map[string]any) map[string]any {
+func prepareCodexFingerprintExtraForUpdate(account *Account, extra map[string]any) map[string]any { //nolint:unused
 	prepared := stripCodexFingerprintSeed(extra)
 	if account == nil || account.Platform != PlatformOpenAI || account.Type != AccountTypeOAuth {
 		return prepared
@@ -172,7 +172,7 @@ func prepareCodexFingerprintExtraForUpdate(account *Account, extra map[string]an
 	return prepared
 }
 
-func sanitizedCodexFingerprintExtraUpdates(updates map[string]any) map[string]any {
+func sanitizedCodexFingerprintExtraUpdates(updates map[string]any) map[string]any { //nolint:unused
 	if updates == nil {
 		return nil
 	}

@@ -1261,7 +1261,7 @@ func (p *openAIWSConnPool) recordLastSuccessfulAcquireForKey(poolKey openAIWSAcc
 	ap.mu.Unlock()
 }
 
-func (p *openAIWSConnPool) recordLastSuccessfulAcquire(accountID int64, generation uint64, req openAIWSAcquireRequest) {
+func (p *openAIWSConnPool) recordLastSuccessfulAcquire(accountID int64, generation uint64, req openAIWSAcquireRequest) { //nolint:unused
 	p.recordLastSuccessfulAcquireForKey(newOpenAIWSAccountPoolKey(accountID, ""), generation, req)
 }
 
@@ -1372,7 +1372,7 @@ func (p *openAIWSConnPool) notifyAccountPoolChangedForKey(poolKey openAIWSAccoun
 	ap.mu.Unlock()
 }
 
-func (p *openAIWSConnPool) notifyAccountPoolChanged(accountID int64) {
+func (p *openAIWSConnPool) notifyAccountPoolChanged(accountID int64) { //nolint:unused
 	p.notifyAccountPoolChangedForKey(newOpenAIWSAccountPoolKey(accountID, ""))
 }
 

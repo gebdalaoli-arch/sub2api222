@@ -534,7 +534,7 @@ func isSupportedGrokCLIVersion(version string) bool {
 }
 
 // acquireClientWithTLS 获取或创建带 TLS 指纹的客户端
-func (s *httpUpstreamService) acquireClientWithTLS(proxyURL string, accountID int64, accountConcurrency int, profile *tlsfingerprint.Profile, upstreamProfile service.HTTPUpstreamProfile) (*upstreamClientEntry, error) {
+func (s *httpUpstreamService) acquireClientWithTLS(proxyURL string, accountID int64, accountConcurrency int, profile *tlsfingerprint.Profile, upstreamProfile service.HTTPUpstreamProfile) (*upstreamClientEntry, error) { //nolint:unused
 	return s.getClientEntryWithTLS(proxyURL, accountID, accountConcurrency, profile, upstreamProfile, true, true)
 }
 
@@ -1016,7 +1016,7 @@ func sanitizeOutboundHeaders(headers http.Header, preserve map[string]struct{}) 
 					break
 				}
 			}
-			if !strip { continue }
+			if !strip { continue } //nolint:gofmt
 		}
 		delete(headers, name)
 		strippedSet[normalized] = struct{}{}
